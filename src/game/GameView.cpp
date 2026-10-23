@@ -40,144 +40,286 @@ void OvalFrustum(MeshBuilder& b, Vec3 base, float r0, float r1, float h, float z
   b.Pop();
 }
 
+// Mehrere elliptische Querschnitte mit weichen Normalen: Stoff folgt dem Körper statt einer Röhre.
+struct BodyRing { float y, x, z, offsetZ = 0; };
+void TailoredForm(MeshBuilder& b, std::initializer_list<BodyRing> profile, int segs = 20) {
+  std::vector<BodyRing> rings(profile);
+  const Mat4 inv = Inverse(b.Xf());
+  auto point = [&](int j, float a) {
+    const auto& q = rings[j];
+    return Vec3(cosf(a) * q.x, q.y, sinf(a) * q.z + q.offsetZ);
+  };
+  auto normal = [&](int j, float a) {
+    Vec3 vertical = point(std::min(j + 1, (int)rings.size() - 1), a) - point(std::max(j - 1, 0), a);
+    Vec3 tangent(-sinf(a) * rings[j].x, 0, cosf(a) * rings[j].z);
+    Vec3 n = Normalize(Cross(vertical, tangent));
+    return Normalize(Vec3(inv.m[0] * n.x + inv.m[1] * n.y + inv.m[2] * n.z,
+                          inv.m[4] * n.x + inv.m[5] * n.y + inv.m[6] * n.z,
+                          inv.m[8] * n.x + inv.m[9] * n.y + inv.m[10] * n.z));
+  };
+  for (int j = 0; j + 1 < (int)rings.size(); j++) {
+    for (int i = 0; i < segs; i++) {
+      float a = TAU * i / segs, c = TAU * (i + 1) / segs;
+      size_t first = b.Target()->verts.size();
+      b.Quad(point(j, a), point(j + 1, a), point(j + 1, c), point(j, c));
+      Vec3 ns[] = {normal(j, a), normal(j + 1, a), normal(j + 1, c), normal(j, c)};
+      for (int k = 0; k < 4; k++) b.Target()->verts[first + k].normal = ns[k];
+    }
+  }
+  for (int j : {0, (int)rings.size() - 1}) {
+    Vec3 center(0, rings[j].y, rings[j].offsetZ);
+    for (int i = 0; i < segs; i++) {
+      Vec3 a = point(j, TAU * i / segs), c = point(j, TAU * (i + 1) / segs);
+      if (j == 0) b.Tri(center, a, c);
+      else b.Tri(center, c, a);
+    }
+  }
+}
+
+// Abgeschrägte Kanten für Schutzausrüstung und Taschen.
+void GearPanel(MeshBuilder& b, Vec3 mn, Vec3 mx, float cut) {
+  cut = std::min(cut, std::min(mx.x - mn.x, mx.y - mn.y) * 0.3f);
+  std::vector<Vec2> p = {{mn.x + cut, mn.y}, {mx.x - cut, mn.y}, {mx.x, mn.y + cut},
+                         {mx.x, mx.y - cut}, {mx.x - cut, mx.y}, {mn.x + cut, mx.y},
+                         {mn.x, mx.y - cut}, {mn.x, mn.y + cut}};
+  ExtrudeConvex(b, p, mn.z, mx.z);
+}
+
 void BuildMeshes(Mesh& torso, Mesh& head, Mesh& thigh, Mesh& shin, Mesh& upperArm, Mesh& foreArm, Mesh& smg3p, Mesh& shotgun3p,
                  Mesh& grenade) {
-  const u32 uniform = 0x1f2a44, uniformD = 0x18213a, vest = 0x2a3142, vestL = 0x353d50, black = 0x141518, skin = 0xd9a684;
-  const u32 hiVis = 0xd8e030;
+  const u32 uniform = 0x39495d, uniformD = 0x283647, vest = 0x343d3e, vestL = 0x505c5b;
+  const u32 black = 0x191d22, skin = 0xc99573, hiVis = 0xe8c454;
   MeshData d;
   MeshBuilder b(&d);
 
-  // --- Oberschenkel (Hüfte im Ursprung, nach unten) ---
+  // --- Cargo-Hose: kräftiger Oberschenkel, Stofffalten und separate Knieschale ---
   b.Mat(MAT_FABRIC); b.ColorHex(uniform);
-  b.Ellipsoid({0, -0.02f, 0}, {0.09f, 0.08f, 0.095f}, 12, 6);
-  b.Frustum({0, -kThigh, 0}, 0.07f, 0.088f, kThigh, 12);
-  b.ColorHex(uniformD);  // Beintasche außen
-  b.Box({-0.095f, -0.3f, -0.05f}, {0.095f, -0.17f, 0.04f});
-  b.Mat(MAT_PLASTIC); b.ColorHex(black);  // Knieschoner
-  b.Ellipsoid({0, -kThigh + 0.005f, -0.05f}, {0.062f, 0.07f, 0.035f}, 10, 6);
+  TailoredForm(b, {{-kThigh, .076f, .079f}, {-.34f, .088f, .09f, .006f},
+                  {-.22f, .108f, .106f, .012f}, {-.08f, .114f, .109f}, {.035f, .09f, .09f}});
+  b.ColorHex(uniformD);
+  for (float side : {-1.0f, 1.0f}) {
+    b.Push(Translation({side * .093f, -.205f, .005f}) * RotationY(side * PI * .5f));
+    GearPanel(b, {-.055f, -.08f, -.014f}, {.055f, .08f, .018f}, .016f);
+    b.ColorHex(0x475567);
+    GearPanel(b, {-.056f, .038f, .019f}, {.056f, .075f, .027f}, .009f);
+    b.ColorHex(uniformD);
+    b.Pop();
+  }
+  b.ColorHex(0x465467);
+  Limb(b, {-.07f, -.33f, -.06f}, {.055f, -.31f, -.065f}, .006f, .004f, 8);
+  b.Mat(MAT_LEATHER); b.ColorHex(black);
+  OvalFrustum(b, {0, -.385f, 0}, .084f, .084f, .036f, 1.0f);
+  b.ColorHex(0x383d43);
+  GearPanel(b, {-.069f, -.435f, -.101f}, {.069f, -.313f, -.067f}, .026f);
+  b.ColorHex(0x4d535a);
+  GearPanel(b, {-.045f, -.412f, -.108f}, {.045f, -.335f, -.1f}, .019f);
   thigh.Upload(d);
   d.Clear();
 
-  // --- Unterschenkel mit Stiefel (Knie im Ursprung, Sohle bei -0.47) ---
+  // --- Wade mit Falten am Stiefelschaft, geformtem Fuß und Profilsohle ---
   b.Mat(MAT_FABRIC); b.ColorHex(uniform);
-  b.Ellipsoid({0, 0, 0}, {0.07f, 0.05f, 0.07f}, 10, 5);
-  b.Frustum({0, -0.36f, 0}, 0.058f, 0.07f, 0.36f, 12);
-  b.Mat(MAT_LEATHER); b.ColorHex(black);
-  b.Frustum({0, -0.44f, 0}, 0.066f, 0.062f, 0.13f, 12);              // Schaft
-  b.Ellipsoid({0, -0.43f, -0.06f}, {0.066f, 0.045f, 0.125f}, 12, 6);  // Fuß
-  b.ColorHex(0x0b0b0c);
-  b.Box({-0.068f, -0.47f, -0.19f}, {0.068f, -0.44f, 0.075f});        // Sohle
+  TailoredForm(b, {{-.34f, .067f, .066f}, {-.285f, .075f, .075f, .008f},
+                  {-.18f, .086f, .094f, .017f}, {-.07f, .081f, .083f, .009f}, {.025f, .073f, .075f},
+                  {.05f, .045f, .046f}, {.06f, .012f, .012f}});
+  b.ColorHex(uniformD);
+  OvalFrustum(b, {0, -.3f, .006f}, .076f, .072f, .022f, 1.0f);
+  b.Mat(MAT_LEATHER); b.ColorHex(0x24272a);
+  TailoredForm(b, {{-.443f, .076f, .137f, -.05f}, {-.419f, .079f, .133f, -.05f},
+                  {-.379f, .073f, .115f, -.04f}, {-.345f, .068f, .076f, -.009f},
+                  {-.285f, .067f, .069f}, {-.27f, .065f, .067f}});
+  b.ColorHex(0x34373a);
+  b.Ellipsoid({0, -.405f, -.12f}, {.072f, .031f, .069f}, 16, 7);
+  b.ColorHex(0x171a1d);
+  TailoredForm(b, {{-.47f, .075f, .137f, -.051f}, {-.46f, .082f, .144f, -.051f},
+                  {-.439f, .082f, .144f, -.051f}, {-.434f, .075f, .137f, -.051f}});
+  b.ColorHex(0x54565a);
+  for (int i = 0; i < 4; i++) {
+    float y = -.325f - i * .018f, z = -.07f - i * .012f;
+    Limb(b, {-.028f, y, z}, {.028f, y - .01f, z - .008f}, .003f, .003f, 6);
+    Limb(b, {.028f, y, z}, {-.028f, y - .01f, z - .008f}, .003f, .003f, 6);
+  }
   shin.Upload(d);
   d.Clear();
 
-  // --- Rumpf (Hüfte im Ursprung, Hals bei 0.56) ---
+  // --- Rumpf: Taille, Brust und Schulterlinie mit eng sitzendem Plattenträger ---
   b.Mat(MAT_FABRIC); b.ColorHex(uniform);
-  OvalFrustum(b, {0, 0, 0}, 0.165f, 0.16f, 0.16f, 0.72f);         // Becken
-  OvalFrustum(b, {0, 0.15f, 0}, 0.16f, 0.215f, 0.33f, 0.62f);     // Brustkorb
-  b.Ellipsoid({0, 0.48f, 0}, {0.235f, 0.08f, 0.13f}, 16, 7);      // Schultern
+  TailoredForm(b, {{-.035f, .151f, .113f, .008f}, {.06f, .176f, .125f, .008f},
+                  {.16f, .164f, .114f}, {.28f, .193f, .135f}, {.41f, .23f, .141f},
+                  {.48f, .235f, .129f}, {.525f, .17f, .105f}, {.55f, .075f, .065f}});
   b.Mat(MAT_LEATHER); b.ColorHex(black);
-  OvalFrustum(b, {0, 0.12f, 0}, 0.172f, 0.172f, 0.055f, 0.74f);   // Gürtel
-  b.Mat(MAT_GOLD); b.ColorHex(0xb0b4b8);
-  b.Box({-0.028f, 0.128f, -0.135f}, {0.028f, 0.168f, -0.122f});   // Schnalle
-  b.Mat(MAT_LEATHER); b.ColorHex(0x1d1e22);
-  b.Box({0.15f, 0.02f, -0.06f}, {0.2f, 0.17f, 0.05f});            // Holster
-  b.Box({-0.19f, 0.06f, -0.03f}, {-0.155f, 0.15f, 0.06f});        // Gürteltasche
-  // Plattenträger: Bauchband, Front- und Rückenplatte, Schultergurte
+  OvalFrustum(b, {0, .115f, 0}, .181f, .18f, .046f, .73f);
+  b.Mat(MAT_METAL); b.ColorHex(0x757d80);
+  GearPanel(b, {-.028f, .12f, -.139f}, {.028f, .153f, -.131f}, .007f);
   b.Mat(MAT_FABRIC); b.ColorHex(vest);
-  OvalFrustum(b, {0, 0.19f, 0}, 0.2f, 0.208f, 0.17f, 0.66f);
-  b.Box({-0.17f, 0.19f, -0.165f}, {0.17f, 0.47f, -0.1f});
-  b.Box({-0.17f, 0.19f, 0.1f}, {0.17f, 0.47f, 0.16f});
-  for (float sx : {-1.0f, 1.0f}) b.Box({sx > 0 ? 0.08f : -0.15f, 0.45f, -0.14f}, {sx > 0 ? 0.15f : -0.08f, 0.545f, 0.14f});
-  // Magazintaschen vorn, Funkgerät links
+  OvalFrustum(b, {0, .185f, 0}, .207f, .226f, .17f, .68f);
+  std::vector<Vec2> plate = {{-.148f, .185f}, {.148f, .185f}, {.179f, .225f}, {.179f, .392f},
+                             {.125f, .482f}, {-.125f, .482f}, {-.179f, .392f}, {-.179f, .225f}};
+  ExtrudeConvex(b, plate, -.174f, -.12f);
+  ExtrudeConvex(b, plate, .113f, .169f);
+  b.ColorHex(vestL);
+  for (float side : {-1.0f, 1.0f}) {
+    b.Push(Translation({side * .123f, 0, 0}));
+    GearPanel(b, {-.033f, .44f, -.153f}, {.033f, .53f, .14f}, .015f);
+    b.Mat(MAT_PLASTIC); b.ColorHex(black);
+    GearPanel(b, {-.023f, .448f, -.166f}, {.023f, .48f, -.152f}, .005f);
+    b.Pop();
+    b.Mat(MAT_FABRIC); b.ColorHex(vestL);
+  }
+  // Nähte und MOLLE-Gurte geben der Weste eine lesbare Struktur.
+  b.ColorHex(0x65706b);
+  for (float y : {.227f, .269f, .31f}) {
+    for (int i = 0; i < 6; i++) {
+      float x = -.146f + i * .05f;
+      b.Box({x, y, .17f}, {x + .04f, y + .014f, .177f});
+    }
+  }
   b.ColorHex(vestL);
   for (int i = 0; i < 3; i++) {
-    float x0 = -0.13f + i * 0.09f;
-    b.Box({x0, 0.2f, -0.205f}, {x0 + 0.075f, 0.32f, -0.16f});
-    b.ColorHex(0x2f3646);
-    b.Box({x0 - 0.002f, 0.29f, -0.209f}, {x0 + 0.077f, 0.325f, -0.2f});  // Klappe
+    float x = -.137f + i * .092f;
+    GearPanel(b, {x, .202f, -.228f}, {x + .081f, .335f, -.171f}, .014f);
+    b.ColorHex(0x65706b);
+    GearPanel(b, {x + .003f, .306f, -.234f}, {x + .078f, .345f, -.224f}, .008f);
     b.ColorHex(vestL);
   }
-  b.Box({-0.15f, 0.34f, -0.2f}, {-0.07f, 0.44f, -0.16f});
+  // Funkgerät, Kabel und seitliche Utility-Taschen.
   b.Mat(MAT_PLASTIC); b.ColorHex(black);
-  b.Box({-0.14f, 0.35f, -0.215f}, {-0.08f, 0.43f, -0.2f});
-  b.Cylinder({-0.09f, 0.43f, -0.19f}, 0.006f, 0.12f, 6);           // Antenne
-  // Reflexstreifen rundum und Schriftzug auf dem Rücken
-  b.Mat(MAT_PLASTIC); b.ColorHex(hiVis); b.Emissive(0.12f);
-  OvalFrustum(b, {0, 0.255f, 0}, 0.212f, 0.212f, 0.03f, 0.67f);
-  b.Box({-0.17f, 0.44f, -0.169f}, {0.17f, 0.455f, -0.164f});
-  b.Push(Translation({-PixelTextWidth("SUCHER", 0.0095f) * 0.5f, 0.33f, 0.161f}));
-  BuildPixelText(b, "SUCHER", 0.0095f, 0.004f);
+  GearPanel(b, {-.164f, .348f, -.208f}, {-.087f, .44f, -.172f}, .008f);
+  b.Cylinder({-.098f, .438f, -.185f}, .005f, .105f, 8);
+  b.ColorHex(0x738377);
+  b.Box({-.151f, .388f, -.211f}, {-.111f, .414f, -.207f});
+  b.ColorHex(0x171c20);
+  for (int i = 0; i < 4; i++) b.Box({-.152f, .358f + i * .006f, -.211f}, {-.105f, .36f + i * .006f, -.207f});
+  Limb(b, {-.15f, .425f, -.19f}, {-.174f, .505f, -.09f}, .006f, .006f, 8);
+  b.Mat(MAT_FABRIC); b.ColorHex(vest);
+  GearPanel(b, {.164f, .03f, -.064f}, {.224f, .19f, .068f}, .018f);
+  GearPanel(b, {-.221f, .065f, -.06f}, {-.165f, .19f, .07f}, .018f);
+  // Rückenpatch, kleine reflektierende Markierungen und Brustabzeichen.
+  b.ColorHex(0x20292c);
+  GearPanel(b, {-.15f, .345f, .17f}, {.15f, .445f, .18f}, .012f);
+  b.Mat(MAT_PLAIN); b.ColorHex(0xe8e3ce);
+  b.Push(Translation({-PixelTextWidth("SUCHER", .0078f) * .5f, .365f, .181f}));
+  BuildPixelText(b, "SUCHER", .0078f, .002f);
   b.Pop();
-  b.Emissive(0);
-  b.Mat(MAT_PLASTIC); b.ColorHex(skin);
-  b.Cylinder({0, 0.5f, 0}, 0.052f, 0.09f, 10);                    // Hals
+  b.ColorHex(hiVis);
+  for (float side : {-1.0f, 1.0f}) {
+    b.Box({side * .128f - .025f, .424f, -.177f}, {side * .128f + .025f, .437f, -.173f});
+    b.Box({side * .128f - .022f, .327f, .171f}, {side * .128f + .022f, .339f, .178f});
+  }
+  b.Push(Translation({.079f, .383f, -.179f}) * RotationY(PI));
+  GearPanel(b, {-.033f, -.024f, 0}, {.033f, .024f, .003f}, .009f);
+  b.ColorHex(0x29343b);
+  b.Push(Translation({-PixelTextWidth("K", .005f) * .5f, -.0175f, .004f}));
+  BuildPixelText(b, "K", .005f, .001f);
+  b.Pop(); b.Pop();
+  // Hoher weicher Kragen schließt den Übergang zum Kopf.
+  b.Mat(MAT_FABRIC); b.ColorHex(uniformD);
+  OvalFrustum(b, {0, .505f, .005f}, .09f, .074f, .065f, .85f);
+  b.Mat(MAT_PLAIN); b.ColorHex(skin);
+  b.Cylinder({0, .54f, .006f}, .059f, .052f, 16);
   torso.Upload(d);
   d.Clear();
 
-  // --- Kopf (Halsansatz im Ursprung) ---
-  b.Mat(MAT_PLASTIC); b.ColorHex(skin);
-  b.Cylinder({0, 0, 0.005f}, 0.05f, 0.08f, 10);
-  b.Ellipsoid({0, 0.165f, 0}, {0.094f, 0.118f, 0.104f}, 16, 10);
-  b.Ellipsoid({0, 0.1f, -0.03f}, {0.074f, 0.058f, 0.074f}, 12, 6);   // Kiefer
-  b.Ellipsoid({0, 0.152f, -0.102f}, {0.016f, 0.027f, 0.02f}, 8, 5);  // Nase
-  for (float sx : {-1.0f, 1.0f}) b.Ellipsoid({sx * 0.093f, 0.158f, 0.0f}, {0.014f, 0.03f, 0.022f}, 8, 5);  // Ohren
-  b.ColorHex(0xf2f0ea);
-  for (float sx : {-1.0f, 1.0f}) b.Ellipsoid({sx * 0.034f, 0.178f, -0.086f}, {0.017f, 0.011f, 0.01f}, 8, 5);
-  b.ColorHex(0x26201c);
-  for (float sx : {-1.0f, 1.0f}) b.Sphere({sx * 0.034f, 0.178f, -0.095f}, 0.0072f, 8, 5);
-  b.ColorHex(0x3a2a20);
-  for (float sx : {-1.0f, 1.0f}) b.Box({sx * 0.034f - 0.017f, 0.196f, -0.1f}, {sx * 0.034f + 0.017f, 0.204f, -0.09f});  // Brauen
-  b.ColorHex(0x9a5a48);
-  b.Box({-0.018f, 0.112f, -0.1f}, {0.018f, 0.117f, -0.094f});  // Mund
-  // Haare an Hinterkopf und Seiten (hintere Hälfte einer etwas größeren Ellipse)
-  b.Mat(MAT_FABRIC); b.ColorHex(0x2e2118);
-  b.Push(Translation({0, 0.168f, 0.012f}) * RotationX(PI * 0.5f));
-  b.Ellipsoid({0, 0, 0}, {0.099f, 0.104f, 0.118f}, 14, 7, -0.2f);
+  // --- Kopf: Kiefer und Wangen, matte Haut, eng anliegende Schutzbrille ---
+  b.Mat(MAT_PLAIN); b.ColorHex(skin);
+  TailoredForm(b, {{0, .056f, .054f, .008f}, {.045f, .058f, .058f}, {.064f, .065f, .075f, -.012f},
+                  {.095f, .085f, .086f, -.006f}, {.145f, .098f, .099f}, {.191f, .096f, .097f, .003f},
+                  {.233f, .08f, .085f, .008f}, {.255f, .045f, .052f, .009f}}, 24);
+  b.ColorHex(0xd4a180);
+  for (float side : {-1.0f, 1.0f}) {
+    b.Ellipsoid({side * .055f, .13f, -.079f}, {.026f, .02f, .014f}, 12, 7);
+    b.Ellipsoid({side * .097f, .142f, .004f}, {.015f, .029f, .02f}, 12, 6);
+  }
+  b.ColorHex(0xb67e60);
+  b.Ellipsoid({0, .137f, -.099f}, {.015f, .023f, .018f}, 12, 7);
+  b.ColorHex(0x9c745c);
+  b.Ellipsoid({0, .078f, -.058f}, {.058f, .022f, .035f}, 16, 7);
+  b.ColorHex(0xb68164);
+  b.Ellipsoid({0, .09f, -.079f}, {.033f, .01f, .019f}, 12, 6);
+  b.ColorHex(0x704a3c);
+  Limb(b, {-.025f, .102f, -.092f}, {.025f, .102f, -.092f}, .0025f, .0025f, 8);
+  // Kurze Haare am Hinterkopf und Schläfen.
+  b.Mat(MAT_FABRIC); b.ColorHex(0x42362e);
+  b.Push(Translation({0, .17f, .017f}) * RotationX(PI * .5f));
+  b.Ellipsoid({0, 0, 0}, {.101f, .094f, .097f}, 20, 9, -.08f);
   b.Pop();
-  // Helm mit Rand, Brillenband, Schutzbrille, Halterung
-  b.Mat(MAT_PLASTIC); b.ColorHex(0x1a2235);
-  b.Ellipsoid({0, 0.19f, 0.006f}, {0.124f, 0.122f, 0.134f}, 18, 9, 0.0f);
-  b.Push(Translation({0, 0.188f, 0.006f}) * Scaling(Vec3(1, 1, 1.08f)));
-  b.Torus({0, 0, 0}, 0.124f, 0.009f, 24, 6);
+  // Ballistischer Helm mit Gummirand und seitlichen Schienen.
+  b.ColorHex(0x38434a);
+  b.Ellipsoid({0, .195f, .01f}, {.116f, .109f, .123f}, 24, 12, -.12f);
+  b.Mat(MAT_LEATHER); b.ColorHex(0x20272d);
+  b.Push(Translation({0, .184f, .01f}) * Scaling({1, .65f, 1.06f}));
+  b.Torus({0, 0, 0}, .115f, .009f, 28, 8);
   b.Pop();
-  b.ColorHex(0x101114);
-  b.Push(Translation({0, 0.235f, 0.006f}) * Scaling(Vec3(1, 1, 1.08f)));
-  b.Torus({0, 0, 0}, 0.118f, 0.007f, 24, 5);
-  b.Pop();
-  b.Box({-0.018f, 0.27f, -0.142f}, {0.018f, 0.3f, -0.118f});
-  b.Mat(MAT_PLASTIC); b.ColorHex(0xff9a30); b.Emissive(0.15f);
-  for (float sx : {-1.0f, 1.0f}) b.Ellipsoid({sx * 0.042f, 0.245f, -0.124f}, {0.032f, 0.021f, 0.016f}, 10, 6);
-  b.Emissive(0);
-  // Headset mit Mikrofon
-  b.ColorHex(0x16171a);
-  for (float sx : {-1.0f, 1.0f}) b.CylinderX({sx * 0.112f, 0.155f, 0.0f}, 0.04f, 0.03f, 12);
-  Limb(b, {-0.11f, 0.13f, -0.025f}, {-0.045f, 0.105f, -0.098f}, 0.005f, 0.005f, 6);
-  b.Sphere({-0.042f, 0.104f, -0.1f}, 0.011f, 8, 5);
+  b.ColorHex(0x505b60);
+  for (float side : {-1.0f, 1.0f}) {
+    b.Push(Translation({side * .109f, .217f, .016f}) * RotationY(side * PI * .5f));
+    GearPanel(b, {-.045f, -.015f, -.006f}, {.045f, .015f, .007f}, .008f);
+    b.Pop();
+  }
+  b.Mat(MAT_PLASTIC); b.ColorHex(0x222a30);
+  GearPanel(b, {-.02f, .226f, -.121f}, {.02f, .268f, -.108f}, .008f);
+  // Brillenfassung und zwei flache bernsteinfarbene Gläser, statt aufgesetzter Kugeln.
+  GearPanel(b, {-.098f, .149f, -.111f}, {.098f, .196f, -.09f}, .017f);
+  b.ColorHex(0x9c7842);
+  for (float side : {-1.0f, 1.0f}) {
+    float cx = side * .048f;
+    GearPanel(b, {cx - .039f, .156f, -.116f}, {cx + .039f, .19f, -.11f}, .011f);
+    b.ColorHex(0xc6a46a);
+    Limb(b, {cx - .026f, .183f, -.117f}, {cx + .019f, .183f, -.117f}, .002f, .002f, 6);
+    b.ColorHex(0x9c7842);
+  }
+  // Kinnriemen und Headset mit Gehäuse, Polster und kurzem Mikrofonarm.
+  b.Mat(MAT_LEATHER); b.ColorHex(0x343b3b);
+  for (float side : {-1.0f, 1.0f}) {
+    Limb(b, {side * .096f, .18f, .015f}, {side * .063f, .066f, -.037f}, .008f, .007f, 8);
+    Limb(b, {side * .063f, .066f, -.037f}, {side * .02f, .058f, -.067f}, .007f, .007f, 8);
+    b.ColorHex(0x1e2529);
+    b.Ellipsoid({side * .112f, .143f, .012f}, {.024f, .044f, .036f}, 14, 8);
+    b.ColorHex(0x505b58);
+    b.Ellipsoid({side * .128f, .145f, .012f}, {.014f, .034f, .027f}, 14, 8);
+    b.ColorHex(0x343b3b);
+  }
+  Limb(b, {-.13f, .12f, -.009f}, {-.09f, .092f, -.098f}, .004f, .004f, 8);
+  Limb(b, {-.09f, .092f, -.098f}, {-.035f, .098f, -.115f}, .004f, .004f, 8);
+  b.ColorHex(0x20272b);
+  b.Ellipsoid({-.033f, .098f, -.115f}, {.014f, .008f, .009f}, 10, 6);
   head.Upload(d);
   d.Clear();
 
-  // --- Oberarm (Schulter im Ursprung, Ellbogen bei -kUpperArm, +Z = Ellbogen-Außenseite) ---
+  // --- Ärmel: Deltoid, Bizeps, Ellbogenfalten und Schulterpatch ---
   b.Mat(MAT_FABRIC); b.ColorHex(uniform);
-  b.Ellipsoid({0, -0.01f, 0}, {0.07f, 0.075f, 0.07f}, 12, 6);
-  b.Frustum({0, -kUpperArm, 0}, 0.052f, 0.062f, kUpperArm, 12);
+  TailoredForm(b, {{-kUpperArm, .058f, .059f}, {-.23f, .069f, .07f}, {-.13f, .086f, .083f},
+                  {-.045f, .091f, .088f}, {.028f, .075f, .073f}, {.057f, .048f, .046f},
+                  {.073f, .012f, .012f}});
   b.ColorHex(uniformD);
-  b.Box({-0.064f, -0.12f, -0.035f}, {0.064f, -0.06f, 0.035f});  // Ärmeltasche/Abzeichen
-  b.Mat(MAT_PLASTIC); b.ColorHex(hiVis); b.Emissive(0.1f);
-  b.Box({-0.066f, -0.105f, -0.02f}, {0.066f, -0.075f, 0.02f});
-  b.Emissive(0);
+  GearPanel(b, {-.058f, -.16f, .071f}, {.058f, -.052f, .091f}, .019f);
+  b.ColorHex(0x5c696a);
+  GearPanel(b, {-.043f, -.14f, .092f}, {.043f, -.068f, .098f}, .014f);
+  b.Mat(MAT_PLAIN); b.ColorHex(hiVis);
+  b.Push(Translation({-PixelTextWidth("K", .006f) * .5f, -.123f, .099f}));
+  BuildPixelText(b, "K", .006f, .002f);
+  b.Pop();
   upperArm.Upload(d);
   d.Clear();
 
-  // --- Unterarm mit Handschuh (Ellbogen im Ursprung, Handmitte bei -kForeArm) ---
+  // --- Unterarm: Manschette, matte Handschuhe und ausgeformte Finger ---
   b.Mat(MAT_FABRIC); b.ColorHex(uniform);
-  b.Ellipsoid({0, 0, 0}, {0.055f, 0.05f, 0.055f}, 10, 5);
-  b.Frustum({0, -0.21f, 0}, 0.043f, 0.052f, 0.21f, 12);
-  b.Mat(MAT_PLASTIC); b.ColorHex(black);
-  b.Ellipsoid({0, -0.005f, 0.035f}, {0.048f, 0.055f, 0.03f}, 10, 5);  // Ellbogenschoner
-  b.Mat(MAT_LEATHER); b.ColorHex(black);
-  b.Frustum({0, -0.235f, 0}, 0.046f, 0.046f, 0.03f, 12);              // Stulpe
-  b.Ellipsoid({0, -kForeArm, 0}, {0.038f, 0.05f, 0.03f}, 10, 6);     // Hand
-  b.Ellipsoid({0.03f, -kForeArm + 0.015f, -0.012f}, {0.014f, 0.032f, 0.014f}, 8, 5);  // Daumen
+  TailoredForm(b, {{-.225f, .046f, .044f}, {-.18f, .051f, .05f}, {-.09f, .067f, .067f},
+                  {-.02f, .063f, .061f}, {.018f, .058f, .056f}, {.045f, .033f, .032f},
+                  {.052f, .008f, .008f}});
+  b.ColorHex(uniformD);
+  OvalFrustum(b, {0, -.225f, 0}, .049f, .051f, .034f, 1.0f);
+  b.Mat(MAT_LEATHER); b.ColorHex(0x2d3336);
+  b.Ellipsoid({0, -.023f, .052f}, {.051f, .061f, .025f}, 14, 8);
+  b.ColorHex(0x272c2f);
+  b.Ellipsoid({0, -kForeArm, 0}, {.042f, .048f, .034f}, 14, 8);
+  b.ColorHex(0x4c5555);
+  GearPanel(b, {-.031f, -.288f, .026f}, {.031f, -.252f, .037f}, .009f);
+  b.ColorHex(0x30373a);
+  for (int i = 0; i < 4; i++) {
+    float x = -.027f + i * .018f;
+    b.Ellipsoid({x, -.303f, -.009f}, {.01f, .021f, .025f}, 8, 6);
+  }
+  b.Ellipsoid({.035f, -.26f, -.021f}, {.015f, .031f, .017f}, 10, 6);
   foreArm.Upload(d);
   d.Clear();
 
@@ -220,10 +362,10 @@ void BuildMeshes(Mesh& torso, Mesh& head, Mesh& thigh, Mesh& shin, Mesh& upperAr
   b.Box({-0.02f, -0.1f, -0.026f}, {0.02f, 0.0f, 0.024f});
   b.Pop();
   b.Push(Translation({0, -0.02f, 0.07f}) * RotationX(-0.12f));
-  b.Box({-0.022f, -0.045f, 0.0f}, {0.022f, 0.025f, 0.26f});   // Schaft
+  b.Box({-0.022f, -0.045f, 0.0f}, {0.022f, 0.025f, 0.18f});   // Schaft endet an der Schulter
   b.Pop();
   b.Mat(MAT_LEATHER); b.ColorHex(black);
-  b.Box({-0.024f, -0.08f, 0.31f}, {0.024f, 0.01f, 0.33f});
+  b.Box({-0.024f, -0.08f, 0.23f}, {0.024f, 0.01f, 0.25f});
   shotgun3p.Upload(d);
   d.Clear();
 
@@ -258,12 +400,15 @@ void Tube(MeshBuilder& b, Vec3 a, Vec3 c, float ra, float rc) {
 
 // Arme mit Handschuhen: rechte Hand am Griff, linke Hand vorne (z = linke Handposition)
 void BuildArms(MeshBuilder& b, Vec3 rightHand, Vec3 leftHand, bool leftVisible) {
-  const u32 glove = 0x1c1d20, sleeve = 0x23304d, cuff = 0x2c3a5c;
+  const u32 glove = 0x272c2f, sleeve = 0x39495d, cuff = 0x283647;
   b.Mat(MAT_LEATHER); b.ColorHex(glove);
   b.Push(Translation(rightHand) * RotationX(-0.25f));
   b.Ellipsoid({0.002f, -0.052f, 0.006f}, {0.036f, 0.052f, 0.04f}, 12, 7);  // Handrücken/Ballen
-  b.Ellipsoid({-0.002f, -0.06f, -0.04f}, {0.034f, 0.05f, 0.021f}, 12, 7);  // Finger um den Griff
+  for (int i = 0; i < 4; i++)
+    b.Ellipsoid({-.002f, -.025f - i * .022f, -.04f}, {.034f, .012f, .022f}, 12, 6);  // Finger um den Griff
   Limb(b, {0.03f, -0.035f, 0.0f}, {0.036f, 0.01f, -0.022f}, 0.013f, 0.011f, 8);  // Daumen
+  b.ColorHex(0x4c5555);
+  GearPanel(b, {-.024f, -.074f, .036f}, {.027f, -.032f, .049f}, .01f);
   b.Pop();
   b.Mat(MAT_FABRIC); b.ColorHex(cuff);
   Vec3 rw = rightHand + Vec3(0.008f, -0.1f, 0.05f);

@@ -1,8 +1,8 @@
 # Kek Me If You Can
 
 Ein Prop-Hunt-Spiel mit **eigener C++-Engine**, ohne externe Bibliotheken: Geometrie, Materialien, Klänge und Musik
-werden beim Start prozedural erzeugt. Am Ende steht eine einzelne EXE. Die einzige Datei neben dem Code ist das
-Programmsymbol, eine Dose mit verschmitztem Blick. Das „can“ im Namen ist wörtlich gemeint.
+werden beim Start prozedural erzeugt. Am Ende steht eine einzelne EXE, einschließlich Programmsymbol und drei
+Intro-Videos. Das Symbol ist eine Dose mit verschmitztem Blick: Das „can“ im Namen ist wörtlich gemeint.
 
 ## Herunterladen
 
@@ -54,6 +54,7 @@ Danach `KekMeIfYouCan.exe` starten. Voraussetzung: Visual Studio 2022/2026 mit �
 | Granate | Eine pro Runde, für verdächtige Gruppen. |
 | 3D-Klang mit Verdeckung | Geräusche hinter Wänden klingen gedämpft. So lassen sich Taunts orten. |
 | Bots für beide Teams | Prop-Bots suchen sich passende Gruppen gleicher Objekte, richten sich aus, verteilen sich über die Karte und fliehen bei Treffern. Jäger-Bots gehen Geräuschen nach, nutzen Sonar und geben Testschüsse ab. |
+| Ausgerüstete Sucher | Geformte Uniformen, Plattenträger mit Taschen und Funkgerät, Schutzbrille, Headset und Stiefel. Arme greifen die Waffe per Zweigelenk-IK; Lauf- und Hockposen werden animiert. |
 | Infektionsmodus | Gefundene Props jagen mit (optional). |
 | Lebendige Karten | Fahnen wehen im Wind, Riesenrad und Kettenflieger drehen sich. |
 | Freie Durchgänge | Gegenstände, die eine Tür versperren würden, werden beim Kartenbau automatisch weggelassen. Ein Test prüft jede Tür. |
