@@ -1,0 +1,32 @@
+// Ressourcen für beide EXEs: Programmsymbol (Dose) und Versionsinfo.
+// icon.ico wird von tools/make_icon.py erzeugt.
+#include <winver.h>
+#include "game/Version.h"
+
+1 ICON "icon.ico"
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION KEK_VERSION_MAJOR, KEK_VERSION_MINOR, KEK_VERSION_PATCH, 0
+PRODUCTVERSION KEK_VERSION_MAJOR, KEK_VERSION_MINOR, KEK_VERSION_PATCH, 0
+FILEFLAGSMASK 0x3fL
+FILEFLAGS 0x0L
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+FILESUBTYPE 0x0L
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040704b0"
+    BEGIN
+      VALUE "FileDescription", "Kek Me If You Can"
+      VALUE "FileVersion", KEK_VERSION_STR
+      VALUE "ProductName", "Kek Me If You Can"
+      VALUE "ProductVersion", KEK_VERSION_STR
+      VALUE "InternalName", "KekMeIfYouCan"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x407, 1200
+  END
+END

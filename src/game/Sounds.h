@@ -1,0 +1,54 @@
+#pragma once
+// Prozedural synthetisierte Klänge.
+#include "engine/Common.h"
+
+enum SoundId {
+  SND_SMG,
+  SND_SHOTGUN,
+  SND_EMPTY,
+  SND_RELOAD_SMG,
+  SND_RELOAD_SHOTGUN,
+  SND_SWITCH,
+  SND_IMPACT_WALL,
+  SND_IMPACT_WOOD,
+  SND_IMPACT_METAL,
+  SND_IMPACT_GLASS,
+  SND_HIT_PROP,
+  SND_HITMARKER,
+  SND_PENALTY,
+  SND_STEP0,
+  SND_STEP1,
+  SND_STEP2,
+  SND_STEP3,
+  SND_JUMP,
+  SND_KILL_PROP,
+  SND_KILL_HUNTER,
+  SND_DISGUISE,
+  SND_DECOY,
+  SND_DECOY_BREAK,
+  SND_SONAR,
+  SND_PING,
+  SND_GRENADE_THROW,
+  SND_EXPLOSION,
+  SND_LOCK,
+  SND_NOFIT,
+  SND_CLICK,
+  SND_HOVER,
+  SND_COUNTDOWN,
+  SND_GO,
+  SND_ROUND_START,
+  SND_HUNT_START,
+  SND_WIN,
+  SND_LOSE,
+  SND_CHAT,
+  SND_ENDSPURT,
+  SND_AMB_OUTDOOR,
+  SND_AMB_INDOOR,
+  SND_MUSIC_MENU,
+  SND_TAUNT_FIRST,
+  SND_COUNT = SND_TAUNT_FIRST + 16
+};
+
+// Erzeugt alle Klänge und registriert sie im Mixer. Gibt die Mixer-IDs zurück.
+void BuildSounds();
+int Snd(int id);

@@ -1,0 +1,38 @@
+# Baut, testet und veröffentlicht ein Release, sobald ein Tag "v<Version>" gepusht wird (siehe release.bat).
+# Das Spiel lädt beim Start die EXEs aus dem neuesten Release (automatische Updates).
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Tag mit Version.h vergleichen
+        shell: pwsh
+        run: |
+          $v = (Select-String -Path src/game/Version.h -Pattern '#define KEK_VERSION_STR "([^"]+)"').Matches[0].Groups[1].Value
+          if ("v$v" -ne "$env:GITHUB_REF_NAME") { throw "Tag $env:GITHUB_REF_NAME passt nicht zu Version.h ($v)" }
+
+      - name: Bauen
+        shell: cmd
+        run: call build.bat
+
+      - name: Testen
+        shell: cmd
+        run: |
+          KekMeIfYouCanCLI.exe --test 1 || exit /b 1
+          KekMeIfYouCanCLI.exe --nettest || exit /b 1
+
+      - name: Release erstellen
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$env:GITHUB_REF_NAME" KekMeIfYouCan.exe KekMeIfYouCanCLI.exe --title "Kek Me If You Can $env:GITHUB_REF_NAME" --generate-notes

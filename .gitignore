@@ -1,0 +1,12 @@
+# Build-Ausgaben (die EXEs gibt es als Release auf GitHub)
+build/
+*.exe
+*.exe.old
+*.exe.new
+*.pdb
+
+# Laufzeitdateien neben der EXE
+prophunt.log
+prophunt.ini
+
+__pycache__/
