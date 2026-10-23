@@ -1,0 +1,40 @@
+KEK ME IF YOU CAN 1.0.6 - Windows x64
+
+1. Das gesamte ZIP entpacken (nicht direkt im ZIP starten).
+2. Im entpackten Ordner KekMeIfYouCan.exe starten.
+3. data/video und folder-install.txt neben der EXE behalten.
+
+Enthalten: Spiel, Konsolen-/Serverprogramm und alle drei Intro-Videos.
+Karten, Figuren und Taunts werden von der Engine erzeugt. Waffenaufnahmen
+sind in der EXE enthalten; Audio-Quellen und Lizenz stehen in CREDITS.txt.
+Es fehlen keine zusaetzlichen Asset-Pakete.
+Kein Installer und keine Administratorrechte erforderlich.
+
+Fuenf Karten: Bundestag, Oktoberfest, Nudelfabrik, KEK-Paketzentrum,
+Dresdner Zwinger mit Kronentor, Galerieterrassen und Nymphenbad.
+Schwere Props koennen Sucher rammen (Umschalt + 1,5 m Anlauf) oder
+aus ausreichender Hoehe erschlagen. Nach einem Treffer: 2 s Pause.
+Spezialmodi: Prop-Roulette, Klon-Alarm, Hummeln im Hintern, Mondschicht.
+Wundertuete waehlt pro Runde einen anderen Spezialmodus.
+Der Gastgeber waehlt vor dem Start oder per Esc fuer die naechste Runde.
+
+Waffenwerkbank im Hauptmenue oder per Esc: MP, Schrotflinte und Pistole mit
+Visierungen, Laeufen, Muendungen, Schaeften, Magazinen und Griffen umbauen.
+Builds werden gespeichert. Aenderungen waehrend der Jagd gelten ab der
+naechsten Runde. Alle Mitspieler brauchen Version 1.0.6 (Protokoll 6).
+Schrot einzeln nachladen; Feuer unterbricht, sobald eine Patrone bereit ist.
+Tasten: 1 MP, 2 Schrotflinte, 3 Pistole, 4 Granate. Pistole: ein Schuss pro
+Klick, 15 Schuss ab Werk, 10/20-Schuss-Magazine und Micro-Reflex optional.
+Die staendigen Vogelrufe der Aussenatmosphaere wurden entfernt.
+
+Der automatische Updater aktualisiert beide EXEs. Bei neuen Videodateien
+das aktuelle vollstaendige ZIP entpacken. Eigene Einstellungen stehen in
+prophunt.ini; diese Datei wird vom Paket nicht ueberschrieben.
+
+Diese Ausgabe ist nicht digital signiert. Eine Windows-Warnung wegen
+unbekanntem Herausgeber kann deshalb weiterhin erscheinen. Bei einem
+konkreten Virenfund die genaue Meldung pruefen und dem Projekt melden.
+SHA256SUMS.txt enthaelt Pruefsummen zum Vergleichen der Dateien; sie sind
+kein Sicherheitszertifikat und ersetzen keine Virenpruefung.
+
+Downloads und Quellcode: https://github.com/GG2EZBoOm/kek-me-if-u-can

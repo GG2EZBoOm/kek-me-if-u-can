@@ -1,6 +1,8 @@
-# Build-Ausgaben (die EXEs gibt es als Release auf GitHub)
+# Build-Ausgaben; die zwei Programme im Stammordner gehören zum spielbaren GitHub-ZIP.
 build/
 *.exe
+!/KekMeIfYouCan.exe
+!/KekMeIfYouCanCLI.exe
 *.exe.old
 *.exe.new
 *.pdb

@@ -2,3 +2,13 @@
 *.bat text eol=crlf
 *.ico binary
 *.png binary
+# Veröffentlichte Spieldateien unverändert archivieren, damit SHA256SUMS.txt gültig bleibt.
+/KekMeIfYouCan.exe binary
+/KekMeIfYouCanCLI.exe binary
+/data/video/*.mp4 binary
+/ZapSplat-EULA.pdf binary
+/folder-install.txt -text whitespace=cr-at-eol
+/LIESMICH.txt -text whitespace=cr-at-eol
+/CREDITS.txt -text whitespace=cr-at-eol
+/sources.json -text whitespace=cr-at-eol
+/SHA256SUMS.txt -text whitespace=cr-at-eol

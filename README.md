@@ -17,8 +17,11 @@ oder [Konsolen-Version](https://github.com/GG2EZBoOm/kek-me-if-u-can/releases/la
 `KekMeIfYouCan-Ordner.exe` in den Release-Dateien ist die Update-Datei für die Ordner-Ausgabe; für einen neuen Download das ZIP nehmen.
 Alle Versionen stehen unter [Releases](https://github.com/GG2EZBoOm/kek-me-if-u-can/releases/latest).
 
-**„Code → Download ZIP“ und „Source code“ enthalten nur die Projektdateien zum Selbstbauen, keine EXE.**
-Zum Spielen bitte den direkten Download oben verwenden.
+**Auch „Code → Download ZIP“ enthält jetzt das fertige Spiel.** Das gesamte ZIP entpacken und
+**KekMeIfYouCan.exe direkt im obersten entpackten Ordner** starten. `data/video` und `folder-install.txt`
+bleiben daneben. Zusätzlich liegen in diesem Download die Projektdateien; ein Compiler ist zum Spielen nicht nötig.
+Ältere ZIPs wie `kek-me-if-u-can-main(1).zip` bitte neu herunterladen. Die automatisch erzeugten
+„Source code“-Archive älterer Release-Tags enthalten weiterhin den damaligen Stand.
 
 Die Programme sind derzeit **nicht digital signiert**. Windows kann sie daher weiterhin warnen oder blockieren;
 die Aufteilung in einen Spielordner garantiert keine Freigabe. Fehlt „Trotzdem ausführen“, bitte den vollständigen

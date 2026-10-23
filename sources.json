@@ -1,0 +1,122 @@
+{
+  "smg_shot": {
+    "source": "gma_gun_submachine_auto_shot_00_last_with_tail_01_581.wav",
+    "source_sha256": "1cd4de533bc534c41145ee586f970ad347d5914e20ea38d0e933b46f93a06849",
+    "duration": 0.72
+  },
+  "smg_burst": {
+    "source": "gma_gun_submachine_auto_shot_00_automatic_preview_01_580.wav",
+    "source_sha256": "ab61cdb0aeb8f4f5a0e26837b385f1cd1cb93f3f3722d37780e609b33ec457df",
+    "duration": 0.065
+  },
+  "arcade_punch": {
+    "source": "zapsplat_multimedia_videogame_machine_gun_synthetic_designed_105191.wav",
+    "source_sha256": "bbf236bf602e1ba0558ee211463ed9b9cd9f39818e583fdc990edb74b70c602c",
+    "duration": 0.09
+  },
+  "empty": {
+    "source": "skyclad_sound_TOYMisc_Gun+Dry+fire+_SCS_CT_821.wav",
+    "source_sha256": "e50c00d619c45b20c227a85703f11135a2a37268cd79b06464693d81e4f1f5e2",
+    "duration": 0.24
+  },
+  "load_0": {
+    "source": "gma_gun_submachine_auto_magazine_load_02_572.wav",
+    "source_sha256": "9394a078b1523ae5786e9dbbe66e87d53845df172ecf0b02a62cfa54ad7be3ed",
+    "duration": 0.3234
+  },
+  "load_1": {
+    "source": "gma_gun_submachine_auto_magazine_load_03_573.wav",
+    "source_sha256": "9508f67c245a3c81647bcc1100ac58ec1ca52b8c812bcc7da7cfb567e973e631",
+    "duration": 0.2862
+  },
+  "load_2": {
+    "source": "gma_gun_submachine_auto_magazine_load_04_574.wav",
+    "source_sha256": "d2380dc6136c1c115b4e4b921a5c1dc112283a9fbc64fc3ea2fb9f42dee5fded",
+    "duration": 0.301
+  },
+  "unload_0": {
+    "source": "gma_gun_submachine_auto_magazine_unload_01_577.wav",
+    "source_sha256": "9b1bc70fa9407522288da2522cdbe1f423ab43c2e4693448dfcc1542c4444af6",
+    "duration": 0.3437
+  },
+  "unload_1": {
+    "source": "gma_gun_submachine_auto_magazine_unload_02_578.wav",
+    "source_sha256": "ac2183078f0d86ed9e53f04ea82a0904443f3245298ad845fafb867ebc479e11",
+    "duration": 0.2223
+  },
+  "unload_2": {
+    "source": "gma_gun_submachine_auto_magazine_unload_03_579.wav",
+    "source_sha256": "5be17a5039f7c2d9e9a38669bdd456b31e5bc172ad75ccd7bf3d11d380cdbfde",
+    "duration": 0.4028
+  },
+  "switch_0": {
+    "source": "gma_gun_submachine_auto_magazine_safety_switch_01_575.wav",
+    "source_sha256": "4847db811e3ca2607dba0a160595a0874ac20233f59613119ae42bc66b473252",
+    "duration": 0.0942
+  },
+  "switch_1": {
+    "source": "gma_gun_submachine_auto_magazine_safety_switch_02_576.wav",
+    "source_sha256": "51bc66b74f7f25ad27c0689d36fbec3f55aad470f1c3a189efe4d6fa276e838f",
+    "duration": 0.048
+  },
+  "metal_0": {
+    "source": "zapsplat_pack_bullet_impacts_wav/zapsplat_warfare_bullet_hit_metal_001_43600.wav",
+    "source_sha256": "bdebd50070226410e726f4667936c8b1ef99f9d46755002351e153837a0254d8",
+    "duration": 0.6
+  },
+  "metal_1": {
+    "source": "zapsplat_pack_bullet_impacts_wav/zapsplat_warfare_bullet_hit_metal_002_43601.wav",
+    "source_sha256": "2295a12342d9ff08d8a2f25760863856a1da2b3e89147e5dbfa889b04b9fba71",
+    "duration": 0.6
+  },
+  "metal_2": {
+    "source": "zapsplat_pack_bullet_impacts_wav/zapsplat_warfare_bullet_hit_metal_003_43602.wav",
+    "source_sha256": "55f492373bda8d22b920dd12008d8304d027fc26307b8b7e5d39418d5fee0d5c",
+    "duration": 0.6
+  },
+  "wood_0": {
+    "source": "zapsplat_pack_bullet_impacts_wav/zapsplat_warfare_gun_bullet_whizz_hit_wood_001_92848.wav",
+    "source_sha256": "154485a5c61c444f5b3773602a2030ef28f58eb00b95c17be06f96c09d37ef29",
+    "duration": 0.38
+  },
+  "wood_1": {
+    "source": "zapsplat_pack_bullet_impacts_wav/zapsplat_warfare_gun_bullet_whizz_hit_wood_002_92849.wav",
+    "source_sha256": "2d03b75c6b6ebcaa8a23d6af5d4712319ac4ccc63dcac24356256aa12636c58e",
+    "duration": 0.38
+  },
+  "wood_2": {
+    "source": "zapsplat_pack_bullet_impacts_wav/zapsplat_warfare_gun_bullet_whizz_hit_wood_003_92850.wav",
+    "source_sha256": "fbf5fcfca5280d6022086378f2e73ee3da22ce79a17e644bc42530ab16d0a6fb",
+    "duration": 0.38
+  },
+  "glass_0": {
+    "source": "zapsplat_pack_bullet_impacts_wav/zapsplat_warfare_gun_bullet_hit_glass_smash_001_92831.wav",
+    "source_sha256": "7014de75c314a35ae8b989097fb97986ae9ab34ba8fd0dcdc2a02b8cf36b5c14",
+    "duration": 0.65
+  },
+  "glass_1": {
+    "source": "zapsplat_pack_bullet_impacts_wav/zapsplat_warfare_gun_bullet_hit_glass_smash_002_92832.wav",
+    "source_sha256": "2c44942602131f705eebb0fea359b3d88d1789f1104956fc890fc3f88eca71e1",
+    "duration": 0.65
+  },
+  "glass_2": {
+    "source": "zapsplat_pack_bullet_impacts_wav/zapsplat_warfare_gun_bullet_hit_glass_smash_003_92833.wav",
+    "source_sha256": "e8cf7f5be9cc5293a7ec16b48aee21fd89d8ad80486be65b967c2c5146406976",
+    "duration": 0.65
+  },
+  "wall_0": {
+    "source": "zapsplat_pack_bullet_impacts_wav/zapsplat_warfare_bullet_hit_ground_dirt_001_43597.wav",
+    "source_sha256": "6067f568cd964f8c6327bd509c4647402d116548f1f18e59a531a46e97054eb8",
+    "duration": 0.3
+  },
+  "wall_1": {
+    "source": "zapsplat_pack_bullet_impacts_wav/zapsplat_warfare_bullet_hit_ground_dirt_002_43598.wav",
+    "source_sha256": "dbf80d23dfc195b4cb95553043fea373d078112d9367d8ee0001d67f2103a856",
+    "duration": 0.3
+  },
+  "wall_2": {
+    "source": "zapsplat_pack_bullet_impacts_wav/zapsplat_warfare_bullet_hit_ground_dirt_003_43599.wav",
+    "source_sha256": "e5416a8130111cfb1753565711c932a25738fa5d4dc1999344582b0a145ea307",
+    "duration": 0.3
+  }
+}

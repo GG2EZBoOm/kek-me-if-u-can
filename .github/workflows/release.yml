@@ -43,3 +43,26 @@ jobs:
           $notes = "docs/releases/$env:GITHUB_REF_NAME.md"
           $noteArgs = if (Test-Path -LiteralPath $notes) { @('--notes-file', $notes) } else { @('--generate-notes') }
           gh release create "$env:GITHUB_REF_NAME" KekMeIfYouCan.exe KekMeIfYouCan-Ordner.exe KekMeIfYouCanCLI.exe build/package/KekMeIfYouCan-Windows.zip build/package/SHA256SUMS.txt --title "Kek Me If You Can $env:GITHUB_REF_NAME" @noteArgs
+
+      - name: Spielbare Dateien im normalen GitHub-ZIP aktualisieren
+        shell: pwsh
+        run: |
+          git fetch origin main
+          if ($LASTEXITCODE -ne 0) { throw 'main konnte nicht geprüft werden.' }
+          $main = git rev-parse origin/main
+          if ($main -ne $env:GITHUB_SHA) {
+            Write-Output '::notice::main hat neuere Änderungen. Dieses ältere Release überschreibt den Repository-Download nicht.'
+            exit 0
+          }
+          $v = $env:GITHUB_REF_NAME.Substring(1)
+          ./sync-repository-game.ps1 -SourceDirectory "build/package/v$v/KekMeIfYouCan"
+          git add KekMeIfYouCan.exe KekMeIfYouCanCLI.exe folder-install.txt LIESMICH.txt CREDITS.txt ZapSplat-EULA.pdf sources.json SHA256SUMS.txt data/video
+          if ($LASTEXITCODE -ne 0) { throw 'Spieldateien konnten nicht vorgemerkt werden.' }
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) { exit 0 }
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "Update playable repository download to $env:GITHUB_REF_NAME"
+          if ($LASTEXITCODE -ne 0) { throw 'Spieldateien konnten nicht gespeichert werden.' }
+          git push origin HEAD:main
+          if ($LASTEXITCODE -ne 0) { throw 'Repository-Download konnte nicht veröffentlicht werden; main bleibt unverändert.' }
