@@ -107,6 +107,16 @@ vec2 planarUV(vec3 p, vec3 n) {
   return p.xy;
 }
 
+// Integral eines periodischen Streifens: Fugen bleiben auch unter einem Pixel breit ruhig.
+float stripeIntegral(float x, float width) {
+  return floor(x) * width + min(fract(x), width);
+}
+float filteredStripe(float x, float width, float footprint) {
+  float fw = max(footprint, 0.0001);
+  float p = x + width * 0.5;
+  return clamp((stripeIntegral(p + fw * 0.5, width) - stripeIntegral(p - fw * 0.5, width)) / fw, 0.0, 1.0);
+}
+
 void main() {
   vec3 N = normalize(vNormal);
   vec3 V = normalize(uCamPos - vWorld);
@@ -187,6 +197,27 @@ void main() {
     spec = 1.3; shin = 90.0; refl = 0.4;
   } else if (mat == 21) {  // Leder
     alb *= 0.85 + 0.18 * vnoise(P * 28.0); spec = 0.35; shin = 36.0;
+  } else if (mat == 22) {  // Backstein (Läuferverband, 25 x 7,5 cm mit Fuge)
+    vec2 q = uv / vec2(0.25, 0.075); float row = floor(q.y);
+    vec2 footprint = fwidth(q);
+    float detail = 1.0 - smoothstep(0.2, 0.7, max(footprint.x, footprint.y));
+    q.x += mod(row, 2.0) * 0.5;
+    vec2 id = floor(q);
+    float mortar = 1.0 - (1.0 - filteredStripe(q.x, 0.04, footprint.x)) *
+                         (1.0 - filteredStripe(q.y, 0.1333, footprint.y));
+    mortar = mix(0.168, mortar, detail);
+    vec3 brick = alb * (0.76 + 0.34 * hash12(id + row * 3.17)) * (0.88 + 0.22 * vnoise(P * 9.0));
+    brick = mix(brick, brick * vec3(0.5, 0.46, 0.44), step(0.93, hash12(id * 1.7 + 4.1)));  // dunkel gebrannte Steine
+    brick = mix(alb * 0.89, brick, detail);
+    alb = mix(brick, vec3(0.14, 0.13, 0.11) * (0.85 + 0.2 * vnoise(P * 3.0)), mortar);
+    spec = 0.04;
+  } else if (mat == 23) {  // Wellblech: Welle über die Normale, Schmutzschlieren
+    vec3 a = abs(vPatN);
+    vec3 tU = (a.y >= a.x && a.y >= a.z) ? vec3(1.0, 0.0, 0.0) : (a.x >= a.z ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0));
+    float detail = 1.0 - smoothstep(0.15, 0.5, fwidth(uv.x) / 0.076);
+    N = normalize(N + tU * cos(uv.x * (6.2831 / 0.076)) * (0.38 * detail));
+    alb *= 0.9 + 0.12 * vnoise(vec3(uv.x * 3.0, uv.y * 0.4, 0.0)) - 0.14 * smoothstep(0.55, 0.9, fbm(vec3(uv.x * 4.0, uv.y * 0.6, 3.0)));
+    spec = 0.55; shin = 44.0; refl = 0.06;
   }
   emit += alb * vAux.z * 6.0;
   // Metalle spiegeln in ihrer eigenen Farbe: dunkler Stahl glänzt dezent, helles Metall bleibt hell

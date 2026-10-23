@@ -85,12 +85,27 @@ Ein Festzelt auf der Theresienwiese in der Abenddämmerung:
 - **Hinterhof** mit Toilettenhäuschen, Strohballen und Fässern. Im Hintergrund stehen Bavaria, Ruhmeshalle und
   die Türme der Frauenkirche.
 
+### Nudelfabrik
+
+Eine Backsteinfabrik mit Werkshof und zwei Produktionslinien:
+
+- **Produktionshalle** unter einem verglasten Sheddach, mit drehenden Teigmischern, Nudelpresse, Schneidwerk,
+  laufendem Nudelband und hängenden Spaghetti auf einer Stangenbahn
+- **Laufstege auf vier Metern Höhe**, erreichbar über zwei Stahltreppen und mit Zugang zum Meisterbüro
+- **Trockenraum**, Mehllager mit Hochregalen und Gabelstapler sowie eine Werkstatt
+- **Verpackung** mit laufendem Kartonband, Paletten und einem begehbaren Lkw-Anhänger an der Laderampe
+- **Bürotrakt** mit Kantine, Umkleide, Meisterbüro, Labor und Archiv
+- **Außengelände** mit drei Mehlsilos, Parkplatz, Pförtnerhaus, Hinterhof und Schornstein
+
+Für einen dedizierten Server: `KekMeIfYouCanCLI.exe --server --map nudelfabrik --bots 8`.
+
 ### Gegenstände
 
-107 verschiedene Gegenstände. Im Bundestag gibt es unter anderem Aktenordner, Wasserglas, Laptop, Mate-Flasche,
+139 verschiedene Gegenstände. Im Bundestag gibt es unter anderem Aktenordner, Wasserglas, Laptop, Mate-Flasche,
 Currywurst, Wahlurne, Präsidentenglocke, Büste und Ficus. Auf dem Oktoberfest kommen Maßkrug, Wiesnbrezn,
 Lebkuchenherz, Bierfass, Hendl, Radi, Trachtenhut, Tuba, Teddybär, Gartenzwerg, Karussellpferd, Autoscooter und
-viele mehr dazu.
+viele mehr dazu. Die Nudelfabrik ergänzt 32 Gegenstände, darunter Mehlsack, Europalette, Spaghetti-Packung,
+Tomatendose, Parmesanlaib, Trockenwagen, Hubwagen, Schutzhelm, Werkzeugkiste und Mikroskop.
 
 ## Steuerung
 
@@ -165,7 +180,8 @@ KekMeIfYouCanCLI.exe --nettest
 KekMeIfYouCan.exe --gameshot build\game
 ```
 
-`--test` prüft Einladungscodes, Updater, Bewegung, Türen und Wegfindung auf allen Karten. Danach spielt es auf jeder
+`--test` prüft Einladungscodes, Updater, Bewegung, Türen und Wegfindung auf allen Karten. Für die Nudelfabrik werden
+zusätzlich alle Startplätze, die Förderband-Umläufe und die Sperre der Spaghetti-Bahn geprüft. Danach spielt es auf jeder
 Karte ein komplettes Bot-Match im Zeitraffer (etwa 1000- bis 2000-fache Echtzeit). Zwei Prüfungen gelten der Grafik und
 der Fairness:
 

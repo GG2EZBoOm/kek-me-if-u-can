@@ -81,6 +81,10 @@ struct AnimatedPart {
   float phase = 0;
   bool orbit = false;
   Vec3 offset;         // bei orbit: Aufhängepunkt relativ zu pivot (Startlage)
+  // Gleiten statt Drehen (Förderbänder): verschiebt um slideDir * (phase + t * speed) modulo slideLen.
+  // Das Netz wiederholt sich im Abstand slideLen, dadurch läuft das Band nahtlos.
+  Vec3 slideDir;
+  float slideLen = 0;
   Mat4 Transform(float t) const;
 };
 

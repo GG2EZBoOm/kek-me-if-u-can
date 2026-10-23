@@ -355,6 +355,62 @@ static void OktoberfestTests(const World& w, const NavGrid& nav, int& fails) {
              fails);
 }
 
+static void NudelfabrikTests(const World& w, const NavGrid& nav, int& fails) {
+  MoveState s;
+  for (Vec3 start : {Vec3(-18.95f, 0.05f, -2.8f), Vec3(18.95f, 0.05f, 6.6f)}) {
+    WalkTest(w, start, 0, 2.0f, s);
+    Check(fabsf(s.pos.y - 4.0f) < 0.1f,
+          StrFormat("Stahltreppe %s auf den Laufsteg (y=4, Position %.2f %.2f %.2f)",
+                    start.x < 0 ? "West" : "Ost", s.pos.x, s.pos.y, s.pos.z), fails);
+    WalkTest(w, start, 0, 3.0f, s, props::Find("tomatendose"));
+    Check(fabsf(s.pos.y - 4.0f) < 0.1f, "Tomatendose kommt auf den Laufsteg", fails);
+  }
+  WalkTest(w, Vec3(26.4f, 0.05f, 20.975f), -PI * 0.5f, 2.0f, s);
+  Check(fabsf(s.pos.y - 4.0f) < 0.1f, "Bürotreppe hinauf ins Archiv (y=4)", fails);
+  WalkTest(w, Vec3(-15, 0.05f, -8.5f), 0, 0.9f, s);
+  Check(fabsf(s.pos.y - 1.2f) < 0.1f, "Treppe auf die Mischerbühne (y=1,2)", fails);
+  WalkTest(w, Vec3(-10, 0.05f, 20.5f), PI, 0.9f, s);
+  Check(fabsf(s.pos.y - 1.2f) < 0.1f && s.pos.z > 22.6f, "Über die Ladetreppe in den Lkw-Anhänger", fails);
+  CheckPaths(nav,
+             {{Vec3(46.5f, 0, 40.5f), Vec3(0, 0, 5.4f), "Jäger-Start -> Produktionshalle"},
+              {Vec3(0, 0, 5.4f), Vec3(-18.95f, 4, -16), "Halle -> Westlaufsteg"},
+              {Vec3(-18.95f, 4, -16), Vec3(18.95f, 4, -1), "Westlaufsteg -> Ostlaufsteg"},
+              {Vec3(18.95f, 4, -1), Vec3(25, 4, 5), "Laufsteg -> Meisterbüro"},
+              {Vec3(25, 4, 5), Vec3(32, 4, 5), "Meisterbüro -> Labor"},
+              {Vec3(25, 4, 5), Vec3(28, 4, 18), "Meisterbüro -> Archiv"},
+              {Vec3(28, 4, 18), Vec3(25, 0, 17), "Archiv -> Umkleide"},
+              {Vec3(25, 0, 17), Vec3(25, 0, 8), "Umkleide -> Kantine"},
+              {Vec3(25, 0, 8), Vec3(31, 0, -5), "Kantine -> Trockenraum"},
+              {Vec3(31, 0, -5), Vec3(30.4f, 0, -26), "Trockenraum -> Hinterhof"},
+              {Vec3(0, 0, -8.6f), Vec3(-29, 0, -11.5f), "Halle -> Mehllager"},
+              {Vec3(-29, 0, -11.5f), Vec3(-29, 0, 12), "Mehllager -> Werkstatt"},
+              {Vec3(-29, 0, -11.5f), Vec3(-45, 0, -11.5f), "Mehllager -> Siloplatz"},
+              {Vec3(0, 0, 5.4f), Vec3(-10, 0, 19), "Halle -> Verpackung"},
+              {Vec3(-10, 0, 19), Vec3(-10, 1.2f, 26.5f), "Verpackung -> Lkw-Anhänger"},
+              {Vec3(0, 0, -8.6f), Vec3(-15, 1.2f, -12), "Halle -> Mischerbühne"},
+              {Vec3(46.5f, 0, 40.5f), Vec3(52, 0, 50), "Werkshof -> Pförtnerhaus"}},
+             fails);
+  MoveEnv env;
+  env.world = &w;
+  for (const auto* spawns : {&w.hunterSpawns, &w.propSpawns}) {
+    for (const SpawnPoint& spawn : *spawns) {
+      s = MoveState();
+      s.pos = spawn.pos + Vec3(0, 0.05f, 0);
+      Check(!BoxBlocked(env, PlayerBox(s, -1)),
+            StrFormat("Freier Startplatz bei (%.1f %.1f %.1f)", spawn.pos.x, spawn.pos.y, spawn.pos.z), fails);
+    }
+  }
+  s = MoveState();
+  s.pos = Vec3(0, 1.2f, -3);
+  Check(BoxBlocked(env, PlayerBox(s, props::Find("tomatendose"))), "Kein Versteck in den hängenden Spaghetti", fails);
+  for (const AnimatedPart& part : w.anims) {
+    if (part.slideLen <= 0) continue;
+    Vec3 a = TransformPoint(part.Transform(0.25f), Vec3(0));
+    Vec3 b = TransformPoint(part.Transform(0.25f + part.slideLen / part.speed), Vec3(0));
+    Check(Distance(a, b) < 0.001f, "Förderband wiederholt seine Bewegung nach einem Umlauf", fails);
+  }
+}
+
 static void BotMatch(World& w, BotManager& bots, int rounds, int& fails) {
   Sim sim;
   MatchSettings ms;
@@ -496,6 +552,7 @@ int RunTests(int matchRounds) {
     CheckFoliage(w, bots.Nav(), fails);
     if (w.id == "bundestag") BundestagTests(w, bots.Nav(), fails);
     if (w.id == "oktoberfest") OktoberfestTests(w, bots.Nav(), fails);
+    if (w.id == "nudelfabrik") NudelfabrikTests(w, bots.Nav(), fails);
     if (matchRounds > 0) BotMatch(w, bots, matchRounds, fails);
   }
   LOG("Tests beendet: %d Fehler", fails);

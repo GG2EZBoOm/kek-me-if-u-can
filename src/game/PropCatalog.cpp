@@ -1550,6 +1550,542 @@ void SchirmBW(PK& k) {
   k.collision({0, 1.2f, 0}, {0.3f, 1.2f, 0.3f});
 }
 
+// --- Nudelfabrik ------------------------------------------------------------------------------
+
+// Europalette 1,2 x 0,8 m, Oberkante 0,144 m (Ursprung = Bodenmitte + o)
+void PaletteAt(PK& k, Vec3 o) {
+  k.mat(MAT_WOOD); k.col(0xc8a070);
+  for (float z : {-0.35f, 0.0f, 0.35f}) k.b.Box(o + Vec3(-0.6f, 0, z - 0.05f), o + Vec3(0.6f, 0.022f, z + 0.05f));
+  k.col(0xb08a5a);
+  for (float x : {-0.55f, 0.0f, 0.55f})
+    for (float z : {-0.35f, 0.0f, 0.35f}) k.b.Box(o + Vec3(x - 0.05f, 0.022f, z - 0.05f), o + Vec3(x + 0.05f, 0.1f, z + 0.05f));
+  k.col(0xc8a070);
+  for (float z : {-0.35f, 0.0f, 0.35f}) k.b.Box(o + Vec3(-0.6f, 0.1f, z - 0.05f), o + Vec3(0.6f, 0.122f, z + 0.05f));
+  k.col(0xd2ab7a);
+  for (int i = 0; i < 5; i++) {
+    float x = -0.55f + i * 0.275f;
+    k.b.Box(o + Vec3(x - 0.05f, 0.122f, -0.4f), o + Vec3(x + 0.05f, 0.144f, 0.4f));
+  }
+  k.part(o + Vec3(-0.6f, 0, -0.4f), o + Vec3(0.6f, 0.144f, 0.4f));
+}
+
+// Gefüllter Mehlsack (liegend), c = Mitte der Unterseite
+void SackAt(PK& k, Vec3 c, u32 col, bool text) {
+  k.mat(MAT_PAPER); k.col(col);
+  k.b.Box(c + Vec3(-0.28f, 0, -0.18f), c + Vec3(0.28f, 0.11f, 0.18f));
+  k.b.Ellipsoid(c + Vec3(0, 0.11f, 0), {0.27f, 0.05f, 0.17f}, 14, 5);
+  k.col(0xcfc3a5);
+  for (float x : {-0.29f, 0.29f}) k.b.Box(c + Vec3(x - 0.012f, 0.02f, -0.185f), c + Vec3(x + 0.012f, 0.1f, 0.185f));  // Falz
+  k.mat(MAT_PLASTIC); k.col(0x2a5aa8);
+  k.b.Box(c + Vec3(-0.27f, 0.035f, 0.18f), c + Vec3(0.27f, 0.065f, 0.183f));
+  if (text) {
+    k.col(0xb03020);
+    k.push(Translation(c + Vec3(-PixelTextWidth("MEHL", 0.02f) * 0.5f, 0.157f, 0.07f)) * RotationX(-PI * 0.5f));
+    BuildPixelText(k.b, "MEHL", 0.02f, 0.003f);
+    k.pop();
+  }
+}
+
+void Mehlsack(PK& k) {
+  SackAt(k, Vec3(0, 0, 0), 0xe6dcc4, true);
+  k.part({-0.3f, 0, -0.19f}, {0.3f, 0.16f, 0.19f});
+}
+
+void Mehlpalette(PK& k) {
+  PaletteAt(k, Vec3(0, 0, 0));
+  for (int l = 0; l < 4; l++)
+    for (int i = 0; i < 4; i++) {
+      Vec3 c(-0.3f + (i % 2) * 0.6f, 0.144f + l * 0.16f, -0.2f + (i / 2) * 0.4f);
+      SackAt(k, c + Vec3((l % 2 ? 0.01f : -0.01f), 0, 0), (i + l) % 2 ? 0xe6dcc4 : 0xe0d4b8, l == 3);
+    }
+  k.part({-0.6f, 0.144f, -0.4f}, {0.6f, 0.144f + 4 * 0.16f, 0.4f});
+}
+
+void Palette(PK& k) { PaletteAt(k, Vec3(0, 0, 0)); }
+
+void Nudelpackung(PK& k) {
+  k.mat(MAT_PAPER); k.col(0x1f4fa0);
+  k.box({-0.04f, 0, -0.016f}, {0.04f, 0.27f, 0.016f});
+  k.mat(MAT_PLASTIC); k.col(0xe8c35a);
+  k.b.Box({-0.022f, 0.06f, 0.016f}, {0.022f, 0.205f, 0.0175f});  // Sichtfenster
+  k.col(0xd8202a);
+  k.b.Box({-0.04f, 0.222f, 0.016f}, {0.04f, 0.252f, 0.0172f});
+  k.col(0xf4f0e6);
+  k.b.Box({-0.03f, 0.02f, 0.016f}, {0.03f, 0.045f, 0.0172f});
+}
+
+void Farfalle(PK& k) {
+  k.mat(MAT_PLASTIC); k.col(0xf0c860);
+  k.ell({0, 0.12f, 0}, {0.11f, 0.12f, 0.045f}, 14, 9);
+  k.col(0x2a8a4a);
+  k.b.Box({-0.1f, 0.22f, -0.01f}, {0.1f, 0.25f, 0.01f});  // Schweißnaht
+  k.col(0xf6f0e2);
+  k.b.Box({-0.055f, 0.08f, 0.032f}, {0.055f, 0.15f, 0.05f});  // Etikett
+  k.col(0xd8202a);
+  k.b.Box({-0.04f, 0.1f, 0.05f}, {0.04f, 0.13f, 0.052f});
+}
+
+void Nudelkarton(PK& k) {
+  k.mat(MAT_PAPER); k.col(0xc49a62);
+  k.box({-0.3f, 0, -0.2f}, {0.3f, 0.4f, 0.2f});
+  k.col(0xd8b884);
+  k.b.Box({-0.3f, 0.4f, -0.03f}, {0.3f, 0.403f, 0.03f});  // Klebeband
+  k.mat(MAT_PLASTIC); k.col(0xb02a20);
+  k.push(Translation({-PixelTextWidth("PASTA", 0.018f) * 0.5f, 0.2f, 0.2f}));
+  BuildPixelText(k.b, "PASTA", 0.018f, 0.003f);
+  k.pop();
+  k.col(0x1a1a1a);
+  for (int i = 0; i < 9; i++) k.b.Box({-0.24f + i * 0.012f, 0.06f, 0.2f}, {-0.236f + i * 0.012f - (i % 3) * 0.001f, 0.12f, 0.202f});  // Strichcode
+}
+
+void Kartonpalette(PK& k) {
+  PaletteAt(k, Vec3(0, 0, 0));
+  k.mat(MAT_PAPER);
+  for (int l = 0; l < 3; l++)
+    for (int i = 0; i < 4; i++) {
+      float x0 = -0.6f + (i % 2) * 0.6f, z0 = -0.4f + (i / 2) * 0.4f, y0 = 0.144f + l * 0.4f;
+      k.col((i + l) % 2 ? 0xc49a62 : 0xb88e58);
+      k.b.Box({x0 + 0.005f, y0, z0 + 0.005f}, {x0 + 0.595f, y0 + 0.395f, z0 + 0.395f});
+      if (i / 2 == 1) {
+        k.mat(MAT_PLASTIC); k.col(0xb02a20);
+        k.push(Translation({x0 + 0.3f - PixelTextWidth("PASTA", 0.012f) * 0.5f, y0 + 0.18f, 0.395f}));
+        BuildPixelText(k.b, "PASTA", 0.012f, 0.002f);
+        k.pop();
+        k.mat(MAT_PAPER);
+      }
+    }
+  k.mat(MAT_PLASTIC); k.col(0xeef0f2);  // Umreifungsbänder
+  for (float x : {-0.32f, 0.28f}) {
+    k.b.Box({x, 0.144f, 0.4f}, {x + 0.04f, 1.344f, 0.404f});
+    k.b.Box({x, 0.144f, -0.404f}, {x + 0.04f, 1.344f, -0.4f});
+    k.b.Box({x, 1.344f, -0.404f}, {x + 0.04f, 1.348f, 0.404f});
+  }
+  k.part({-0.6f, 0.144f, -0.4f}, {0.6f, 1.344f, 0.4f});
+}
+
+void Tomatendose(PK& k) {
+  k.mat(MAT_METAL); k.col(0xb8bcc2);
+  k.cyl({0, 0, 0}, 0.065f, 0.02f, 20);
+  k.cyl({0, 0.122f, 0}, 0.065f, 0.018f, 20);
+  k.mat(MAT_PAPER); k.col(0xc8281e);  // Etikett
+  k.cyl({0, 0.02f, 0}, 0.065f, 0.068f, 20);
+  k.col(0x2f8a3a);
+  k.b.Cylinder({0, 0.088f, 0}, 0.065f, 0.014f, 20);
+  k.col(0xf4e6c0);
+  k.b.Cylinder({0, 0.102f, 0}, 0.065f, 0.02f, 20);
+  k.mat(MAT_METAL); k.col(0x9aa0a6);
+  k.b.Torus({0, 0.14f, 0}, 0.06f, 0.006f, 20, 5);
+  k.b.Torus({0, 0.004f, 0}, 0.06f, 0.006f, 20, 5);
+}
+
+void Olivenoel(PK& k) {
+  k.mat(MAT_METAL); k.col(0xc8b860);
+  k.b.Box({-0.08f, 0, -0.055f}, {0.08f, 0.05f, 0.055f});
+  k.b.Box({-0.08f, 0.22f, -0.055f}, {0.08f, 0.3f, 0.055f});
+  k.mat(MAT_PAPER); k.col(0x2f6a2a);
+  k.b.Box({-0.08f, 0.05f, -0.055f}, {0.08f, 0.22f, 0.055f});
+  k.col(0xe8d070);
+  k.b.Box({-0.05f, 0.09f, 0.055f}, {0.05f, 0.18f, 0.057f});
+  k.col(0x2f6a2a);
+  k.b.Ellipsoid({0, 0.135f, 0.057f}, {0.03f, 0.018f, 0.002f}, 8, 4);  // Olive
+  k.mat(MAT_METAL); k.col(0x8a8e94);
+  k.b.Cylinder({0.045f, 0.3f, 0}, 0.014f, 0.035f, 10);
+  k.b.Box({-0.055f, 0.3f, -0.006f}, {0.0f, 0.335f, 0.006f});
+  k.part({-0.08f, 0, -0.055f}, {0.08f, 0.335f, 0.055f});
+}
+
+void Parmesan(PK& k) {
+  k.mat(MAT_PLASTIC); k.col(0xd2ae5c);
+  k.fr({0, 0, 0}, 0.2f, 0.215f, 0.06f, 28);
+  k.fr({0, 0.06f, 0}, 0.215f, 0.2f, 0.06f, 28);
+  k.col(0xe6cf8a);
+  k.b.Cylinder({0, 0.12f, 0}, 0.19f, 0.004f, 28);
+  k.mat(MAT_PAPER); k.col(0xf4f0e6);
+  k.b.Cylinder({0, 0.124f, 0}, 0.06f, 0.002f, 18);
+}
+
+void Teigwanne(PK& k) {
+  const float y0 = 0.16f, y1 = 0.78f;
+  k.mat(MAT_METAL); k.col(0xc0c6cc);
+  k.box({-0.45f, y0, -0.3f}, {0.45f, y0 + 0.03f, 0.3f});
+  k.box({-0.45f, y0 + 0.03f, -0.3f}, {-0.42f, y1, 0.3f});
+  k.box({0.42f, y0 + 0.03f, -0.3f}, {0.45f, y1, 0.3f});
+  k.box({-0.42f, y0 + 0.03f, -0.3f}, {0.42f, y1, -0.27f});
+  k.box({-0.42f, y0 + 0.03f, 0.27f}, {0.42f, y1, 0.3f});
+  k.mat(MAT_PLASTIC); k.col(0xf0dca8);  // Teig
+  k.b.Box({-0.42f, y0 + 0.03f, -0.27f}, {0.42f, 0.6f, 0.27f});
+  k.b.Ellipsoid({-0.08f, 0.6f, 0.02f}, {0.3f, 0.07f, 0.2f}, 14, 5);
+  k.mat(MAT_METAL); k.col(0x8a9096);
+  k.b.Box({0.45f, 0.64f, -0.2f}, {0.5f, 0.68f, 0.2f});  // Schiebegriff
+  for (float sx : {-1.0f, 1.0f})
+    for (float sz : {-1.0f, 1.0f}) {
+      k.col(0x8a9096);
+      k.b.Cylinder({sx * 0.36f, 0.09f, sz * 0.22f}, 0.012f, 0.07f, 8);
+      k.mat(MAT_PLASTIC); k.col(0x1d1e20);
+      k.b.CylinderX({sx * 0.36f, 0.05f, sz * 0.22f}, 0.05f, 0.04f, 12);
+      k.mat(MAT_METAL);
+    }
+  k.part({-0.45f, 0, -0.3f}, {0.45f, y0, 0.3f});
+}
+
+void Trockenwagen(PK& k) {
+  k.mat(MAT_METAL); k.col(0xb8bec4);
+  for (float sx : {-0.65f, 0.65f})
+    for (float sz : {-0.32f, 0.32f}) k.b.Cylinder({sx, 0.1f, sz}, 0.02f, 1.85f, 8);
+  for (float y : {0.12f, 1.93f})
+    for (float sz : {-0.32f, 0.32f}) k.b.CylinderX({0, y, sz}, 0.018f, 1.32f, 8);
+  for (float y : {0.12f, 1.93f})
+    for (float sx : {-0.65f, 0.65f}) k.b.CylinderZ({sx, y, 0}, 0.018f, 0.66f, 8);
+  Rng r(17);
+  for (int lv = 0; lv < 3; lv++) {
+    float y = 0.8f + lv * 0.52f;
+    for (float pz : {-0.16f, 0.16f}) {
+      k.mat(MAT_WOOD); k.col(0xd8c090);
+      k.b.CylinderX({0, y, pz}, 0.012f, 1.28f, 6);
+      k.mat(MAT_PLASTIC);
+      for (int i = 0; i < 12; i++) {
+        float x = -0.56f + i * 0.102f, len = 0.36f + r.Range(-0.04f, 0.04f);
+        k.col(i % 3 ? 0xead07a : 0xe2c464);
+        for (float side : {-1.0f, 1.0f})
+          k.b.Box({x - 0.02f, y - len, pz + side * 0.008f - 0.005f}, {x + 0.02f, y - 0.01f, pz + side * 0.008f + 0.005f});
+      }
+    }
+  }
+  k.mat(MAT_PLASTIC); k.col(0x1d1e20);
+  for (float sx : {-0.65f, 0.65f})
+    for (float sz : {-0.32f, 0.32f}) k.b.CylinderX({sx, 0.05f, sz}, 0.05f, 0.04f, 12);
+  k.part({-0.68f, 0, -0.35f}, {0.68f, 1.95f, 0.35f});
+}
+
+void Hubwagen(PK& k) {
+  k.mat(MAT_METAL); k.col(0x2c2e32);
+  for (float sx : {-0.27f, 0.27f}) k.box({sx - 0.08f, 0.0f, -0.62f}, {sx + 0.08f, 0.085f, 0.5f});
+  k.col(0xe0a020);
+  k.box({-0.36f, 0.0f, 0.5f}, {0.36f, 0.32f, 0.72f});
+  k.col(0x2c2e32);
+  k.cyl({0, 0.32f, 0.61f}, 0.05f, 0.25f, 10);
+  k.push(Translation({0, 0.55f, 0.62f}) * RotationX(0.35f));
+  k.col(0xe0a020);
+  k.box({-0.025f, 0, -0.025f}, {0.025f, 0.62f, 0.025f});
+  k.col(0x1d1e20);
+  k.box({-0.15f, 0.62f, -0.03f}, {0.15f, 0.68f, 0.03f});
+  k.pop();
+  k.mat(MAT_PLASTIC); k.col(0x1a1b1d);
+  k.b.CylinderX({0, 0.08f, 0.8f}, 0.08f, 0.12f, 14);
+}
+
+void Gabelstapler(PK& k) {
+  const u32 yellow = 0xe8a51c;
+  k.mat(MAT_METAL); k.col(yellow);
+  k.box({-0.55f, 0.2f, -0.6f}, {0.55f, 1.0f, 0.95f});
+  k.col(0x2c2e32);
+  k.box({-0.58f, 0.2f, 0.95f}, {0.58f, 1.15f, 1.3f});  // Gegengewicht
+  k.col(yellow);
+  for (float sx : {-0.5f, 0.5f}) {
+    k.box({sx - 0.035f, 1.0f, -0.5f}, {sx + 0.035f, 2.15f, -0.43f});
+    k.box({sx - 0.035f, 1.0f, 0.82f}, {sx + 0.035f, 2.15f, 0.89f});
+  }
+  k.box({-0.55f, 2.15f, -0.52f}, {0.55f, 2.2f, 0.91f});  // Schutzdach
+  k.col(0x1d1e20);
+  for (int i = 0; i < 6; i++) k.b.Box({-0.5f, 2.2f, -0.45f + i * 0.24f}, {0.5f, 2.21f, -0.42f + i * 0.24f});
+  k.mat(MAT_LEATHER); k.col(0x1d1e20);
+  k.box({-0.26f, 1.0f, 0.3f}, {0.26f, 1.12f, 0.75f});
+  k.box({-0.26f, 1.12f, 0.7f}, {0.26f, 1.62f, 0.8f});
+  k.mat(MAT_PLASTIC); k.col(0x1d1e20);
+  k.b.Push(Translation({0, 1.42f, -0.12f}) * RotationX(-0.9f));
+  k.b.Torus({0, 0, 0}, 0.16f, 0.018f, 18, 6);
+  k.b.Pop();
+  k.b.Box({-0.03f, 1.0f, -0.25f}, {0.03f, 1.38f, -0.18f});  // Lenksäule
+  // Hubmast und Gabeln vorn (-Z)
+  k.mat(MAT_METAL); k.col(0x3a3d42);
+  for (float sx : {-0.32f, 0.32f}) k.box({sx - 0.05f, 0.1f, -0.78f}, {sx + 0.05f, 2.5f, -0.66f});
+  k.box({-0.37f, 2.42f, -0.78f}, {0.37f, 2.5f, -0.66f});
+  k.col(0x2c2e32);
+  k.box({-0.45f, 0.08f, -0.86f}, {0.45f, 0.75f, -0.78f});
+  for (float sx : {-0.3f, 0.3f}) k.box({sx - 0.06f, 0.08f, -1.95f}, {sx + 0.06f, 0.13f, -0.86f});
+  k.mat(MAT_PLASTIC); k.col(0x151516);
+  for (float sx : {-0.6f, 0.6f}) {
+    k.cylx({sx, 0.3f, -0.35f}, 0.3f, 0.2f, 18);
+    k.cylx({sx, 0.24f, 0.98f}, 0.24f, 0.18f, 16);
+  }
+  k.mat(MAT_PLASTIC); k.col(0xff8a20); k.emis(0.6f);
+  k.b.Box({-0.06f, 2.2f, 0.4f}, {0.06f, 2.28f, 0.52f});  // Rundumleuchte
+  k.emis(0);
+}
+
+void Spind(PK& k) {
+  k.mat(MAT_METAL); k.col(0x8fa3b0);
+  k.box({-0.3f, 0.0f, -0.25f}, {0.3f, 1.85f, 0.25f});
+  k.col(0x6d7f8a);
+  k.b.Box({-0.003f, 0.04f, 0.25f}, {0.003f, 1.8f, 0.253f});
+  k.col(0x55606a);
+  for (float sx : {-0.15f, 0.15f})
+    for (int i = 0; i < 5; i++) k.b.Box({sx - 0.07f, 1.5f + i * 0.04f, 0.25f}, {sx + 0.07f, 1.515f + i * 0.04f, 0.252f});
+  k.col(0x30353a);
+  for (float sx : {-0.06f, 0.06f}) k.b.Box({sx - 0.012f, 0.95f, 0.25f}, {sx + 0.012f, 1.1f, 0.265f});
+  k.mat(MAT_PAPER); k.col(0xf4f0e6);
+  k.b.Box({-0.22f, 1.32f, 0.25f}, {-0.1f, 1.39f, 0.252f});
+}
+
+void Stechuhr(PK& k) {
+  k.mat(MAT_METAL); k.col(0x5a5f66);
+  k.box({-0.06f, 0, -0.06f}, {0.06f, 1.1f, 0.06f});
+  k.box({-0.2f, 0, -0.15f}, {0.2f, 0.04f, 0.15f});
+  k.mat(MAT_PLASTIC); k.col(0xd8d4c8);
+  k.box({-0.17f, 1.1f, -0.1f}, {0.17f, 1.48f, 0.1f});
+  k.col(0xf8f6ee);
+  k.b.CylinderZ({0, 1.36f, 0.1f}, 0.085f, 0.006f, 20);
+  k.col(0x1a1a1a);
+  k.b.Box({-0.004f, 1.36f, 0.103f}, {0.004f, 1.43f, 0.106f});
+  k.b.Box({0.0f, 1.356f, 0.103f}, {0.05f, 1.364f, 0.106f});
+  k.b.Box({-0.07f, 1.15f, 0.1f}, {0.07f, 1.2f, 0.11f});  // Kartenschlitz
+  k.mat(MAT_PAPER); k.col(0xe8dfc8);
+  for (int i = 0; i < 6; i++) k.b.Box({-0.14f + i * 0.05f, 1.48f, -0.01f}, {-0.11f + i * 0.05f, 1.56f, 0.0f});  // Stempelkarten
+}
+
+void Schutzhelm(PK& k) {
+  k.mat(MAT_PLASTIC); k.col(0xf2c418);
+  k.b.Ellipsoid({0, 0.012f, 0}, {0.13f, 0.15f, 0.15f}, 16, 8, 0.0f);
+  k.b.Push(Scaling(Vec3(1, 1, 1.18f)));
+  k.b.Cylinder({0, 0, 0.015f}, 0.152f, 0.012f, 20);
+  k.b.Pop();
+  k.b.Box({-0.012f, 0.12f, -0.12f}, {0.012f, 0.165f, 0.1f});  // Grat
+  k.part({-0.15f, 0, -0.18f}, {0.15f, 0.165f, 0.2f});
+}
+
+void Warnschild(PK& k) {
+  for (float s : {-1.0f, 1.0f}) {
+    k.push(Translation({0, 0, s * 0.16f}) * RotationX(-s * 0.26f));
+    k.mat(MAT_PLASTIC); k.col(0xf2c418);
+    k.box({-0.15f, 0, -0.008f}, {0.15f, 0.64f, 0.008f});
+    k.col(0x1a1a1a);
+    float f = s * 0.0095f;
+    k.b.Box({-0.15f, 0.56f, f - 0.0015f}, {0.15f, 0.64f, f + 0.0015f});
+    k.b.Box({-0.016f, 0.3f, f - 0.0015f}, {0.016f, 0.47f, f + 0.0015f});
+    k.b.Box({-0.016f, 0.24f, f - 0.0015f}, {0.016f, 0.272f, f + 0.0015f});
+    k.pop();
+  }
+}
+
+void Werkzeugkiste(PK& k) {
+  k.mat(MAT_METAL); k.col(0xc0281e);
+  k.box({-0.25f, 0, -0.11f}, {0.25f, 0.2f, 0.11f});
+  k.col(0xa82018);
+  k.b.Wedge({-0.25f, 0.2f, -0.11f}, {0.25f, 0.2f, 0.11f}, 0.03f, 0.03f);
+  k.col(0x2a2c30);
+  k.b.Box({-0.12f, 0.23f, -0.012f}, {-0.1f, 0.3f, 0.012f});
+  k.b.Box({0.1f, 0.23f, -0.012f}, {0.12f, 0.3f, 0.012f});
+  k.b.Box({-0.12f, 0.29f, -0.012f}, {0.12f, 0.31f, 0.012f});
+  k.col(0xb8bcc2);
+  for (float sx : {-0.18f, 0.18f}) k.b.Box({sx - 0.02f, 0.16f, 0.11f}, {sx + 0.02f, 0.19f, 0.12f});
+  k.part({-0.25f, 0, -0.11f}, {0.25f, 0.31f, 0.11f});
+}
+
+void Eimer(PK& k) {
+  k.mat(MAT_PLASTIC); k.col(0x2a7ad0);
+  k.fr({0, 0, 0}, 0.12f, 0.15f, 0.3f, 20);
+  k.col(0xf0f2f4);
+  k.b.Cylinder({0, 0.26f, 0}, 0.146f, 0.002f, 20);  // Wasser
+  k.mat(MAT_METAL); k.col(0x9aa0a6);
+  k.b.Push(Translation({0, 0.3f, 0}) * RotationX(PI * 0.5f));
+  k.b.Torus({0, 0, 0}, 0.15f, 0.005f, 20, 4);
+  k.b.Pop();
+}
+
+void Kabeltrommel(PK& k) {
+  k.mat(MAT_WOOD); k.col(0xb08a5a);
+  for (float z : {-0.3f, 0.3f}) k.cylz({0, 0.48f, z}, 0.48f, 0.05f, 24);
+  k.cylz({0, 0.48f, 0}, 0.16f, 0.56f, 16);
+  k.mat(MAT_PLASTIC); k.col(0x1a1b1d);
+  k.b.CylinderZ({0, 0.48f, 0}, 0.33f, 0.54f, 24);  // Kabel
+  k.col(0xe06a1a);
+  k.b.CylinderZ({0, 0.48f, 0.12f}, 0.335f, 0.06f, 24);
+  k.mat(MAT_METAL); k.col(0x55595f);
+  for (float z : {-0.33f, 0.33f}) k.b.CylinderZ({0, 0.48f, z}, 0.05f, 0.03f, 10);
+}
+
+void Standventilator(PK& k) {
+  k.mat(MAT_PLASTIC); k.col(0xe8eaec);
+  k.cyl({0, 0, 0}, 0.2f, 0.04f, 20);
+  k.cyl({0, 0.04f, 0}, 0.018f, 1.05f, 8);
+  k.col(0xd8dadc);
+  k.box({-0.06f, 1.05f, -0.1f}, {0.06f, 1.2f, 0.06f});
+  k.mat(MAT_METAL); k.col(0xc8ccd0);
+  k.b.Push(Translation({0, 1.15f, 0.12f}) * RotationX(PI * 0.5f));
+  k.b.Torus({0, 0, 0}, 0.24f, 0.008f, 28, 4);
+  k.b.Torus({0, 0, 0}, 0.16f, 0.004f, 24, 4);
+  k.b.Pop();
+  for (int i = 0; i < 12; i++) {
+    float a = TAU * i / 12;
+    Vec3 d(cosf(a), sinf(a), 0);
+    k.b.Box(Vec3(0, 1.15f, 0.12f) + d * 0.12f - Vec3(0.004f, 0.004f, 0.004f), Vec3(0, 1.15f, 0.12f) + d * 0.12f + Vec3(0.004f, 0.004f, 0.004f));
+  }
+  k.mat(MAT_PLASTIC); k.col(0x7ab8e0);
+  for (int i = 0; i < 3; i++) {
+    k.b.Push(Translation({0, 1.15f, 0.11f}) * RotationZ(TAU * i / 3) * RotationY(0.3f));
+    k.b.Box({-0.04f, 0.02f, -0.004f}, {0.04f, 0.21f, 0.004f});
+    k.b.Pop();
+  }
+  k.part({-0.25f, 0.9f, 0.05f}, {0.25f, 1.4f, 0.17f});
+}
+
+void Sackkarre(PK& k) {
+  k.mat(MAT_METAL); k.col(0x2f6ab0);
+  for (float sx : {-0.2f, 0.2f}) {
+    k.push(Translation({sx, 0.12f, 0.08f}) * RotationX(-0.18f));
+    k.box({-0.015f, 0, -0.015f}, {0.015f, 1.2f, 0.015f});
+    k.pop();
+  }
+  for (float y : {0.45f, 0.85f}) k.box({-0.2f, y, 0.0f}, {0.2f, y + 0.025f, 0.03f});
+  k.col(0x55595f);
+  k.box({-0.22f, 0.0f, -0.25f}, {0.22f, 0.02f, 0.05f});  // Schaufel
+  k.mat(MAT_PLASTIC); k.col(0x1a1b1d);
+  for (float sx : {-0.27f, 0.27f}) k.cylx({sx, 0.13f, 0.12f}, 0.13f, 0.06f, 16);
+  k.col(0x1d1e20);
+  k.box({-0.21f, 1.3f, 0.28f}, {0.21f, 1.34f, 0.32f});  // Griff
+}
+
+void Nudelsieb(PK& k) {
+  k.mat(MAT_METAL); k.col(0xc8ccd2);
+  k.b.Push(RotationX(PI));
+  k.b.Ellipsoid({0, -0.13f, 0}, {0.13f, 0.11f, 0.13f}, 18, 8, 0.0f);
+  k.b.Pop();
+  k.b.Cylinder({0, 0, 0}, 0.07f, 0.03f, 16);
+  k.b.Push(Translation({0, 0.13f, 0}) * RotationX(PI * 0.5f));
+  k.b.Torus({0, 0, 0}, 0.13f, 0.006f, 20, 4);
+  k.b.Pop();
+  for (float sx : {-1.0f, 1.0f}) k.b.Box({sx * 0.13f - 0.03f, 0.11f, -0.012f}, {sx * 0.13f + 0.03f, 0.125f, 0.012f});
+  k.col(0x55595f);
+  for (int i = 0; i < 16; i++) {
+    float a = TAU * i / 16;
+    Vec3 p(cosf(a) * 0.105f, 0.07f, sinf(a) * 0.105f);
+    k.b.Box(p - Vec3(0.006f), p + Vec3(0.006f));
+  }
+  k.part({-0.16f, 0, -0.13f}, {0.16f, 0.135f, 0.13f});
+}
+
+void Werkbank(PK& k) {
+  k.mat(MAT_METAL); k.col(0x2f6ab0);
+  for (float sx : {-0.82f, 0.82f})
+    for (float sz : {-0.36f, 0.36f}) k.box({sx - 0.03f, 0, sz - 0.03f}, {sx + 0.03f, 0.84f, sz + 0.03f});
+  k.box({-0.85f, 0.15f, -0.39f}, {0.85f, 0.18f, 0.39f});
+  k.mat(MAT_WOOD); k.col(0xc89a62);
+  k.box({-0.9f, 0.84f, -0.42f}, {0.9f, 0.9f, 0.42f});
+  k.mat(MAT_METAL); k.col(0x55595f);
+  k.box({0.5f, 0.6f, -0.38f}, {0.8f, 0.84f, 0.36f});  // Schubladenblock
+  k.col(0x3a3d42);
+  for (int i = 0; i < 3; i++) k.b.Box({0.6f, 0.64f + i * 0.07f, 0.36f}, {0.7f, 0.655f + i * 0.07f, 0.372f});
+  k.col(0x30353a);  // Schraubstock
+  k.box({-0.75f, 0.9f, 0.2f}, {-0.55f, 1.0f, 0.4f});
+  k.box({-0.7f, 1.0f, 0.22f}, {-0.6f, 1.08f, 0.38f});
+  k.b.CylinderZ({-0.65f, 0.96f, 0.47f}, 0.012f, 0.16f, 8);
+}
+
+void Waage(PK& k) {
+  k.mat(MAT_METAL); k.col(0xc0c6cc);
+  k.box({-0.4f, 0, -0.4f}, {0.4f, 0.08f, 0.4f});
+  k.col(0x55595f);
+  k.box({-0.03f, 0.08f, -0.42f}, {0.03f, 1.0f, -0.36f});
+  k.mat(MAT_PLASTIC); k.col(0x2a2c30);
+  k.box({-0.15f, 0.95f, -0.45f}, {0.15f, 1.12f, -0.36f});
+  k.mat(MAT_SCREEN); k.col(0x7aff8a);
+  k.b.Box({-0.11f, 1.0f, -0.36f}, {0.11f, 1.07f, -0.358f});
+}
+
+void Mikroskop(PK& k) {
+  k.mat(MAT_PLASTIC); k.col(0xf0f0ee);
+  k.box({-0.1f, 0, -0.14f}, {0.1f, 0.04f, 0.1f});
+  k.box({-0.03f, 0.04f, -0.13f}, {0.03f, 0.3f, -0.07f});
+  k.box({-0.07f, 0.13f, -0.08f}, {0.07f, 0.145f, 0.06f});  // Objekttisch
+  k.mat(MAT_METAL); k.col(0x2a2c30);
+  k.push(Translation({0, 0.24f, -0.06f}) * RotationX(0.5f));
+  k.cyl({0, 0, 0}, 0.022f, 0.16f, 12);
+  k.pop();
+  k.b.Cylinder({0, 0.16f, 0.0f}, 0.012f, 0.05f, 10);
+}
+
+void Klemmbrett(PK& k) {
+  k.mat(MAT_WOOD); k.col(0x8a5a33);
+  k.box({-0.115f, 0, -0.16f}, {0.115f, 0.006f, 0.16f});
+  k.mat(MAT_PAPER); k.col(0xf6f4ee);
+  k.b.Box({-0.1f, 0.006f, -0.13f}, {0.1f, 0.008f, 0.15f});
+  k.col(0x5a5f66);
+  for (int i = 0; i < 6; i++) k.b.Box({-0.08f, 0.008f, -0.1f + i * 0.04f}, {0.06f - (i % 2) * 0.03f, 0.009f, -0.094f + i * 0.04f});
+  k.mat(MAT_METAL); k.col(0xb8bcc2);
+  k.b.Box({-0.05f, 0.006f, -0.165f}, {0.05f, 0.02f, -0.12f});
+}
+
+void Nudelteller(PK& k) {
+  k.mat(MAT_PLASTIC); k.col(0xf6f6f2);
+  k.fr({0, 0, 0}, 0.07f, 0.13f, 0.025f, 24);
+  k.col(0xeee6c8);
+  k.b.Cylinder({0, 0.025f, 0}, 0.1f, 0.001f, 24);
+  k.col(0xe8c870);  // Spaghetti-Nest
+  for (int i = 0; i < 3; i++) k.b.Torus({0, 0.035f + i * 0.012f, 0}, 0.06f - i * 0.012f, 0.012f, 20, 6);
+  k.col(0xb8281a);  // Soße
+  k.b.Ellipsoid({0, 0.06f, 0}, {0.04f, 0.018f, 0.04f}, 12, 5);
+  k.col(0x2f8a3a);
+  k.b.Ellipsoid({0.012f, 0.078f, 0.008f}, {0.012f, 0.003f, 0.007f}, 8, 3);  // Basilikum
+  k.mat(MAT_METAL); k.col(0xc8ccd2);
+  k.b.Box({0.06f, 0.03f, -0.006f}, {0.17f, 0.036f, 0.006f});  // Gabel
+}
+
+void Schaltschrank(PK& k) {
+  k.mat(MAT_METAL); k.col(0xd4d6d2);
+  k.box({-0.4f, 0.1f, -0.2f}, {0.4f, 2.0f, 0.2f});
+  k.col(0x5a5f66);
+  k.box({-0.4f, 0, -0.2f}, {0.4f, 0.1f, 0.2f});
+  k.col(0xb8bab6);
+  k.b.Box({-0.002f, 0.15f, 0.2f}, {0.002f, 1.95f, 0.203f});
+  k.col(0x30353a);
+  for (float sx : {-0.06f, 0.06f}) k.b.Box({sx - 0.015f, 1.0f, 0.2f}, {sx + 0.015f, 1.12f, 0.22f});
+  k.mat(MAT_PLASTIC); k.col(0xf2c418);  // Warnschild
+  k.b.Box({-0.32f, 1.6f, 0.2f}, {-0.16f, 1.76f, 0.203f});
+  k.col(0x1a1a1a);
+  k.b.Box({-0.245f, 1.63f, 0.203f}, {-0.235f, 1.73f, 0.205f});
+  k.col(0x30d050); k.emis(0.9f);
+  k.b.Box({0.18f, 1.7f, 0.2f}, {0.22f, 1.74f, 0.21f});
+  k.col(0xff3020);
+  k.b.Box({0.26f, 1.7f, 0.2f}, {0.3f, 1.74f, 0.21f});
+  k.emis(0);
+}
+
+void Kunststofffass(PK& k) {
+  k.mat(MAT_PLASTIC); k.col(0x1f5fb0);
+  k.cyl({0, 0, 0}, 0.29f, 0.9f, 22);
+  k.col(0x1a54a0);
+  for (float y : {0.3f, 0.6f}) {
+    k.b.Push(Translation({0, y, 0}));
+    k.b.Torus({0, 0, 0}, 0.29f, 0.012f, 22, 4);
+    k.b.Pop();
+  }
+  k.col(0x18489a);
+  k.b.Cylinder({0.15f, 0.9f, 0}, 0.04f, 0.02f, 10);
+  k.b.Cylinder({-0.15f, 0.9f, 0}, 0.03f, 0.02f, 10);
+}
+
+void IbcTank(PK& k) {
+  PaletteAt(k, Vec3(0, 0, 0));
+  k.mat(MAT_PLASTIC); k.col(0xe8eae4);
+  k.box({-0.55f, 0.15f, -0.36f}, {0.55f, 1.1f, 0.36f});
+  k.col(0xd0d2cc);
+  k.b.Box({-0.5f, 0.15f, 0.36f}, {0.5f, 0.75f, 0.362f});  // Füllstand
+  k.mat(MAT_METAL); k.col(0x9aa0a6);
+  for (float x : {-0.58f, -0.29f, 0.0f, 0.29f, 0.58f}) {
+    k.b.Box({x - 0.012f, 0.15f, 0.37f}, {x + 0.012f, 1.14f, 0.39f});
+    k.b.Box({x - 0.012f, 0.15f, -0.39f}, {x + 0.012f, 1.14f, -0.37f});
+  }
+  for (float y : {0.15f, 0.62f, 1.12f}) {
+    k.b.Box({-0.6f, y, 0.37f}, {0.6f, y + 0.02f, 0.39f});
+    k.b.Box({-0.6f, y, -0.39f}, {0.6f, y + 0.02f, -0.37f});
+  }
+  k.col(0x55595f);
+  k.cyl({0, 1.1f, 0}, 0.08f, 0.05f, 14);
+  k.mat(MAT_PLASTIC); k.col(0x1a1b1d);
+  k.b.CylinderZ({0, 0.25f, 0.42f}, 0.04f, 0.06f, 10);
+  k.part({-0.6f, 0.144f, -0.39f}, {0.6f, 1.15f, 0.39f});
+}
+
 struct Entry {
   const char* id;
   const char* name;
@@ -1674,6 +2210,38 @@ void BuildCatalog() {
       {"lautsprecher", "Lautsprecher", true, Lautsprecher},
       {"kerze", "Kerze", true, Kerze},
       {"schirm_bw", "Biergartenschirm", true, SchirmBW},
+      {"mehlsack", "Mehlsack", true, Mehlsack},
+      {"mehlpalette", "Mehlpalette", true, Mehlpalette},
+      {"palette", "Europalette", true, Palette},
+      {"nudelpackung", "Spaghetti-Packung", true, Nudelpackung},
+      {"farfalle", "Farfalle-Tüte", true, Farfalle},
+      {"nudelkarton", "Nudelkarton", true, Nudelkarton},
+      {"kartonpalette", "Kartonpalette", true, Kartonpalette},
+      {"tomatendose", "Tomatendose", true, Tomatendose},
+      {"olivenoel", "Olivenöl-Kanister", true, Olivenoel},
+      {"parmesan", "Parmesanlaib", true, Parmesan},
+      {"teigwanne", "Teigwanne", true, Teigwanne},
+      {"trockenwagen", "Trockenwagen", true, Trockenwagen},
+      {"hubwagen", "Hubwagen", true, Hubwagen},
+      {"gabelstapler", "Gabelstapler", false, Gabelstapler},
+      {"spind", "Spind", true, Spind},
+      {"stechuhr", "Stechuhr", true, Stechuhr},
+      {"schutzhelm", "Schutzhelm", true, Schutzhelm},
+      {"warnschild", "Warnaufsteller", true, Warnschild},
+      {"werkzeugkiste", "Werkzeugkiste", true, Werkzeugkiste},
+      {"eimer", "Eimer", true, Eimer},
+      {"kabeltrommel", "Kabeltrommel", true, Kabeltrommel},
+      {"ventilator", "Standventilator", true, Standventilator},
+      {"sackkarre", "Sackkarre", true, Sackkarre},
+      {"sieb", "Nudelsieb", true, Nudelsieb},
+      {"werkbank", "Werkbank", true, Werkbank},
+      {"waage", "Plattformwaage", true, Waage},
+      {"mikroskop", "Mikroskop", true, Mikroskop},
+      {"klemmbrett", "Klemmbrett", true, Klemmbrett},
+      {"nudelteller", "Teller Spaghetti", true, Nudelteller},
+      {"schaltschrank", "Schaltschrank", true, Schaltschrank},
+      {"fass_blau", "Kunststofffass", true, Kunststofffass},
+      {"ibc", "IBC-Tank", true, IbcTank},
   };
   g_defs.reserve(COUNTOF(entries));
   for (const Entry& e : entries) {

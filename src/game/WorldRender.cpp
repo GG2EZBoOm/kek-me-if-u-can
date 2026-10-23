@@ -45,6 +45,7 @@ void WorldRender::Load(Renderer& r, const World& w) {
     an.center = a.pivot;
     for (const Vertex& v : a.mesh.verts) an.radius = std::max(an.radius, Distance(v.pos, a.pivot));
     if (a.orbit) an.radius += Length(a.offset);
+    if (a.slideLen > 0) an.radius += Length(a.slideDir) * a.slideLen;
     anims_.push_back(std::move(an));
   }
   loaded_ = &w;

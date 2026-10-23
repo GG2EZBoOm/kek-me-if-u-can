@@ -70,6 +70,7 @@ bool OverlapOBox(const OBox& a, const OBox& b, Vec3* mtv) {
 }
 
 Mat4 AnimatedPart::Transform(float t) const {
+  if (slideLen > 0) return Translation(slideDir * fmodf(phase + t * speed, slideLen));
   float a = phase + t * speed;
   Mat4 r = axis == 0 ? RotationX(a) : axis == 2 ? RotationZ(a) : RotationY(a);
   if (orbit) return Translation(TransformPoint(r, offset) - offset);

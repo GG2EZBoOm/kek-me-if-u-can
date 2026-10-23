@@ -10,6 +10,10 @@ const std::vector<MapInfo>& AllMaps() {
        "Festzelt auf der Theresienwiese: Bierbänke, Musikpodium, Empore mit Boxen, Ausschank und Hendlküche – draußen "
        "Biergarten, Wirtsbudenstraße, Riesenrad, Kettenflieger und Autoscooter.",
        BuildOktoberfest},
+      {"nudelfabrik", "Nudelfabrik",
+       "Alte Backsteinfabrik: Produktionshalle mit Rührwerken, Nudelpresse und Spaghetti-Straße, Laufstege, Trockenraum, "
+       "Mehllager, Verpackung mit Lkw an der Rampe – draußen Mehlsilos, Werkshof und Parkplatz.",
+       BuildNudelfabrik},
   };
   return maps;
 }

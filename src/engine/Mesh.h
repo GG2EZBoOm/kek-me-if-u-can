@@ -28,6 +28,8 @@ enum Material : u8 {
   MAT_PLASTER,    // Putz
   MAT_GOLD,
   MAT_LEATHER,
+  MAT_BRICK,       // Backstein im Läuferverband
+  MAT_CORRUGATED,  // Wellblech
   MAT_COUNT
 };
 
