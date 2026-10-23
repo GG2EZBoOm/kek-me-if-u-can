@@ -34,6 +34,7 @@ void Settings::Load(const std::string& path) {
   b("fullscreen", fullscreen);
   b("showFps", showFps);
   b("autoUpdate", autoUpdate);
+  b("intros", intros);
   i("map", match.mapIndex);
   i("rounds", match.rounds);
   f("hideTime", match.hideTime);
@@ -57,7 +58,7 @@ void Settings::Save(const std::string& path) const {
   t += StrFormat("masterVolume=%.2f\nmusicVolume=%.2f\n", masterVolume, musicVolume);
   t += StrFormat("shadowQuality=%d\nssao=%d\nbloom=%d\nfxaa=%d\nvsync=%d\nfullscreen=%d\nshowFps=%d\n", shadowQuality,
                  ssao ? 1 : 0, bloom ? 1 : 0, fxaa ? 1 : 0, vsync ? 1 : 0, fullscreen ? 1 : 0, showFps ? 1 : 0);
-  t += StrFormat("autoUpdate=%d\n", autoUpdate ? 1 : 0);
+  t += StrFormat("autoUpdate=%d\nintros=%d\n", autoUpdate ? 1 : 0, intros ? 1 : 0);
   t += StrFormat("map=%d\nrounds=%d\nhideTime=%.0f\nroundTime=%.0f\nbots=%d\nbotSkill=%d\ninfection=%d\n", match.mapIndex,
                  match.rounds, match.hideTime, match.roundTime, match.bots, match.botSkill, match.infection ? 1 : 0);
   t += "lastServer=" + lastServer + "\n";

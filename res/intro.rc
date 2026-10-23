@@ -1,0 +1,5 @@
+// Intro-Videos (MP4: H.264 + AAC), werden vor dem Hauptmenü abgespielt.
+// IDs müssen zu kIntroIds in src/game/Game.cpp passen.
+100 RCDATA "video/kekishintro.mp4"
+101 RCDATA "video/engineintro.mp4"
+102 RCDATA "video/spielintro.mp4"

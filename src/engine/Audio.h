@@ -23,6 +23,8 @@ void Shutdown();
 bool Available();
 // Mono-Samples (-1..1) bei SAMPLE_RATE
 int CreateSound(std::vector<float> samples);
+// Stereo-Samples (L, R, L, R, ...) – nur nicht-positional; andere Abtastraten über PlayParams::pitch ausgleichen
+int CreateSoundStereo(std::vector<float> interleaved);
 float SoundLength(int sound);
 int Play(int sound, const PlayParams& p);
 void Stop(int voice);
