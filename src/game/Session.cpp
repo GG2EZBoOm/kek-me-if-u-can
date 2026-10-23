@@ -1,6 +1,7 @@
 #include "game/Session.h"
 #include "game/Maps.h"
 #include "game/NetGame.h"
+#include "game/Invite.h"
 
 void FillClientState(const Sim& sim, ClientState& out, float alpha) {
   out.valid = true;
@@ -72,6 +73,11 @@ void FillClientState(const Sim& sim, ClientState& out, float alpha) {
 }
 
 LocalSession::LocalSession() = default;
+
+void LocalSession::SetInternetAddress(const std::string& address) {
+  internetAddress_ = InternetInviteAddress(address);
+  if (net_) net_->internetAddress = internetAddress_;
+}
 
 LocalSession::~LocalSession() {
   if (net_) net_->Stop(sim_);

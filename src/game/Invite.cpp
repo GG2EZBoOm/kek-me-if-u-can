@@ -88,3 +88,33 @@ std::string InviteMessage(const std::string& address, const std::string& code, c
   return "Kek Me If You Can – spiel mit mir auf \"" + mapName + "\"! Code: " + code + " (Adresse " + address +
          ") · Im Spiel: Server beitreten → Code einfügen";
 }
+
+std::string InternetInviteAddress(const std::string& address) {
+  size_t split = address.find(':');
+  if (split == std::string::npos || split + 1 == address.size()) return "";
+  std::string ip = address.substr(0, split), portText = address.substr(split + 1);
+  if (ip.size() > 15 || portText.size() > 5) return "";
+  for (char ch : ip) if ((ch < '0' || ch > '9') && ch != '.') return "";
+  if (!upnp::IsPublicIPv4(ip)) return "";
+  unsigned port = 0;
+  for (char ch : portText) {
+    if (ch < '0' || ch > '9') return "";
+    port = port * 10 + (ch - '0');
+  }
+  if (!port || port > 65535) return "";
+  u32 numeric; upnp::ParseIPv4(ip, numeric);
+  return StrFormat("%u.%u.%u.%u:%u", numeric >> 24, (numeric >> 16) & 255, (numeric >> 8) & 255, numeric & 255, port);
+}
+
+std::string HostInternetAddress(const std::string& routerIp, const std::string& detectedIp, u16 port) {
+  std::string router = InternetInviteAddress(routerIp + ":" + std::to_string(port));
+  return !router.empty() ? router : InternetInviteAddress(detectedIp + ":" + std::to_string(port));
+}
+
+std::string InternetInviteCode(const std::string& address) {
+  std::string valid = InternetInviteAddress(address);
+  if (valid.empty()) return "";
+  size_t split = valid.find(':');
+  u32 ip; upnp::ParseIPv4(valid.substr(0, split), ip);
+  return EncodeInvite(ip, (u16)atoi(valid.c_str() + split + 1));
+}

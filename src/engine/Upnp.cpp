@@ -1,6 +1,7 @@
 #include "engine/Upnp.h"
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <winhttp.h>
 #include <chrono>
 
 namespace upnp {
@@ -134,6 +135,19 @@ std::vector<std::string> DiscoverGateways(int waitMs) {
   std::vector<std::string> found;
   SOCKET s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if (s == INVALID_SOCKET) return found;
+  // Multicast kann sonst über einen VPN-Adapter mit niedrigerer Metrik laufen,
+  // obwohl die Internet-Standardroute (und unser Spielserver) das Heimnetz nutzt.
+  std::string local = LocalIPv4();
+  sockaddr_in source = {};
+  source.sin_family = AF_INET;
+  if (!local.empty() && inet_pton(AF_INET, local.c_str(), &source.sin_addr) == 1) {
+    if (bind(s, (sockaddr*)&source, sizeof(source)) != 0 ||
+        setsockopt(s, IPPROTO_IP, IP_MULTICAST_IF, (const char*)&source.sin_addr, sizeof(source.sin_addr)) != 0) {
+      LOG("UPnP: Netzwerkschnittstelle %s nicht verfügbar (%d)", local.c_str(), WSAGetLastError());
+      closesocket(s);
+      return found;
+    }
+  }
   DWORD to = 300;
   setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (const char*)&to, sizeof(to));
   sockaddr_in dst = {};
@@ -188,11 +202,21 @@ std::string SoapError(const std::string& resp) {
 }  // namespace
 
 bool ParseIPv4(const std::string& text, u32& ip) {
-  int a, b, c, d;
-  char tail;
-  if (sscanf(text.c_str(), "%d.%d.%d.%d%c", &a, &b, &c, &d, &tail) != 4) return false;
-  if (a < 0 || a > 255 || b < 0 || b > 255 || c < 0 || c > 255 || d < 0 || d > 255) return false;
-  ip = ((u32)a << 24) | ((u32)b << 16) | ((u32)c << 8) | (u32)d;
+  if (text.size() > 15) return false;
+  size_t pos = 0;
+  u32 value = 0;
+  for (int part = 0; part < 4; part++) {
+    unsigned octet = 0, digits = 0;
+    while (pos < text.size() && text[pos] >= '0' && text[pos] <= '9') {
+      octet = octet * 10 + (text[pos++] - '0'); digits++;
+      if (octet > 255 || digits > 3) return false;
+    }
+    if (!digits) return false;
+    value = (value << 8) | octet;
+    if (part < 3) { if (pos >= text.size() || text[pos++] != '.') return false; }
+    else if (pos != text.size()) return false;
+  }
+  ip = value;
   return true;
 }
 
@@ -202,6 +226,16 @@ bool IsPrivateIPv4(const std::string& text) {
   u32 a = ip >> 24, b = (ip >> 16) & 255;
   return a == 10 || a == 127 || a == 0 || (a == 172 && b >= 16 && b <= 31) || (a == 192 && b == 168) || (a == 169 && b == 254) ||
          (a == 100 && b >= 64 && b <= 127);
+}
+
+bool IsPublicIPv4(const std::string& text) {
+  u32 ip;
+  if (!ParseIPv4(text, ip) || IsPrivateIPv4(text)) return false;
+  u32 a = ip >> 24, b = (ip >> 16) & 255, c = (ip >> 8) & 255;
+  if (a >= 224 || (a == 198 && (b == 18 || b == 19))) return false;
+  if ((a == 192 && b == 0 && c == 2) || (a == 198 && b == 51 && c == 100) || (a == 203 && b == 0 && c == 113)) return false;
+  if (a == 192 && b == 0 && c == 0 && ip != 0xc0000009u && ip != 0xc000000au) return false;
+  return true;
 }
 
 std::string LocalIPv4() {
@@ -371,28 +405,37 @@ void PublicIpLookup::Start() {
     std::lock_guard<std::mutex> l(mu_);
     if (busy_) return;
     busy_ = true;
+    result_.clear();
     error_.clear();
   }
   if (thread_.joinable()) thread_.join();
   thread_ = std::thread([this]() {
-    WsaGuard wsa;
-    std::string resp, ip, err;
-    const char* req = "GET / HTTP/1.1\r\nHost: api.ipify.org\r\nUser-Agent: KekMeIfYouCan\r\nConnection: close\r\n\r\n";
-    if (HttpRequest("api.ipify.org", 80, req, resp, nullptr, 4000) && HttpStatus(resp) == 200) {
-      std::string body = Body(resp);
-      // erstes IPv4-artiges Wort im Text (auch bei chunked-Kodierung)
-      size_t i = 0;
-      while (i < body.size()) {
-        size_t j = i;
-        while (j < body.size() && (isdigit((unsigned char)body[j]) || body[j] == '.')) j++;
-        u32 tmp;
-        if (j > i && ParseIPv4(body.substr(i, j - i), tmp)) { ip = body.substr(i, j - i); break; }
-        i = j + 1;
-      }
-      if (ip.empty()) err = "Unerwartete Antwort";
-    } else {
-      err = "Keine Verbindung zu api.ipify.org";
+    std::string body, ip, err;
+    HINTERNET session = WinHttpOpen(L"KekMeIfYouCan", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+                                    WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    if (session) WinHttpSetTimeouts(session, 4000, 4000, 4000, 4000);
+    HINTERNET conn = session ? WinHttpConnect(session, L"api.ipify.org", INTERNET_DEFAULT_HTTPS_PORT, 0) : nullptr;
+    HINTERNET req = conn ? WinHttpOpenRequest(conn, L"GET", L"/", nullptr, WINHTTP_NO_REFERER,
+                                             WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE) : nullptr;
+    bool ok = req && WinHttpSendRequest(req, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
+              WinHttpReceiveResponse(req, nullptr);
+    DWORD status = 0, size = sizeof(status);
+    ok = ok && WinHttpQueryHeaders(req, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                                   WINHTTP_HEADER_NAME_BY_INDEX, &status, &size, WINHTTP_NO_HEADER_INDEX) && status == 200;
+    while (ok) {
+      char buf[64]; DWORD got = 0;
+      if (!WinHttpReadData(req, buf, sizeof(buf), &got)) { ok = false; break; }
+      if (!got) break;
+      body.append(buf, got);
+      if (body.size() > 64) { ok = false; break; }
     }
+    if (req) WinHttpCloseHandle(req);
+    if (conn) WinHttpCloseHandle(conn);
+    if (session) WinHttpCloseHandle(session);
+    while (!body.empty() && isspace((unsigned char)body.back())) body.pop_back();
+    while (!body.empty() && isspace((unsigned char)body.front())) body.erase(body.begin());
+    if (ok && IsPublicIPv4(body)) ip = body;
+    else err = ok ? "Keine gültige öffentliche IPv4 erhalten" : "Öffentliche IP konnte nicht ermittelt werden – erneut versuchen";
     std::lock_guard<std::mutex> l(mu_);
     result_ = ip;
     error_ = err;

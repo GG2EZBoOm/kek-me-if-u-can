@@ -15,6 +15,7 @@ enum NetMsg : u8 {
   MSG_DISCOVER,
   MSG_INFO,
   MSG_EVENTS,
+  MSG_INTERNET_ADDRESS,  // optionale Host-Adresse für Einladungen; ältere Clients ignorieren sie
 };
 constexpr u16 NET_MAGIC = 0x4850;
 
@@ -30,6 +31,7 @@ class NetServer {
   u16 Port() const { return sock_.LocalPort(); }
   std::function<void()> onPlayersChanged;
   std::string name;
+  std::string internetAddress;
 
  private:
   struct Client {
@@ -62,6 +64,7 @@ class NetClient : public Session {
   bool Failed() const override { return state_ == FailedState; }
   std::string StatusText() const override { return status_; }
   bool IsHost() const override { return false; }
+  std::string InternetAddress() const override;
   void TakeEvents(std::vector<GameEvent>& out) override;
   void SendChat(const std::string& text) override;
   const MoveState* LocalMove() const override { return &pred_; }
@@ -84,6 +87,8 @@ class NetClient : public Session {
   std::string status_ = "Verbinde ...";
   std::string name_;
   std::string serverName_;
+  std::string internetAddress_;
+  u32 internetAddressTick_ = 0;
   double time_ = 0, helloTimer_ = 0, lastRecv_ = 0;
   int slot_ = -1;
   World world_;

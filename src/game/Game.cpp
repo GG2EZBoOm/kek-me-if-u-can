@@ -163,6 +163,7 @@ class Game {
   upnp::PublicIpLookup ipLookup_;
   DiscordRpc discord_;
   bool hosting_ = false;      // eigener Server mit Netzwerk
+  bool inviteLan_ = false;    // ausdrückliche LAN-Auswahl, nie für Discord-Präsenz
   std::string localIp_;
   std::string partyId_;
   std::string serverAddr_;    // Adresse des beigetretenen Servers (für Einladungen als Gast)
@@ -300,7 +301,11 @@ void Game::StartLocal(bool host) {
   session_ = std::move(s);
   session_->makeCmd = [this]() { return MakeCmd(); };
   hosting_ = host;
-  if (host) portMapper_.Start(GAME_PORT, "Kek Me If You Can");
+  inviteLan_ = false;
+  if (host && !autopilot_) {
+    portMapper_.Start(GAME_PORT, "Kek Me If You Can");
+    ipLookup_.Start();
+  }
   partyId_ = StrFormat("kek-%08x%08x", rng_.Next(), (u32)time(nullptr));
   sessionStart_ = (long long)time(nullptr);
   serverAddr_.clear();
@@ -326,6 +331,7 @@ void Game::StartJoin(const std::string& addr) {
   c->Connect(resolved, cfg_.name);
   hosting_ = false;
   // Einmal numerisch auflösen, damit Pausenmenü und Discord nicht ständig DNS fragen
+  inviteLan_ = false;
   net::Address na;
   serverAddr_ = net::Address::Parse(resolved, GAME_PORT, na) && na.ip != 0 ? na.ToString() : "";
   partyId_ = "kek-" + serverAddr_;
@@ -862,6 +868,10 @@ void Game::Frame(float dt) {
                       joinRequests_.end());
   if (!joinRequests_.empty() && (plat::KeyPressed(VK_F8) || plat::KeyPressed(VK_F9))) {
     bool accept = plat::KeyPressed(VK_F8);
+    if (accept && (!session_ || session_->InternetAddress().empty())) {
+      AddChat("", "Internet-Adresse noch unbekannt. Esc → Freunde einladen zeigt den Status.", TEAM_SPECTATOR, true);
+      accept = false;
+    }
     discord_.RespondJoinRequest(joinRequests_.front().userId, accept);
     if (accept) AddChat("", joinRequests_.front().name + " wurde über Discord eingeladen", TEAM_SPECTATOR, true);
     joinRequests_.erase(joinRequests_.begin());
@@ -1571,30 +1581,30 @@ void Game::DrawUpdateCard(const Rect& r) {
 
 std::string Game::InviteAddress(std::string* note, Color* noteColor) const {
   upnp::Status s = portMapper_.GetStatus();
-  std::string routerIp = !s.externalIp.empty() && !upnp::IsPrivateIPv4(s.externalIp) ? s.externalIp : "";
-  std::string pub = !routerIp.empty() ? routerIp : ipLookup_.Result();
+  std::string address = HostInternetAddress(s.externalIp, ipLookup_.Result(), GAME_PORT);
   std::string lan = !s.localIp.empty() ? s.localIp : localIp_;
-  std::string ip = !pub.empty() ? pub : lan;
   if (note && noteColor) {
-    if (s.state == upnp::Status::Working) {
-      *note = "Router wird eingerichtet …";
-      *noteColor = theme::Dim;
-    } else if (s.state == upnp::Status::Mapped && !pub.empty()) {
-      *note = "Port 27015 ist offen – Freunde können über das Internet beitreten.";
-      *noteColor = theme::Ok;
-    } else if (!pub.empty()) {
-      *note = (s.message.empty() ? std::string("Keine automatische Freigabe") : s.message) +
-              ". Gib UDP-Port 27015 im Router für " + lan + " frei.";
+    if (!s.externalIp.empty() && upnp::IsPrivateIPv4(s.externalIp)) {
+      *note = "Router hat eine private WAN-IP. Doppel-NAT braucht weitere Portfreigaben; bei CGNAT/DS-Lite öffentliche IPv4 oder VPN nötig.";
       *noteColor = theme::Accent;
-    } else if (!s.externalIp.empty() && upnp::IsPrivateIPv4(s.externalIp)) {
-      *note = "Dein Anschluss hat keine öffentliche IPv4 (Carrier-NAT/DS-Lite) – Internetspiel nur per VPN, im LAN klappt es.";
-      *noteColor = theme::Danger;
+    } else if (address.empty() && ipLookup_.Busy()) {
+      *note = "Öffentliche IPv4 wird automatisch ermittelt. Discord-Einladungen sind danach verfügbar.";
+      *noteColor = theme::Dim;
+    } else if (s.state == upnp::Status::Working) {
+      *note = "Router wird eingerichtet. Für Internetspiel muss UDP-Port 27015 erreichbar sein.";
+      *noteColor = theme::Dim;
+    } else if (s.state == upnp::Status::Mapped && !address.empty()) {
+      *note = "Öffentliche Adresse bereit. UDP-Port 27015 ist am Router freigegeben.";
+      *noteColor = theme::Ok;
+    } else if (!address.empty()) {
+      *note = "Öffentliche Adresse bereit. UDP-Port 27015 im Router für " + lan + " freigeben (keine automatische Freigabe).";
+      *noteColor = theme::Accent;
     } else {
-      *note = "Nur im Heimnetz erreichbar, solange die öffentliche IP unbekannt ist.";
+      *note = "Öffentliche Adresse unbekannt. „IP erneut suchen“ probieren. Für Mitspieler im selben Netzwerk oben auf Heimnetz wechseln.";
       *noteColor = theme::Accent;
     }
   }
-  return ip.empty() ? "" : StrFormat("%s:%d", ip.c_str(), GAME_PORT);
+  return address;
 }
 
 void Game::CopyInvite(const std::string& text, const std::string& what) {
@@ -1611,19 +1621,27 @@ void Game::DrawInvitePanel(const Rect& p) {
   ui_.Panel(p, ui_.S(20));
   float x = p.x + ui_.S(24), y = p.y + ui_.S(20), w = p.w - ui_.S(48);
   ui_.Label(x, y, "Freunde einladen", theme::Accent);
+  if (ui_.ButtonEx("inv_scope", {x + w - ui_.S(170), y - ui_.S(8), ui_.S(170), ui_.S(32)},
+                    inviteLan_ ? "Ziel: Heimnetz" : "Ziel: Internet", icon::Globe, UI::BTN_SECONDARY)) inviteLan_ = !inviteLan_;
   std::string note;
   Color nc = theme::Dim;
   std::string addr;
-  if (hosting_) {
+  if (inviteLan_) {
+    upnp::Status st = portMapper_.GetStatus();
+    std::string lan = !st.localIp.empty() ? st.localIp : localIp_;
+    addr = hosting_ ? (lan.empty() ? "" : StrFormat("%s:%d", lan.c_str(), GAME_PORT)) : serverAddr_;
+    note = "Diese Einladung ist fürs gleiche Netzwerk oder VPN. Discord-Beitritte verwenden weiterhin die öffentliche Serveradresse.";
+  } else if (hosting_) {
     addr = InviteAddress(&note, &nc);
   } else {
-    addr = serverAddr_;
-    note = "Du bist Gast – eingeladene Freunde kommen auf denselben Server.";
+    addr = session_ ? session_->InternetAddress() : "";
+    note = addr.empty() ? "Öffentliche Serveradresse noch unbekannt. Der Gastgeber muss Internet-Einladungen bereitstellen."
+                        : "Du bist Gast – diese öffentliche Adresse führt zum Server des Gastgebers.";
   }
   net::Address a;
   bool ok = !addr.empty() && net::Address::Parse(addr, GAME_PORT, a) && a.ip != 0;
   std::string code = ok ? EncodeInvite(a.ip, a.port) : "–";
-  ui_.Text(FONT_SMALL, x, y + ui_.S(26), "Einladungscode", theme::Dim);
+  ui_.Text(FONT_SMALL, x, y + ui_.S(30), inviteLan_ ? "Heimnetz-Code" : "Internet-Code", theme::Dim);
   ui_.Text(FONT_LARGE, x, y + ui_.S(44), code, kWhite, ALIGN_LEFT, ui_.S(1));
   ui_.Icon(x, y + ui_.S(96), icon::Globe, theme::Dim);
   ui_.Text(FONT_NORMAL, x + ui_.S(28), y + ui_.S(94), addr.empty() ? "Adresse wird ermittelt …" : addr, kWhite);
@@ -1642,12 +1660,10 @@ void Game::DrawInvitePanel(const Rect& p) {
   by += ui_.S(58);
   float half = (w - ui_.S(10)) * 0.5f;
   if (ui_.ButtonEx("inv_code", {x, by, half, ui_.S(44)}, "Nur Code", icon::Copy, UI::BTN_SECONDARY, ok)) CopyInvite(code, "Code");
-  upnp::Status st = portMapper_.GetStatus();
-  bool needIp = hosting_ && (st.externalIp.empty() || upnp::IsPrivateIPv4(st.externalIp)) && ipLookup_.Result().empty() &&
-                st.state != upnp::Status::Working;
+  bool needIp = hosting_ && !inviteLan_ && addr.empty();
   if (needIp) {
     bool busy = ipLookup_.Busy();
-    if (ui_.ButtonEx("inv_ip", {x + half + ui_.S(10), by, half, ui_.S(44)}, busy ? "Frage ab …" : "Öffentliche IP", icon::World,
+    if (ui_.ButtonEx("inv_ip", {x + half + ui_.S(10), by, half, ui_.S(44)}, busy ? "Frage ab …" : "IP erneut suchen", icon::World,
                      UI::BTN_SECONDARY, !busy))
       ipLookup_.Start();
   } else {
@@ -1657,8 +1673,9 @@ void Game::DrawInvitePanel(const Rect& p) {
   by += ui_.S(56);
   bool dc = discord_.Connected();
   ui_.Circle({x + ui_.S(6), by + ui_.S(10)}, ui_.S(4), dc ? Color::Hex(0x5865F2) : theme::Faint);
-  ui_.Text(FONT_SMALL, x + ui_.S(20), by + ui_.S(1),
-           dc ? "Discord: Freunde sehen „Beitreten“ in deinem Profil" : "Discord nicht gestartet – Einladung kopieren und teilen", theme::Dim);
+  bool canJoin = session_ && !session_->InternetAddress().empty();
+  ui_.Text(FONT_SMALL, x + ui_.S(20), by + ui_.S(1), dc ? (canJoin ? "Discord: „Beitreten“ ist verfügbar" : "Discord wartet auf die öffentliche Serveradresse")
+                                                           : "Discord nicht gestartet – Einladung kopieren und teilen", theme::Dim);
   if (!ipLookup_.Error().empty() && needIp) ui_.Text(FONT_SMALL, x, p.y + p.h + ui_.S(8), ipLookup_.Error(), theme::Danger);
 }
 
@@ -1680,6 +1697,8 @@ void Game::DrawJoinRequests() {
 }
 
 void Game::UpdatePresence() {
+  if (hosting_ && session_ && session_->IsHost())
+    static_cast<LocalSession*>(session_.get())->SetInternetAddress(InviteAddress(nullptr, nullptr));
   if (!discord_.Connected()) return;
   DiscordActivity a;
   a.startTime = sessionStart_;
@@ -1712,10 +1731,8 @@ void Game::UpdatePresence() {
     a.partyId = partyId_;
     a.partySize = humans;
     a.partyMax = MAX_PLAYERS;
-    std::string addr = hosting_ ? InviteAddress(nullptr, nullptr) : serverAddr_;
-    net::Address na;
-    if (!addr.empty() && net::Address::Parse(addr, GAME_PORT, na) && na.ip != 0) {
-      a.joinSecret = EncodeInvite(na.ip, na.port);
+    a.joinSecret = InternetInviteCode(session_->InternetAddress());
+    if (!a.joinSecret.empty()) {
       a.partyId = "party-" + a.joinSecret;  // Gastgeber und Gäste landen in derselben Discord-Gruppe
     }
   }
@@ -2459,6 +2476,10 @@ void Game::Autopilot() {
   localIp_ = upnp::LocalIPv4();
   frames(20);
   Shot("invite");
+  inviteLan_ = true;
+  frames(4);
+  Shot("invite_lan");
+  inviteLan_ = false;
   inviteOpen_ = false;
   paused_ = false;
   joinRequests_.push_back({"0", "Kek-Freund", time_});

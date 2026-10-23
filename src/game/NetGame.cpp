@@ -1,5 +1,6 @@
 #include "game/NetGame.h"
 #include "game/Maps.h"
+#include "game/Invite.h"
 
 using namespace net;
 
@@ -383,12 +384,24 @@ void NetServer::SendSnapshot(Sim& sim, Client& c, double now) {
   }
   ew.buf[3] = (u8)ne;
   if (ne) sock_.Send(c.addr, ew.buf.data(), ew.Size());
+  if (c.snapshots % 15 == 0) {
+    Writer address;
+    Header(address, MSG_INTERNET_ADDRESS);
+    address.U32(sim.tick);
+    address.Str(InternetInviteAddress(internetAddress));
+    sock_.Send(c.addr, address.buf.data(), address.Size());
+  }
   c.snapshots++;
 }
 
 // ---------------------------------------------------------------------------------------------
 // Client
 // ---------------------------------------------------------------------------------------------
+
+std::string NetClient::InternetAddress() const {
+  if (!internetAddress_.empty()) return internetAddress_;
+  return InternetInviteAddress(server_.ToString());
+}
 
 NetClient::~NetClient() {
   if (state_ != FailedState && sock_.IsOpen()) {
@@ -492,6 +505,16 @@ void NetClient::HandlePacket(const u8* data, int size) {
       state_ = FailedState;
       status_ = "Der Server wurde beendet";
       break;
+    case MSG_INTERNET_ADDRESS: {
+      if (state_ != Connected) return;
+      u32 tick = r.U32();
+      std::string address = r.Str();
+      if (r.Ok() && tick >= internetAddressTick_) {
+        internetAddress_ = InternetInviteAddress(address);
+        internetAddressTick_ = tick;
+      }
+      break;
+    }
     case MSG_EVENTS: {
       if (state_ != Connected) return;
       int ne = r.U8();

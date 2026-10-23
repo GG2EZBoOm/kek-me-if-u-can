@@ -191,20 +191,25 @@ Tomatendose, Parmesanlaib, Trockenwagen, Hubwagen, Schutzhelm, Werkzeugkiste und
    **„Freunde einladen“** die Karte mit
    - einem **Einladungscode** wie `KEK-TE294-3VBJZ`. Er enthält deine IPv4-Adresse und den Port.
    - **Einladung kopieren**: Das kopiert eine fertige Nachricht für Discord oder einen anderen Chat.
-   - **Öffentliche IP**: Diese Schaltfläche erscheint, wenn der Router die Adresse nicht verrät. Die Adresse wird
-     erst auf Klick bei api.ipify.org nachgefragt.
+   - **Ziel: Internet / Heimnetz**: Internet ist voreingestellt. Heimnetz-Codes sind ausdrücklich für das gleiche
+     Netzwerk oder VPN vorgesehen.
+   - Beim Hosten wird die öffentliche IPv4 automatisch über den Router und per HTTPS bei api.ipify.org ermittelt.
+     Wenn das fehlschlägt, erscheint **IP erneut suchen**. Offline-Spiele starten keine solche Abfrage.
 3. Deine Freunde wählen **Server beitreten** und fügen den Code, die IP-Adresse oder gleich die ganze Nachricht ein
    (Einfügen-Knopf neben dem Feld). Server im selben Netzwerk erscheinen automatisch in der Liste.
 4. Freie Plätze werden mit Bots aufgefüllt. Tritt ein Mensch bei, macht ein Bot Platz.
 
 Wenn das automatische Freigeben nicht klappt, gib im Router UDP-Port 27015 für deinen PC frei. Das Esc-Menü zeigt
-dafür die passende lokale Adresse an. Bei Anschlüssen ohne eigene öffentliche IPv4 (Carrier-NAT/DS-Lite) ist ein
-Internetspiel nur per VPN möglich. Das Spiel erkennt diesen Fall und weist darauf hin.
+dafür die passende lokale Adresse an. Bei Anschlüssen ohne eigene öffentliche IPv4 (Carrier-NAT/DS-Lite)
+braucht ihr für Internetspiel eine öffentliche IPv4 oder geeignete VPN-Verbindung. Eine private
+WAN-Adresse am Router kann auch Doppel-NAT bedeuten; dort müssen beide Router entsprechend weiterleiten.
 
 ### Discord
 
 Läuft Discord auf dem PC, zeigt dein Profil Karte, Phase, Runde und Rolle. Freunde sehen bei einem Online-Spiel
 **„Beitreten“** und landen mit einem Klick auf deinem Server. Ist das Spiel bei ihnen noch zu, startet Discord es.
+Der Beitritt wird erst mit einer öffentlichen Serveradresse angeboten; lokale IPs werden nicht als
+Discord-Einladung veröffentlicht. LAN-Gäste erhalten dafür die öffentliche Adresse des Gastgebers.
 Fragt jemand per Discord an, erscheint rechts ein Hinweis, den du mit **F8** annimmst oder mit **F9** ablehnst.
 
 Damit Discord das Spielsymbol anzeigt, lade im [Discord Developer Portal](https://discord.com/developers/applications)

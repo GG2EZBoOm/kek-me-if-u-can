@@ -538,6 +538,29 @@ static void InviteTests(int& fails) {
   Check(caught >= 31, StrFormat("Tippfehler werden erkannt oder ändern die Adresse (%d/31)", caught), fails);
   Check(upnp::IsPrivateIPv4("192.168.1.2") && upnp::IsPrivateIPv4("100.70.1.1") && !upnp::IsPrivateIPv4("203.0.113.7"),
         "Private und öffentliche IPv4 unterschieden", fails);
+  Check(HostInternetAddress("", "", GAME_PORT).empty() && HostInternetAddress("192.168.1.4", "", GAME_PORT).empty(),
+        "Internet-Einladung fällt bei unbekannter öffentlicher IP niemals auf LAN zurück", fails);
+  Check(HostInternetAddress("192.168.1.4", "8.8.8.8", GAME_PORT) == "8.8.8.8:27015" &&
+        HostInternetAddress("100.70.1.1", "8.8.8.8", GAME_PORT) == "8.8.8.8:27015",
+        "Öffentliche IP-Abfrage ersetzt private Router-Adressen einschließlich Carrier-NAT", fails);
+  Check(HostInternetAddress("9.9.9.9", "8.8.8.8", GAME_PORT) == "9.9.9.9:27015",
+        "Öffentliche Router-Adresse hat Vorrang vor dem externen Fallback", fails);
+  bool privateRejected = true;
+  for (const char* ip : {"192.168.1.2", "10.2.3.4", "172.16.0.1", "172.31.255.255", "100.64.0.1", "100.127.255.255",
+                         "127.0.0.1", "169.254.1.2", "0.0.0.0", "224.0.0.1", "255.255.255.255", "198.18.0.1", "203.0.113.1"})
+    privateRejected &= InternetInviteCode(std::string(ip) + ":27015").empty();
+  Check(privateRejected, "Discord-Code verwirft LAN-, Loopback-, CGNAT-, Link-Local- und Sonderadressen", fails);
+  std::string publicCode = InternetInviteCode("8.8.8.8:27016");
+  Check(!publicCode.empty() && ResolveJoinInput(publicCode) == "8.8.8.8:27016",
+        "Discord-Code enthält öffentliche Server-IP und richtigen Port", fails);
+  bool badRejected = true;
+  for (const char* address : {"8.8.8.8", "8.8.8.8:0", "8.8.8.8:65536", "8.8.8.8:-1", "8.8.8.8:27015oops", "8.8.8.8:99999999999",
+                              "localhost:27015", "999.8.8.8:27015", "<html>8.8.8.8</html>:27015", "8.8.8.+8:27015"})
+    badRejected &= InternetInviteAddress(address).empty();
+  Check(badRejected, "Fehlerhafte IP-Antworten und ungültige Ports werden nicht veröffentlicht", fails);
+  Check(InternetInviteAddress("8.8.8.8:65535") == "8.8.8.8:65535" &&
+        ResolveJoinInput(EncodeInvite((192u << 24) | (168u << 16) | (1u << 8) | 4u, 27015)) == "192.168.1.4:27015",
+        "Gültige Ports und ausdrücklich erzeugte Heimnetz-Codes bleiben unterstützt", fails);
 }
 
 // Updater: Versionsvergleich, Release-Antwort von GitHub, SHA-256
@@ -647,6 +670,17 @@ int RunNetTest() {
   Check(maxErr < 1.5f, "Vorhersage bleibt nah am Server", fails);
   bool named = client.State().players[client.LocalId()].name == std::string("Tester");
   Check(named, "Spielername übertragen", fails);
+  Check(client.InternetAddress().empty(), "LAN-Gast veröffentlicht seine lokale Verbindungsadresse nicht in Discord", fails);
+  auto pumpInvites = [&]() {
+    for (int i = 0; i < 60; i++) { host.Update(TICK_DT); client.Update(TICK_DT); std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
+  };
+  host.SetInternetAddress("8.8.8.8:27015"); pumpInvites();
+  Check(client.InternetAddress() == "8.8.8.8:27015" && InternetInviteCode(client.InternetAddress()) == InternetInviteCode(host.InternetAddress()),
+        "LAN-Gast bekommt öffentliche Host-Adresse und denselben Discord-Code", fails);
+  host.SetInternetAddress("9.9.9.9:27016"); pumpInvites();
+  Check(client.InternetAddress() == "9.9.9.9:27016", "Geänderte öffentliche Host-Adresse wird an Gäste übertragen", fails);
+  host.SetInternetAddress("192.168.1.2:27015"); pumpInvites();
+  Check(host.InternetAddress().empty() && client.InternetAddress().empty(), "Ungültige Host-Adresse entfernt den bisherigen Internet-Code auch beim Gast", fails);
   host.SetNextMode(MODE_CLONES);
   for (int i = 0; i < 30; i++) { host.Update(TICK_DT); client.Update(TICK_DT); std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
   Check(client.State().mode == MODE_MOON && client.State().nextMode == MODE_CLONES,

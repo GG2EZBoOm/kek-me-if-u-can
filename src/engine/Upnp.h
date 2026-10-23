@@ -34,7 +34,7 @@ class PortMapper {
   bool mapped_ = false;
 };
 
-// Fragt die öffentliche IPv4 bei api.ipify.org ab – nur auf ausdrücklichen Wunsch des Spielers
+// Fragt beim Hosten die öffentliche IPv4 per HTTPS bei api.ipify.org ab.
 class PublicIpLookup {
  public:
   ~PublicIpLookup();
@@ -54,6 +54,8 @@ class PublicIpLookup {
 std::string LocalIPv4();
 // 10/8, 172.16/12, 192.168/16, 100.64/10 (Carrier-NAT), 127/8, 169.254/16
 bool IsPrivateIPv4(const std::string& ip);
+// Für Internet-Einladungen: filtert private, lokale, Multicast- und bekannte Sondernetze.
+bool IsPublicIPv4(const std::string& ip);
 bool ParseIPv4(const std::string& text, u32& ip);
 
 }  // namespace upnp

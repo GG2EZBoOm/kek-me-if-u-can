@@ -20,6 +20,7 @@ class Session {
   virtual bool Failed() const { return false; }
   virtual std::string StatusText() const { return ""; }
   virtual bool IsHost() const = 0;
+  virtual std::string InternetAddress() const { return ""; }
   virtual void SetNextMode(int) {}  // ausschließlich LocalSession/Host darf Rundenregeln ändern
   virtual void TakeEvents(std::vector<GameEvent>& out) = 0;
   virtual void SendChat(const std::string& text) = 0;
@@ -40,6 +41,8 @@ class LocalSession : public Session {
   const World& GetWorld() const override { return world_; }
   bool Ready() const override { return ready_; }
   bool IsHost() const override { return true; }
+  std::string InternetAddress() const override { return internetAddress_; }
+  void SetInternetAddress(const std::string& address);
   void SetNextMode(int mode) override { sim_.settings.mode = ClampI(mode, 0, MODE_COUNT - 1); }
   void TakeEvents(std::vector<GameEvent>& out) override;
   void SendChat(const std::string& text) override;
@@ -66,6 +69,7 @@ class LocalSession : public Session {
   bool dedicated_ = false;
   Rng rng_{99};
   int desiredBots_ = 0;
+  std::string internetAddress_;
 };
 
 // Füllt den Client-Zustand aus der Simulation (mit Interpolation alpha zwischen letztem und aktuellem Tick)
