@@ -1,6 +1,7 @@
 // Das Spiel: Menüs, Eingabe, HUD, Sound-Anbindung und Hauptschleife.
 #include "engine/Audio.h"
 #include "engine/Upnp.h"
+#include "engine/Video.h"
 #include "engine/Image.h"
 #include "engine/Platform.h"
 #include "engine/UI.h"
@@ -103,6 +104,9 @@ class Game {
   void DrawUpdateCard(const Rect& r);
   std::string UpdateStatusText() const;
   void StartUpdateCheck();
+  // Intro-Videos vor dem Hauptmenü
+  void PlayIntros();
+  bool IntroShot(int index, double t, const char* name);
   void SaveCfg() { if (!autopilot_) cfg_.Save(cfgPath_); }
   Rect R(float x, float y, float w, float h) const { return {ui_.S(x), ui_.S(y), ui_.S(w), ui_.S(h)}; }
   // Demo-/Screenshot-Modus
@@ -170,6 +174,7 @@ class Game {
   std::vector<JoinRequest> joinRequests_;
   update::Updater updater_;
   bool noUpdate_ = false;
+  bool noIntro_ = false;
   bool updateHandled_ = false;    // "installiert" wurde schon ausgewertet
   double updateCheckStart_ = -1;  // Zeitpunkt der letzten Prüfung (für die Anzeige)
   double updateFailAt_ = -1;      // Fehlermeldung nur kurz zeigen
@@ -193,6 +198,7 @@ int Game::Run(int argc, char** argv) {
     if (a == "--gameshot" && i + 1 < argc) { shotDir_ = argv[++i]; autopilot_ = true; hidden_ = true; }
     if ((a == "--connect" || a == "--join") && i + 1 < argc) joinAddr_ = argv[++i];
     if (a == "--no-update") noUpdate_ = true;
+    if (a == "--no-intro") noIntro_ = true;
   }
   if (!plat::Init("Kek Me If You Can", w, h, hidden_)) {
     MessageBoxW(nullptr, L"OpenGL 3.3 konnte nicht initialisiert werden.\nBitte Grafiktreiber aktualisieren.", L"Kek Me If You Can", MB_ICONERROR);
@@ -241,6 +247,9 @@ int Game::Run(int argc, char** argv) {
     RayHit hh = w2->Raycast(a, b - a, Length(b - a), COL_BULLET, false);
     return hh.hit && hh.t < Length(b - a) - 0.4f;
   });
+
+  // Intros: nicht bei Testläufen, nicht beim direkten Beitreten (Discord/Kommandozeile)
+  if (!autopilot_ && !hidden_ && cfg_.intros && !noIntro_ && !connectArg) PlayIntros();
 
   if (autopilot_) {
     Autopilot();
@@ -1248,6 +1257,8 @@ void Game::DrawSettings(bool overlay) {
   if (ui_.Checkbox("s_fs", R(x2, yr, cw, h), "Vollbild (F11)", &fs)) plat::SetFullscreen(fs);
   yr += h + gap;
   ui_.Checkbox("s_fps", R(x2, yr, cw, h), "FPS anzeigen", &cfg_.showFps);
+  yr += h + gap;
+  ui_.Checkbox("s_intro", R(x2, yr, cw, h), "Intros beim Start zeigen", &cfg_.intros);
   float by = py + ph - 24 - 56;
   if (ui_.ButtonEx("s_back", R(x + w - 220, by, 220, 56), "Fertig", icon::Check, UI::BTN_PRIMARY) || back ||
       (plat::KeyPressed(VK_ESCAPE) && !ui_.AnyActive() && !overlay)) {
@@ -1290,6 +1301,97 @@ void Game::DrawError() {
   ui_.IconIn(FONT_ICON, {r.x + ui_.S(12), r.y, ui_.S(26), r.h}, icon::Warning, theme::Danger);
   ui_.Text(FONT_NORMAL, r.x + ui_.S(46), r.y + (r.h - ui_.LineHeight(FONT_NORMAL)) * 0.5f, error_, kWhite);
   ui_.SetAlpha(1);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Intro-Videos (in der EXE eingebettet, res/intro.rc)
+// ---------------------------------------------------------------------------------------------
+
+// Reihenfolge: Studio (Kekish Games), Engine, Spiel
+static const int kIntroIds[] = {100, 101, 102};
+
+static bool IntroResource(int id, const void*& data, size_t& size) {
+  HRSRC res = FindResourceW(nullptr, MAKEINTRESOURCEW(id), RT_RCDATA);
+  HGLOBAL g = res ? LoadResource(nullptr, res) : nullptr;
+  data = g ? LockResource(g) : nullptr;
+  size = res ? SizeofResource(nullptr, res) : 0;
+  return data && size > 0;
+}
+
+// Leertaste/Enter/Klick: nächstes Video, Esc: alle überspringen. Läuft vor der Hauptschleife.
+void Game::PlayIntros() {
+  bool skipAll = false;
+  for (int id : kIntroIds) {
+    if (skipAll || !plat::PumpEvents()) break;
+    const void* data = nullptr;
+    size_t size = 0;
+    if (!IntroResource(id, data, size)) continue;
+    VideoPlayer vp;
+    if (!vp.Open(data, size)) continue;
+    double t0 = plat::Time(), last = t0, fadeOut = -1;
+    vp.Play(t0, 1.0f);
+    LOG("Intro %d gestartet (%.1f s)", id, vp.Duration());
+    while (plat::PumpEvents()) {
+      double now = plat::Time();
+      float dt = (float)std::min(0.1, now - last);
+      last = now;
+      if (fadeOut < 0) {
+        if (plat::KeyPressed(VK_ESCAPE)) {
+          skipAll = true;
+          fadeOut = now;
+          LOG("Intros mit Esc übersprungen (nach %.1f s)", now - t0);
+        } else if (plat::KeyPressed(VK_SPACE) || plat::KeyPressed(VK_RETURN) || plat::MousePressed(plat::MOUSE_LEFT)) {
+          fadeOut = now;
+          LOG("Intro %d übersprungen (nach %.1f s)", id, now - t0);
+        }
+      }
+      bool running = vp.Update(now);
+      float alpha = Saturate((float)(now - t0) / 0.2f);
+      if (fadeOut >= 0) {
+        float f = 1.0f - Saturate((float)(now - fadeOut) / 0.25f);
+        alpha *= f;
+        vp.SetVolume(f);
+      }
+      if (!running || (fadeOut >= 0 && now - fadeOut > 0.25)) break;
+      int W = plat::Width(), H = plat::Height();
+      vp.Draw(W, H, alpha);
+      // Hinweis zum Überspringen unten rechts, erscheint nach einer Sekunde
+      ui_.Begin(W, H, false, dt);
+      float ha = Saturate((float)(now - t0 - 1.0) / 0.6f) * alpha * 0.8f;
+      if (ha > 0.01f) {
+        ui_.SetAlpha(ha);
+        float kh = ui_.S(26), gap = ui_.S(8), space = ui_.S(26);
+        const char* t1 = "Weiter";
+        const char* t2 = "Alle überspringen";
+        float total = ui_.KeyCapWidth("Leertaste", kh) + gap + ui_.Measure(FONT_SMALL, t1).x + space + ui_.KeyCapWidth("Esc", kh) + gap +
+                      ui_.Measure(FONT_SMALL, t2).x;
+        float x = W - ui_.S(40) - total, y = H - ui_.S(52);
+        float ty = y + (kh - ui_.LineHeight(FONT_SMALL)) * 0.5f;
+        x += ui_.KeyCap(x, y, "Leertaste", kh) + gap;
+        x += ui_.Text(FONT_SMALL, x, ty, t1, kWhite) + space;
+        x += ui_.KeyCap(x, y, "Esc", kh) + gap;
+        ui_.Text(FONT_SMALL, x, ty, t2, theme::Dim);
+        ui_.SetAlpha(1);
+      }
+      ui_.End();
+      audio::Update(dt);
+      plat::Present();
+    }
+  }
+  flybyStart_ = time_;
+  LOG("Intros beendet");
+}
+
+// Testlauf: zeigt das Bild bei t Sekunden aus Intro index und speichert es
+bool Game::IntroShot(int index, double t, const char* name) {
+  const void* data = nullptr;
+  size_t size = 0;
+  if (index < 0 || index >= COUNTOF(kIntroIds) || !IntroResource(kIntroIds[index], data, size)) return false;
+  VideoPlayer vp;
+  if (!vp.Open(data, size) || !vp.ShowFrameAt(t)) return false;
+  vp.Draw(plat::Width(), plat::Height(), 1.0f);
+  Shot(name);
+  return true;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -2168,6 +2270,9 @@ void Game::Autopilot() {
       session_->TakeEvents(evs);
     }
   };
+  IntroShot(0, 2.5, "intro_studio");
+  IntroShot(1, 3.0, "intro_engine");
+  IntroShot(2, 6.0, "intro_spiel");
   frames(90);
   Shot("menu");
   int startMap = cfg_.match.mapIndex;

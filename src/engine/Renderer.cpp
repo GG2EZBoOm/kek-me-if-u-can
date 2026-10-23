@@ -1172,6 +1172,12 @@ void Renderer::Render(const ScreenFX& fx) {
 void Renderer::ReadBackbuffer(std::vector<u8>& rgba, int& w, int& h) {
   w = width_;
   h = height_;
+  if (w <= 0 || h <= 0) {  // vor dem ersten 3D-Bild (z. B. Intro-Video): aktuelle Bildfläche
+    GLint vp[4] = {};
+    glGetIntegerv(GL_VIEWPORT, vp);
+    w = vp[2];
+    h = vp[3];
+  }
   rgba.resize((size_t)w * h * 4);
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glPixelStorei(GL_PACK_ALIGNMENT, 1);

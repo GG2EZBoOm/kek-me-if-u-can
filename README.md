@@ -10,6 +10,12 @@ Die fertigen EXEs gibt es unter [Releases](https://github.com/GG2EZBoOm/kek-me-i
 `KekMeIfYouCan.exe` laden und starten, eine Installation ist nicht nötig. Windows SmartScreen kann beim ersten Start
 warnen, weil die Datei nicht signiert ist („Weitere Informationen“ → „Trotzdem ausführen“).
 
+### Intros
+
+Beim Start laufen drei Intro-Videos: Kekish Games, die Engine und das Spiel. Mit **Leertaste**, Enter oder einem
+Klick geht es zum nächsten, **Esc** überspringt alle. In den Einstellungen lassen sie sich abschalten, `--no-intro`
+überspringt sie für einen Start. Die Videos stecken in der EXE und werden über Windows Media Foundation abgespielt.
+
 ### Automatische Updates
 
 Beim Start fragt das Spiel im Hintergrund das neueste Release auf GitHub ab. Gibt es eine neuere Version, lädt es die
@@ -220,11 +226,11 @@ KekMeIfYouCanCLI.exe --update --pretend-version 0.0.1
 ```
 src/engine   Plattform (Win32/WGL), eigener GL-Loader, Renderer (HDR, kaskadierte Schatten, SSAO, Bloom, FXAA,
              prozedurale Materialien), UI mit Milchglas und GDI-Schriftatlas, Audio-Mixer (waveOut),
-             UDP-Netzwerk, UPnP-Portfreigabe
+             UDP-Netzwerk, UPnP-Portfreigabe, Videowiedergabe (Media Foundation, NV12-Shader)
 src/game     Prop-Katalog, Karten-Baukasten, Karten (maps/), Kollision und Bewegung, Simulation,
              Navigationsgitter und Bots, Netzwerkprotokoll, Einladungscodes, Discord-Anbindung (IPC ohne SDK),
              Auto-Update (WinHTTP + SHA-256), Darstellung, Klangsynthese, Menüs und HUD
-res          Programmsymbol und Versionsinfo
+res          Programmsymbol, Versionsinfo, Intro-Videos (res/video, in die Spiel-EXE eingebettet)
 tools        Symbol-Generator
 .github      Release-Workflow (bauen, testen, veröffentlichen)
 ```

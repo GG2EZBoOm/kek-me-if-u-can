@@ -17,6 +17,7 @@ struct Voice {
   bool active = false;
   int id = 0;
   std::shared_ptr<std::vector<float>> data;
+  int channels = 1;
   double cursor = 0;
   float pitch = 1;
   bool loop = false;
@@ -31,6 +32,7 @@ struct Voice {
 
 std::mutex g_mutex;
 std::vector<std::shared_ptr<std::vector<float>>> g_sounds;
+std::vector<int> g_channels;
 Voice g_voices[MAX_VOICES];
 int g_nextId = 1;
 HWAVEOUT g_wave = nullptr;
@@ -52,9 +54,31 @@ void Mix(short* out) {
     for (Voice& v : g_voices) {
       if (!v.active || !v.data) continue;
       const std::vector<float>& d = *v.data;
-      size_t n = d.size();
+      size_t n = d.size() / v.channels;
       if (n == 0) { v.active = false; continue; }
       float dl = (v.targetL - v.curL) / FRAMES, dr = (v.targetR - v.curR) / FRAMES;
+      if (v.channels == 2) {
+        // Stereo: Kanäle getrennt, Mittenpegel (0,707) wieder ausgleichen
+        for (int i = 0; i < FRAMES; i++) {
+          size_t idx = (size_t)v.cursor;
+          if (idx >= n) {
+            if (v.loop) { v.cursor -= (double)n; idx = (size_t)v.cursor; }
+            else { v.active = false; break; }
+          }
+          float frac = (float)(v.cursor - (double)idx);
+          size_t j = idx + 1 < n ? idx + 1 : idx;
+          float sl = d[idx * 2] + (d[j * 2] - d[idx * 2]) * frac;
+          float sr = d[idx * 2 + 1] + (d[j * 2 + 1] - d[idx * 2 + 1]) * frac;
+          v.curL += dl;
+          v.curR += dr;
+          mix[i * 2] += sl * v.curL * 1.4142f;
+          mix[i * 2 + 1] += sr * v.curR * 1.4142f;
+          v.cursor += v.pitch;
+        }
+        v.curL = v.targetL;
+        v.curR = v.targetR;
+        continue;
+      }
       float dlp = (v.lpTarget - v.lpCoef) / FRAMES;
       for (int i = 0; i < FRAMES; i++) {
         size_t idx = (size_t)v.cursor;
@@ -153,13 +177,22 @@ bool Available() { return g_available; }
 int CreateSound(std::vector<float> samples) {
   std::lock_guard<std::mutex> lock(g_mutex);
   g_sounds.push_back(std::make_shared<std::vector<float>>(std::move(samples)));
+  g_channels.push_back(1);
+  return (int)g_sounds.size() - 1;
+}
+
+int CreateSoundStereo(std::vector<float> interleaved) {
+  std::lock_guard<std::mutex> lock(g_mutex);
+  if (interleaved.size() % 2) interleaved.push_back(0.0f);
+  g_sounds.push_back(std::make_shared<std::vector<float>>(std::move(interleaved)));
+  g_channels.push_back(2);
   return (int)g_sounds.size() - 1;
 }
 
 float SoundLength(int sound) {
   std::lock_guard<std::mutex> lock(g_mutex);
   if (sound < 0 || sound >= (int)g_sounds.size()) return 0;
-  return (float)g_sounds[sound]->size() / SAMPLE_RATE;
+  return (float)g_sounds[sound]->size() / g_channels[sound] / SAMPLE_RATE;
 }
 
 int Play(int sound, const PlayParams& p) {
@@ -184,6 +217,7 @@ int Play(int sound, const PlayParams& p) {
   v.active = true;
   v.id = g_nextId++;
   v.data = g_sounds[sound];
+  v.channels = g_channels[sound];
   v.pitch = p.pitch;
   v.loop = p.loop;
   v.params = p;

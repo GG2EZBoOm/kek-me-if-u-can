@@ -17,6 +17,7 @@ struct Settings {
   bool fullscreen = false;
   bool showFps = false;
   bool autoUpdate = true;  // beim Start nach einer neuen Version auf GitHub suchen
+  bool intros = true;      // Intro-Videos vor dem Hauptmenü
   MatchSettings match;
   std::string lastServer = "127.0.0.1";
   std::string serverName = "Kek-Server";
