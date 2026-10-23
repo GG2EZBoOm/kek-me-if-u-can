@@ -10,7 +10,7 @@ constexpr int MAX_DECOYS = 48;  // auch bei voller Lobby drei Klone je Prop
 constexpr int MAX_GRENADES = 8;
 constexpr int NAME_LEN = 24;
 constexpr u16 GAME_PORT = 27015;
-constexpr u32 PROTOCOL_VERSION = 6;
+constexpr u32 PROTOCOL_VERSION = 7;
 
 enum GameMode : u8 { MODE_CLASSIC, MODE_ROULETTE, MODE_CLONES, MODE_HOT, MODE_MOON, MODE_SHUFFLE, MODE_COUNT };
 constexpr float ROULETTE_INTERVAL = 25, CLONE_RECHARGE = 12, HOT_LIMIT = 7;

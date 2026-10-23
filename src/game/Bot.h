@@ -4,6 +4,7 @@
 #include "game/Sim.h"
 
 class BotManager {
+  friend struct BotRouteTest;
  public:
   void Init(const World& w);
   // Erzeugt pro Tick die Befehle der Bots (vor Sim::Tick aufrufen)

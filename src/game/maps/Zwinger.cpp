@@ -75,7 +75,7 @@ class Zwinger {
       float xx = x + side * 4;
       Stone(); k.WallZ(z - 3.84f, z + 3.84f, xx - .16f, xx + .16f, 0, 4, {{z - 1.65f, z + 1.65f, 0, 3.6f}});
     }
-    Terrace(x - 4.25f, z - 4.25f, x + 4.25f, z + 4.25f, DECK);
+    Terrace(x - 4.25f, z - 4.5f, x + 4.5f, z + 4.5f, DECK);
     Stone(); k.Solid({x - 2.35f, DECK, z - 2.35f}, {x + 2.35f, 7.3f, z + 2.35f});
     // Obere Fenster, Pilaster, Gesimse und kupferne Mansardenhaube.
     for (float side : {-1.0f, 1.0f}) {
@@ -297,6 +297,7 @@ class Zwinger {
   void Build() {
     w.env.sunDir = Normalize(Vec3(-.5f, .75f, .3f)); w.env.sunColor = {3.1f, 2.7f, 2.15f};
     w.env.clouds = .25f; w.env.fogDensity = .0018f; w.env.indoorAmbient = {.40f, .37f, .32f};
+    w.env.exposure = .78f;
     k.Clip({-46, -2, -52}, {42, 0, 52}, COL_SOLID);
     k.FloorFinish(-46, -52, 42, 52, 0, MAT_TILE, 0xb8ae95);
     Arcades(); CrownGate(); SemperGallery(); NymphBath();

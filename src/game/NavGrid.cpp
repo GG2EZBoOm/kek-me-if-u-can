@@ -41,7 +41,8 @@ void NavGrid::Build(const World& w) {
         }
         if (buried) continue;
         // Körper erst ab Stufenhöhe prüfen, sonst blockieren benachbarte Treppenstufen
-        OBox body(Vec3(x, t + 1.15f, z), Vec3(0.25f, 0.65f, 0.25f));
+        // Gleiche Breite wie PlayerBox; nur die begehbare Stufenhöhe aussparen.
+        OBox body(Vec3(x, t + 1.125f, z), Vec3(0.32f, 0.675f, 0.32f));
         bool blocked = false;
         for (int i : idx) {
           const Collider& c = w.cols[i];
@@ -109,7 +110,7 @@ void NavGrid::Neighbors(int n, std::vector<std::pair<int, float>>& out) const {
     int m = NodeAt(a.cx + dx[d], a.cz + dz[d], a.y, 0.55f);
     if (m < 0) continue;
     if (d >= 4) {
-      if (NodeAt(a.cx + dx[d], a.cz, a.y, 0.55f) < 0 && NodeAt(a.cx, a.cz + dz[d], a.y, 0.55f) < 0) continue;
+      if (NodeAt(a.cx + dx[d], a.cz, a.y, 0.55f) < 0 || NodeAt(a.cx, a.cz + dz[d], a.y, 0.55f) < 0) continue;
     }
     float cost = (d >= 4 ? 1.4142f : 1.0f) * cell_ + fabsf(nodes_[m].y - a.y) * 0.5f;
     out.push_back({m, cost});
@@ -131,8 +132,12 @@ int NavGrid::Nearest(Vec3 p, float maxDist) const {
         Vec3 np = NodePos(n);
         float dy = np.y - p.y;
         if (dy > 0.6f || dy < -3.0f) continue;
-        float s = sqrtf(Sq(np.x - p.x) + Sq(np.z - p.z)) + fabsf(dy) * 1.5f;
-        if (comp_[n] != mainComp_) s += 5.0f;
+        float horizontal = DistanceXZ(np, p);
+        if (horizontal > maxDist) continue;
+        // Die richtige Etage hat Vorrang vor einer bequemeren Komponente am Boden.
+        float s = horizontal + fabsf(dy) * 1.5f;
+        if (fabsf(dy) > .6f) s += 10;
+        if (comp_[n] != mainComp_) s += 5;
         if (s < bs) { bs = s; best = n; }
       }
     }
@@ -173,6 +178,7 @@ bool NavGrid::FindPath(Vec3 from, Vec3 to, std::vector<Vec3>& out, int maxExpand
   };
   std::vector<float> gs(nodes_.size(), 1e30f);
   std::vector<int> parent(nodes_.size(), -1);
+  std::vector<u8> closed(nodes_.size(), 0);
   std::priority_queue<QE> open;
   Vec3 gp = NodePos(g);
   auto h = [&](int n) {
@@ -188,11 +194,14 @@ bool NavGrid::FindPath(Vec3 from, Vec3 to, std::vector<Vec3>& out, int maxExpand
   while (!open.empty() && expanded < maxExpand) {
     QE cur = open.top();
     open.pop();
+    if (closed[cur.n]) continue;
     if (cur.n == g) { found = true; break; }
     if (cur.f - h(cur.n) > gs[cur.n] + 1e-3f) continue;
+    closed[cur.n] = 1;
     expanded++;
     Neighbors(cur.n, nb);
     for (auto& e : nb) {
+      if (closed[e.first]) continue;
       float ng = gs[cur.n] + e.second;
       if (ng < gs[e.first]) {
         gs[e.first] = ng;

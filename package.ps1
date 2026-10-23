@@ -1,6 +1,7 @@
 param([string]$OutputDirectory = (Join-Path $PSScriptRoot 'build\package'))
 $ErrorActionPreference = 'Stop'
 $version = (Select-String -LiteralPath (Join-Path $PSScriptRoot 'src\game\Version.h') -Pattern '#define KEK_VERSION_STR "([^"]+)"').Matches[0].Groups[1].Value
+$protocol = (Select-String -LiteralPath (Join-Path $PSScriptRoot 'src\game\GameTypes.h') -Pattern 'PROTOCOL_VERSION = (\d+)').Matches[0].Groups[1].Value
 $outputPath = [IO.Path]::GetFullPath($OutputDirectory)
 $stage = Join-Path $outputPath "v$version\KekMeIfYouCan"
 $videoDir = Join-Path $stage 'data\video'
@@ -32,7 +33,10 @@ Es fehlen keine zusaetzlichen Asset-Pakete.
 Kein Installer und keine Administratorrechte erforderlich.
 
 Fuenf Karten: Bundestag, Oktoberfest, Nudelfabrik, KEK-Paketzentrum,
-Dresdner Zwinger mit Kronentor, Galerieterrassen und Nymphenbad.
+Dresdner Zwinger mit vier Terrassenaufgaengen, Blumengaerten und Nymphenbad.
+KEK: Expresshalle, Containerhof, Servicebereich und Paketstation.
+Nudelfabrik: zusaetzliches Versandlager mit begehbarer Galerie.
+Alle Karten haben neue Versteckgruppen und praezisere Bot-Navigation.
 Schwere Props koennen Sucher rammen (Umschalt + 1,5 m Anlauf) oder
 aus ausreichender Hoehe erschlagen. Nach einem Treffer: 2 s Pause.
 Spezialmodi: Prop-Roulette, Klon-Alarm, Hummeln im Hintern, Mondschicht.
@@ -42,7 +46,7 @@ Der Gastgeber waehlt vor dem Start oder per Esc fuer die naechste Runde.
 Waffenwerkbank im Hauptmenue oder per Esc: MP, Schrotflinte und Pistole mit
 Visierungen, Laeufen, Muendungen, Schaeften, Magazinen und Griffen umbauen.
 Builds werden gespeichert. Aenderungen waehrend der Jagd gelten ab der
-naechsten Runde. Alle Mitspieler brauchen Version $version (Protokoll 6).
+naechsten Runde. Alle Mitspieler brauchen Version $version (Protokoll $protocol).
 Schrot einzeln nachladen; Feuer unterbricht, sobald eine Patrone bereit ist.
 Tasten: 1 MP, 2 Schrotflinte, 3 Pistole, 4 Granate. Pistole: ein Schuss pro
 Klick, 15 Schuss ab Werk, 10/20-Schuss-Magazine und Micro-Reflex optional.

@@ -9,7 +9,7 @@ class NavGrid {
   // nächster Knoten zu einer Position (-1 wenn keiner in der Nähe)
   int Nearest(Vec3 p, float maxDist = 2.0f) const;
   Vec3 NodePos(int n) const;
-  bool FindPath(Vec3 from, Vec3 to, std::vector<Vec3>& out, int maxExpand = 90000) const;
+  bool FindPath(Vec3 from, Vec3 to, std::vector<Vec3>& out, int maxExpand = 360000) const;
   int RandomNode(Rng& rng) const;
   // zufälliger Knoten in Reichweite eines Punktes
   int RandomNodeNear(Rng& rng, Vec3 p, float radius) const;
@@ -30,7 +30,7 @@ class NavGrid {
   bool WalkableLine(int a, int b) const;
   int NodeAt(int cx, int cz, float y, float tol) const;
 
-  float cell_ = 0.5f;
+  float cell_ = 0.25f;
   Vec3 origin_;
   int gw_ = 0, gh_ = 0;
   std::vector<Node> nodes_;

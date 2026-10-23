@@ -36,8 +36,9 @@ class ParcelCenter {
     w.env.fogDensity = .0025f;
     w.env.indoorAmbient = {.32f, .34f, .38f};
     w.env.clouds = .3f;
-    k.Clip({-41, -2, -35}, {51, 0, 45}, COL_SOLID);
-    k.FloorFinish(-41, -35, 51, 45, -.025f, MAT_ASPHALT, 0x454950);
+    w.env.exposure = .79f;
+    k.Clip({-59, -2, -53}, {51, 0, 45}, COL_SOLID);
+    k.FloorFinish(-59, -53, 51, 45, -.025f, MAT_ASPHALT, 0x454950);
     k.FloorFinish(-26, -22, 26, 14, 0, MAT_CONCRETE, 0x9a9e9f);
     k.FloorFinish(-26, 14, -10, 27, 0, MAT_TILE, 0xbfc4be);
     k.FloorFinish(14, 14, 26, 27, 0, MAT_PARQUET, 0xb79a6a);
@@ -60,10 +61,15 @@ class ParcelCenter {
     }
     // Öffentliches Retourenbüro und Leitstelle mit zwei Zugängen je Flügel.
     k.Style(MAT_PLASTER, 0xe5e0d6);
-    k.WallX(-26.2f, -10, 27, 27.2f, 0, 4.2f, {{-22, -18, 0, 2.8f}});
+    k.WallX(-26.2f, -10, 27, 27.2f, 0, 4.2f,
+            {{-22, -18, 0, 2.8f}, {-25, -23, 1.1f, 2.7f, true}, {-16.5f, -11, 1.1f, 2.7f, true}});
+    k.Glass({-25, 1.1f, 27.08f}, {-23, 2.7f, 27.12f}, 0x7399aa, .32f);
+    k.Glass({-16.5f, 1.1f, 27.08f}, {-11, 2.7f, 27.12f}, 0x7399aa, .32f);
     k.WallZ(14.2f, 27, -26.2f, -26, 0, 4.2f);
     k.WallZ(14.2f, 27, -10.2f, -10, 0, 4.2f, {{18, 21, 0, 2.8f}});
-    k.WallX(14, 26.2f, 27, 27.2f, 0, 4.2f, {{18, 22, 0, 2.8f}});
+    k.WallX(14, 26.2f, 27, 27.2f, 0, 4.2f,
+            {{18, 22, 0, 2.8f}, {15, 17, 1.1f, 2.7f, true}, {23, 25, 1.1f, 2.7f, true}});
+    for (float x : {15.0f, 23.0f}) k.Glass({x, 1.1f, 27.08f}, {x + 2, 2.7f, 27.12f}, 0x7399aa, .32f);
     k.WallZ(14.2f, 27, 26, 26.2f, 0, 4.2f);
     k.WallZ(14.2f, 27, 14, 14.2f, 0, 4.2f, {{18, 22, 1.1f, 3.2f, true}});
     k.Glass({14.06f, 1.1f, 18}, {14.12f, 3.2f, 22}, 0x99c8dd, .22f);
@@ -237,8 +243,8 @@ class ParcelCenter {
       }
       k.Clip(Min(a, b), Max(a, b) + Vec3(.08f, 7.6f, .08f), COL_SOLID);
     };
-    fence({-39, 0, -33}, {-39, 0, 43}); fence({49, 0, -33}, {49, 0, 43});
-    fence({-39, 0, -33}, {49, 0, -33}); fence({-39, 0, 43}, {49, 0, 43});
+    fence({-57, 0, -51}, {-57, 0, 43}); fence({49, 0, -51}, {49, 0, 43});
+    fence({-57, 0, -51}, {49, 0, -51}); fence({-57, 0, 43}, {49, 0, 43});
     Logo({0, 2, 42.8f}, .75f, PI);
     for (Vec3 p : {Vec3(-34, 0, 27), Vec3(30, 0, 29), Vec3(-33, 0, -27)}) {
       k.Style(MAT_METAL, STEEL); k.Solid(p, p + Vec3(.16f, 6, .16f));
@@ -246,12 +252,12 @@ class ParcelCenter {
     }
     // Sichtbare Industriekulisse jenseits des Zauns, ohne zusätzlichen Spielbereich.
     k.Style(MAT_CORRUGATED, 0x788593);
-    k.Visual({-80, -1, -65}, {-45, 12, -40}); k.Visual({55, -1, -70}, {95, 15, 5});
+    k.Visual({-90, -1, -75}, {-63, 12, -40}); k.Visual({55, -1, -70}, {95, 15, 5});
   }
 
   void Build() {
     Shell(); Sorting(); Offices(); Yard();
-    k.Zone({-40, -1, -34}, {50, 30, 44}, 1, "KEK-Betriebshof");
+    k.Zone({-58, -1, -52}, {50, 30, 44}, 1, "KEK-Betriebshof");
     k.Zone({-26, 0, -22}, {26, 8.2f, 14}, .35f, "Sortierhalle", 1);
     k.Zone({-24, 3.3f, -5}, {24, 6.5f, -1}, .4f, "Sortierbrücke", 2);
     k.Zone({-26, 0, 14.2f}, {-10, 4.2f, 27}, .3f, "Retouren & Abholung", 1);

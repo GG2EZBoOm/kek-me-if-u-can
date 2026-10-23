@@ -3,6 +3,7 @@
 #include "game/Bot.h"
 #include "game/Invite.h"
 #include "game/Maps.h"
+#include "game/MapKit.h"
 #include "game/NetGame.h"
 #include "game/Taunts.h"
 #include "game/Sounds.h"
@@ -56,8 +57,18 @@ static void CheckDoors(const World& w, const NavGrid& nav, int& fails) {
     float off = d.depth * 0.5f + 0.8f;
     Vec3 a = d.center - n * off + Vec3(0, 0.05f, 0), b = d.center + n * off + Vec3(0, 0.05f, 0);
     std::vector<Vec3> path;
-    bool ok = nav.Nearest(a, 0.7f) >= 0 && nav.Nearest(b, 0.7f) >= 0 && nav.FindPath(a, b, path, 6000);
-    if (ok && PathLength(path) > off * 2.0f + 3.0f) ok = false;
+    auto connected = [&]() {
+      return nav.Nearest(a, .7f) >= 0 && nav.Nearest(b, .7f) >= 0 && nav.FindPath(a, b, path, 24000) && PathLength(path) <= off * 2 + 3;
+    };
+    bool ok = connected();
+    if (!ok) {
+      // Ladetreppen können direkt in der Tür beginnen: zusätzlich die dortige Oberfläche prüfen.
+      for (Vec3* p : {&a, &b}) {
+        RayHit floor = w.Raycast(*p + Vec3(0, 1.5f, 0), {0, -1, 0}, 1.6f, COL_PLAYER, false);
+        if (floor.hit) p->y = p->y + 1.5f - floor.t + .025f;
+      }
+      ok = connected();
+    }
     if (!ok) {
       bad++;
       LOG("    Tür blockiert bei (%.1f %.1f %.1f), Breite %.1f: %s <-> %s", d.center.x, d.center.y, d.center.z, d.width,
@@ -412,6 +423,49 @@ static void NudelfabrikTests(const World& w, const NavGrid& nav, int& fails) {
   }
 }
 
+// Führt dieselbe Pfadverfolgung und Steuerung wie ein Sucher mit echter Kollision aus.
+// So zählen keine Pfade, die nur rechnerisch über eine Ecke oder auf die falsche Etage führen.
+struct BotRouteTest {
+  static bool Walk(BotManager& bots, const World& w, Vec3 from, Vec3 to) {
+    Player p; p.ms.pos = from + Vec3(0, .025f, 0);
+    BotManager::Brain b;
+    if (!bots.SetGoal(p, b, to)) {
+      LOG("  Kein Bot-Pfad zum Ziel %.2f %.2f %.2f: %s", to.x, to.y, to.z, bots.Nav().DebugColumn(to).c_str());
+      return false;
+    }
+    MoveEnv env; env.world = &w;
+    int ticks = (int)((PathLength(b.path) / 2.5f + 12) * TICK_RATE);
+    for (int i = 0; i < ticks; i++) {
+      if (DistanceXZ(p.ms.pos, to) < .8f && fabsf(p.ms.pos.y - to.y) < .35f) return true;
+      UserCmd cmd;
+      Vec3 dir = bots.FollowPath(p, b);
+      bots.Steer(p, b, dir, true, cmd, false); cmd.yaw = b.yaw;
+      ApplyMovement(env, p.ms, cmd, -1, false); b.lastButtons = cmd.buttons;
+      if (!b.hasGoal) break;
+    }
+    LOG("  Bot bleibt bei %.2f %.2f %.2f stehen, Ziel %.2f %.2f %.2f", p.ms.pos.x, p.ms.pos.y, p.ms.pos.z, to.x, to.y, to.z);
+    return false;
+  }
+};
+
+static void NavigationRegressionTests(int& fails) {
+  World w;
+  MapKit k(w);
+  k.Style(MAT_CONCRETE, 0x888888);
+  k.Solid({0, -1, 0}, {8, 0, 8});
+  k.Solid({3, 0, 0}, {3.2f, 2.5f, 3.55f});
+  k.Solid({3, 0, 4.45f}, {3.2f, 2.5f, 8});
+  k.Solid({5, 2.8f, 5}, {7, 3, 7});
+  w.Finalize();
+  NavGrid nav; nav.Build(w);
+  std::vector<Vec3> path;
+  Check(nav.FindPath({1, 0, 4}, {6, 0, 4}, path), "Navigation: echte Sucherbreite durch 90-cm-Durchgang", fails);
+  int upper = nav.Nearest({6, 3, 6}, .8f);
+  Check(upper >= 0 && fabsf(nav.NodePos(upper).y - 3) < .01f,
+        "Navigation: unerreichbare obere Etage wird nicht durch unteren Boden ersetzt", fails);
+  Check(!nav.FindPath({1, 0, 4}, {6, 3, 6}, path), "Navigation: isolierte Plattform meldet fehlenden Weg", fails);
+}
+
 static void ZwingerTests(const World& w, const NavGrid& nav, int& fails) {
   MoveState s;
   for (float z : {-13.0f, 13.0f}) {
@@ -622,6 +676,7 @@ int RunTests(int matchRounds) {
   InviteTests(fails);
   UpdaterTests(fails);
   fails += RunSoundTests();
+  NavigationRegressionTests(fails);
   props::BuildCatalog();
   extern int RunModeTests();
   fails += RunModeTests();
@@ -646,6 +701,33 @@ int RunTests(int matchRounds) {
     if (w.id == "nudelfabrik") NudelfabrikTests(w, bots.Nav(), fails);
     if (w.id == "paketzentrum") PaketzentrumTests(w, bots.Nav(), fails);
     if (w.id == "zwinger") ZwingerTests(w, bots.Nav(), fails);
+    if (w.id == "zwinger") {
+      for (Vec3 goal : {Vec3(-28, 4.3f, 10), Vec3(-12, 4.3f, -37), Vec3(12, 4.3f, -37),
+                        Vec3(27, 4.3f, -25.2f), Vec3(12, 4.3f, 37), Vec3(27, 4.3f, 25.2f),
+                        Vec3(11, 0, 11), Vec3(-11, 0, -11), Vec3(11, 0, -11), Vec3(-11, 0, 11),
+                        Vec3(27, 0, -37), Vec3(-40, 0, 0), Vec3(0, 0, -47)})
+        Check(BotRouteTest::Walk(bots, w, {0, 0, 0}, goal),
+              StrFormat("Sucher läuft real zum Zwinger-Ziel (%.1f %.1f %.1f)", goal.x, goal.y, goal.z), fails);
+      Check(BotRouteTest::Walk(bots, w, {27, 4.3f, -25.2f}, {0, 0, 0}), "Sucher verlässt die Nordostterrasse wieder", fails);
+      Check(BotRouteTest::Walk(bots, w, {27, 4.3f, 25.2f}, {0, 0, 0}), "Sucher verlässt die Südostterrasse wieder", fails);
+    }
+    if (w.id == "paketzentrum") {
+      for (Vec3 goal : {Vec3(0, 0, -38), Vec3(-48, 0, -15), Vec3(-40, 0, -9),
+                        Vec3(-44, 0, 17), Vec3(36, 0, 34)})
+        Check(BotRouteTest::Walk(bots, w, {0, 0, 30}, goal),
+              StrFormat("Sucher läuft real zum KEK-Ziel (%.1f %.1f %.1f)", goal.x, goal.y, goal.z), fails);
+    }
+    if (w.id == "nudelfabrik") {
+      for (Vec3 goal : {Vec3(16, 0, 43), Vec3(25, 2.4f, 46), Vec3(-24, 0, 40)})
+        Check(BotRouteTest::Walk(bots, w, {0, 0, 30}, goal),
+              StrFormat("Sucher läuft real zum Werksziel (%.1f %.1f %.1f)", goal.x, goal.y, goal.z), fails);
+    }
+    if (w.id == "bundestag") {
+      Check(BotRouteTest::Walk(bots, w, {-70, -1.2f, 0}, {-55, -1.2f, 25}), "Sucher erreicht das Besucherforum", fails);
+      Check(BotRouteTest::Walk(bots, w, {-22, 0, 8}, {0, 16, 4.5f}), "Sucher erreicht die Kuppelplattform real", fails);
+    }
+    if (w.id == "oktoberfest")
+      Check(BotRouteTest::Walk(bots, w, {55, 0, 33}, {19.5f, 0, 49}), "Sucher erreicht das Fundbüro durch die Festinseln", fails);
     if (matchRounds > 0) BotMatch(w, bots, matchRounds, fails);
     if (matchRounds > 0 && (w.id == "paketzentrum" || w.id == "zwinger")) for (int mode = MODE_ROULETTE; mode < MODE_COUNT; mode++) {
       bots.Init(w);

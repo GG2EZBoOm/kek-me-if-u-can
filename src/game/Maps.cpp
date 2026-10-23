@@ -1,25 +1,26 @@
 #include "game/Maps.h"
+#include "game/MapDetails.h"
 
 const std::vector<MapInfo>& AllMaps() {
   static const std::vector<MapInfo> maps = {
       {"bundestag", "Bundestag",
        "Reichstagsgebäude in Berlin: Plenarsaal, Glaskuppel mit Spiralrampen, Fraktionssäle, Kantine, Dachterrasse "
-       "und der Platz der Republik an der Spree.",
+       "und der Platz der Republik mit Besucherforum und bepflanzten Versteckinseln.",
        BuildBundestag},
       {"oktoberfest", "Oktoberfest",
        "Festzelt auf der Theresienwiese: Bierbänke, Musikpodium, Empore mit Boxen, Ausschank und Hendlküche – draußen "
-       "Biergarten, Wirtsbudenstraße, Riesenrad, Kettenflieger und Autoscooter.",
+       "Biergarten, Wirtsbudenstraße mit Festinseln, Fundbüro, Riesenrad, Kettenflieger und Autoscooter.",
        BuildOktoberfest},
       {"nudelfabrik", "Nudelfabrik",
        "Alte Backsteinfabrik: Produktionshalle mit Rührwerken, Nudelpresse und Spaghetti-Straße, Laufstege, Trockenraum, "
-       "Mehllager, Verpackung mit Lkw an der Rampe – draußen Mehlsilos, Werkshof und Parkplatz.",
+       "Mehllager, Verpackung mit Lkw an der Rampe – draußen ein zweites Versandlager mit Galerie, Leergutcontainer und Pausenhof.",
        BuildNudelfabrik},
       {"paketzentrum", "KEK-Paketzentrum",
        "Gelb-rote Sortierhalle mit laufenden Paketbändern, begehbarer Sortierbrücke, Paketregalen, Retourenschalter, "
-       "Leitstelle und drei begehbaren Lkw-Wechselbrücken. Zugestellt? Angeblich.",
+       "Leitstelle und drei begehbaren Lkw-Wechselbrücken. Dazu Express-Umschlag, Containerhof, Servicebereich und Paketstation.",
        BuildPaketzentrum},
       {"zwinger", "Dresdner Zwinger",
-       "Barocker Innenhof mit vier Brunnen, goldenem Kronentor, Bogengalerien und begehbaren Terrassen. "
+       "Barocker Innenhof mit vier Brunnen, Blumengärten, goldenem Kronentor und Bogengalerien mit vier Terrassenaufgängen. "
        "Zwischen Porzellan, Orangenkübeln und Nymphenbad wird aus Kunst plötzlich Gegenwehr.",
        BuildZwinger},
   };
@@ -41,6 +42,7 @@ bool BuildMap(int index, World& w) {
   w.name = m[index].name;
   w.description = m[index].description;
   m[index].build(w);
+  RefineMap(w);
   w.Finalize();
   return true;
 }

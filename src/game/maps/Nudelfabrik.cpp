@@ -154,7 +154,7 @@ class Builder {
     e.fogColor = Hex(0xc4d0dc);
     e.fogDensity = 0.0032f;
     e.clouds = 0.55f;
-    e.exposure = 1.0f;
+    e.exposure = .82f;
   }
 
   // ------------------------------------------------------------------------------------------

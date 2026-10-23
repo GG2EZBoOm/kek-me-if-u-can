@@ -126,8 +126,8 @@ Vertikalgriff auf; unter den kurzen Schrotlauf passt keine 8er-Magazinverlänger
 
 Der Gastgeber prüft alle Teile. **Bis zum Ende der Versteckphase** werden Umbauten übernommen;
 während der Jagd gilt eine Änderung **ab der nächsten Runde**. Auch bei einem späten Beitritt während der Jagd
-wird der gespeicherte Build erst zur nächsten Runde angelegt. Alle Teilnehmer müssen **Version 1.0.6** verwenden
-(Netzwerkprotokoll 6). Andere Spieler sehen dieselben montierten Bauteile.
+wird der gespeicherte Build erst zur nächsten Runde angelegt. Alle Teilnehmer müssen **Version 1.0.7** verwenden
+(Netzwerkprotokoll 7). Andere Spieler sehen dieselben montierten Bauteile.
 
 Die Handhabung nutzt zeitabhängigen Anschlag, serverseitigen Rückstoß, Sprint-Erholung und getrennte Bewegungen
 für Hände, Magazin, Verschluss und Pumpgriff. Die Schrotflinte lädt **Patronen einzeln**; mit Feuer lässt sich
@@ -169,11 +169,12 @@ Die Karte wählst du im Hauptmenü über die Kartenkarte unten rechts oder beim 
 
 Eine für Prop Hunt verkleinerte, stilisierte Interpretation mit eigener Geometrie:
 
-![Dresdner Zwinger als Prop-Hunt-Karte](docs/screenshots/v1.0.5-zwinger.png)
+![Dresdner Zwinger mit neuen Gartenanlagen und Osttreppen](docs/screenshots/v1.0.7-zwinger.png)
 
 - Innenhof mit **vier Brunnenbecken**, Orangenkübeln und Bänken
 - **Kronentor** mit goldener Krone, Brücke und Graben; Wall- und Glockenspielpavillon
-- Offene Bogengalerien und **begehbare Terrassen** mit zwei Treppen und Verbindung über das Kronentor
+- Offene Bogengalerien und **begehbare Terrassen** mit vier Hofaufgängen, breiteren Pavillonrändern und Verbindung über das Kronentor
+- Blumenbeete, Hofmedaillon, Sitzgruppen und gerahmte Gemälde in der Sempergalerie
 - Sempergalerie, Porzellansammlung, Mathematisch-Physikalischer Salon und **Nymphenbad** mit Kaskade
 - Sechs neue Tarnungen: Porzellanvase, Barockurne, Orangenkübel, Sandsteinfigur, historisches Fernrohr und Kunsttransportkiste
 
@@ -196,6 +197,7 @@ Das Reichstagsgebäude auf drei Ebenen plus Dach:
   Currywurst-Theke, Küche, Lager, vier Ecktürme mit Treppenhäusern, Dachterrasse mit Dachrestaurant
 - **Platz der Republik** mit Rasen, wehenden Fahnen, Besucherzentrum, Straße mit Polizeiwagen und der Spree.
   In der Ferne stehen Fernsehturm und Brandenburger Tor.
+- **Besucherforum** mit überdachtem Infopunkt, Presseausrüstung und bepflanzten Versteckinseln
 
 ### Oktoberfest
 
@@ -207,6 +209,7 @@ Ein Festzelt auf der Theresienwiese in der Abenddämmerung:
 - **Wirtsbudenstraße** mit Lichterketten und Ständen: Lebkuchen, Schießbude, Hendl, Mandeln, Steckerlfisch,
   Souvenirs, Zuckerwatte, Brezn und Lose
 - **Fahrgeschäfte**: drehendes Riesenrad, Kettenflieger, Autoscooter-Halle und Kinderkarussell
+- **Festinseln** mit Tischen und Fässern sowie überdachtes Fundbüro mit Fahrkartenbereich
 - **Hinterhof** mit Toilettenhäuschen, Strohballen und Fässern. Im Hintergrund stehen Bavaria, Ruhmeshalle und
   die Türme der Frauenkirche.
 
@@ -221,6 +224,9 @@ Eine Backsteinfabrik mit Werkshof und zwei Produktionslinien:
 - **Verpackung** mit laufendem Kartonband, Paletten und einem begehbaren Lkw-Anhänger an der Laderampe
 - **Bürotrakt** mit Kantine, Umkleide, Meisterbüro, Labor und Archiv
 - **Außengelände** mit drei Mehlsilos, Parkplatz, Pförtnerhaus, Hinterhof und Schornstein
+- **Versandlager 02** mit fünf Zugängen und begehbarer Galerie; Leergutcontainer, Pausenhof und zusätzliche Ladegruppen
+
+![Neues Versandlager mit Galerie](docs/screenshots/v1.0.7-versandlager.png)
 
 Für einen dedizierten Server: `KekMeIfYouCanCLI.exe --server --map nudelfabrik --bots 8`.
 
@@ -232,8 +238,13 @@ Gelb-rote Logistikhalle mit dem schrägen **KEK-Schriftzug und Streifen**, ohne 
 - Eine begehbare Sortierbrücke mit zwei Treppen und Rundwegen
 - Retourenschalter, Packplätze und Leitstelle
 - Drei begehbare Lkw-Laderäume mit Ladetreppen und ein Betriebshof
+- **Express-Umschlaghalle**, zwei begehbare Container, Service- und Pausenbereich sowie Paketstation
+- Das umzäunte Gelände ist **106 × 94 Meter** groß, rund **49 % mehr Fläche** als zuvor.
+  Bürofenster, Eingangsdach, Fassadenstreifen und Wegweiser gliedern die Außenbereiche.
 - Zehn neue Tarnungen: Päckchen, Paket, zerbrechliches Paket, Versandrolle, Handscanner, Klebeband,
   Postsack, Sortierkiste, Rollcontainer und Etikettendrucker
+
+![KEK-Paketzentrum mit überarbeitetem Eingang](docs/screenshots/v1.0.7-paketzentrum.png)
 
 Für einen dedizierten Server: `KekMeIfYouCanCLI.exe --server --map paketzentrum --bots 8`.
 
@@ -326,7 +337,10 @@ KekMeIfYouCan.exe --gameshot build\game
 
 `--test` prüft Einladungscodes, Updater, Audio, Bewegung, Türen und Wegfindung auf allen Karten. Für die Nudelfabrik werden
 zusätzlich alle Startplätze, die Förderband-Umläufe und die Sperre der Spaghetti-Bahn geprüft. Danach spielt es auf jeder
-Karte ein komplettes Bot-Match im Zeitraffer (etwa 1000- bis 2000-fache Echtzeit). Zwei Prüfungen gelten der Grafik und
+Karte ein komplettes Bot-Match im Zeitraffer. **26 Routen werden mit der tatsächlichen Bot-Steuerung und Spielerkollision
+abgelaufen**, darunter die Zwinger-Terrassen in beide Richtungen, alle vier Brunnen, die Bundestagskuppel und die neuen
+Lagerbereiche. Das Navigationsgitter berücksichtigt die Sucherbreite auf einem 25-cm-Raster, blockierte diagonale Ecken
+und übereinanderliegende Etagen. Zwei Prüfungen gelten der Grafik und
 der Fairness:
 
 - **Flackern:** Kein Flächenpaar darf in derselben Ebene liegen (bis 5 mm Abstand) und dabei unterschiedlich aussehen.
