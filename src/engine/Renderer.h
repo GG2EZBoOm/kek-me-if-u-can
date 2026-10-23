@@ -100,6 +100,7 @@ class Renderer {
   void Begin(const Camera& cam, const Environment& env, int width, int height, float time);
   float Time() const { return time_; }
   void SetLights(const std::vector<PointLight>& lights);
+  void ShowWorld(bool show) { showWorld_ = show; }
   void Prop(int meshId, const PropInstance& inst);
   void Draw(const DrawItem& item);
   void AddParticle(const Particle& p) { particles_.push_back(p); }
@@ -137,6 +138,7 @@ class Renderer {
   RenderSettings settings_;
   Shader lit_, depth_, sky_, ssao_, blur_, bloomDown_, bloomUp_, composite_, fxaa_, particle_, kawase_;
   Mesh world_, glass_, decalMesh_;
+  bool showWorld_ = true;
   std::vector<std::unique_ptr<Mesh>> propMeshes_;
   std::vector<std::vector<PropInstance>> instances_;
   std::vector<DrawItem> items_;

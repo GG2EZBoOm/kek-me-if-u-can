@@ -3,6 +3,7 @@
 #include "engine/Renderer.h"
 #include "game/ClientState.h"
 #include "game/WorldRender.h"
+#include "game/WeaponModels.h"
 
 struct ViewInput {
   float yaw = 0, pitch = 0;
@@ -23,6 +24,8 @@ class GameView {
               int height, ScreenFX& fx);
   // Menü-Hintergrund: Kamerafahrt
   void RenderFlyby(Renderer& r, const World& w, float time, int width, int height);
+  void RenderWorkbench(Renderer& r, int weapon, u16 build, float angle, float elevation, int selectedSlot,
+                       float time, int width, int height);
 
   const Camera& Cam() const { return cam_; }
   int HighlightProp() const { return highlight_; }
@@ -62,8 +65,12 @@ class GameView {
   std::vector<Fx> fx_;
   std::vector<FxLight> lights_;
   std::vector<PointLight> lightBuf_;
-  Mesh torso_, head_, thigh_, shin_, upperArm_, foreArm_, smg3p_, shotgun3p_, grenade_;
-  Mesh vmSmg_, vmShotgun_, vmGrenade_, vmHands_[3], flash_;
+  Mesh torso_, head_, thigh_, shin_, upperArm_, foreArm_, grenade_;
+  Mesh vmGrenade_, grenadeHands_, flash_;
+  WeaponModels weapons_;
+  Mesh rightHand_, leftHand_, bench_, casing_;
+  struct Casing { Vec3 pos, vel; float life, delay, spin; };
+  std::vector<Casing> casings_;
   float walkPhase_[MAX_PLAYERS] = {};
   float eyeH_ = 1.62f;
   float recoil_ = 0, flashTimer_ = 0, shake_ = 0, bobPhase_ = 0;
@@ -72,5 +79,7 @@ class GameView {
   int lastWeapon_ = -1;
   int highlight_ = -1;
   float time_ = 0;
+  float frameDt_ = TICK_DT, sprintBlend_ = 0, lastYaw_ = 0, lastPitch_ = 0;
+  Vec2 sway_, cameraRecoil_;
   Rng rng_{4242};
 };

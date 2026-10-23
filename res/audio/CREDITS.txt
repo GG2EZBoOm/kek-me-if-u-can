@@ -1,0 +1,15 @@
+KEK ME IF YOU CAN - AUDIO CREDITS
+
+Additional sound effects obtained from https://www.zapsplat.com
+Contributors: ZapSplat, GMA (Game Master Audio), Skyclad Sound.
+Recordings supplied by the project owner; source filenames and hashes are in sources.json.
+
+The recordings have been trimmed, converted, mixed and embedded in this game.
+They remain copyrighted by their respective authors and are not licensed for
+standalone redistribution or use as a sound-effects library. The embedded
+game-sfx.bank is part of this game, not an independently licensed asset pack.
+See the supplied ZapSplat-EULA.pdf for the included pack's license.
+
+All 16 taunt designs and their 48 synthesized variations are original procedural
+audio created for Kek Me If You Can. No celebrity voices or commercial songs
+are used. The long field recordings are not included in the game.

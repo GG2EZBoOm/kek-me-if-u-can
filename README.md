@@ -1,7 +1,7 @@
 # Kek Me If You Can
 
-Ein Prop-Hunt-Spiel mit **eigener C++-Engine**, ohne externe Bibliotheken: Geometrie, Materialien, Klänge und Musik
-werden beim Start prozedural erzeugt. Es gibt einen vollständigen Spielordner als ZIP und eine Einzel-EXE mit
+Ein Prop-Hunt-Spiel mit **eigener C++-Engine**, ohne externe Laufzeitbibliotheken: Geometrie, Materialien, Taunts und Musik
+werden beim Start prozedural erzeugt; aufbereitete Waffenaufnahmen ergänzen den Klang. Es gibt einen vollständigen Spielordner als ZIP und eine Einzel-EXE mit
 eingebetteten Intros. Das Symbol ist eine Dose mit verschmitztem Blick: Das „can“ im Namen ist wörtlich gemeint.
 
 ## Herunterladen
@@ -9,7 +9,7 @@ eingebetteten Intros. Das Symbol ist eine Dose mit verschmitztem Blick: Das „c
 **[Vollständigen Spielordner für Windows herunterladen – ZIP](https://github.com/GG2EZBoOm/kek-me-if-u-can/releases/latest/download/KekMeIfYouCan-Windows.zip)**
 
 Das ZIP vollständig entpacken, dann **KekMeIfYouCan.exe** im entpackten Ordner starten. Es enthält die kleine
-Spiel-EXE (rund 1,8 MB), das Konsolen-/Serverprogramm, alle drei Intro-Videos in `data/video`, eine Anleitung und
+Spiel-EXE (rund 2,8 MB), das Konsolen-/Serverprogramm, alle drei Intro-Videos in `data/video`, eine Anleitung, Audio-Credits und
 SHA-256-Prüfsummen. Eine Installation ist nicht nötig. Den Ordner zusammenlassen.
 
 Alternativ: [Einzel-EXE mit eingebetteten Videos](https://github.com/GG2EZBoOm/kek-me-if-u-can/releases/latest/download/KekMeIfYouCan.exe)
@@ -43,6 +43,22 @@ Spiels wird nichts unterbrochen. In den Einstellungen lässt sich das abschalten
 Die Ordner-Ausgabe bleibt bei EXE-Updates klein; dafür `folder-install.txt` behalten. Wenn sich die Videos ändern,
 das neue vollständige ZIP herunterladen. Beide Ausgaben enthalten dieselben Spielregeln und Karten.
 
+### Taunts und Waffenklänge
+
+Alle **16 Taunts** besitzen jeweils **drei neu gestaltete Varianten**: von der Quietscheente mit abschließendem
+Quietscher über den absackenden Trompeten-Fail bis zum ungeduldigen Glockenläuten und dem verspäteten letzten
+Klatscher beim Applaus. Die Darbietung wechselt bei jedem Taunt. Lautstärken sind angeglichen, Anfänge und Enden
+weich ausgeblendet. Länge, Punkte und Abklingzeiten bleiben gleich. Klone spielen dieselbe Variante wie ihr Besitzer.
+
+MP-Schüsse, leere Abzüge, Nachladen sowie Holz-, Metall-, Glas- und Bodentreffer verwenden **24 aufbereitete
+Aufnahmen**. Sie sind in allen EXEs eingebettet und kommen auch über den bisherigen Auto-Updater an.
+Die großen Gefechts-Atmosphären sind nicht enthalten: Hintergrundschüsse würden die Ortung echter Spieler stören.
+
+Zusätzliche Soundeffekte von **[ZapSplat](https://www.zapsplat.com)**, **GMA** und **Skyclad Sound**.
+Credits und Lizenz stehen in [res/audio/CREDITS.txt](res/audio/CREDITS.txt) und im Spielordner. Die eingebettete
+Aufnahme-Bank gehört zum Spiel und darf nicht als eigenständige Soundbibliothek weitergegeben werden.
+Die Taunts selbst sind eigene prozedurale Klangentwürfe.
+
 ## Selbst bauen
 
 ```bash
@@ -67,11 +83,13 @@ Danach `KekMeIfYouCan.exe` starten. Voraussetzung: Visual Studio 2022/2026 mit �
 | Faire Tarnung | Echte und verwandelte Objekte werden identisch gerendert und ausgeblendet. Es gibt keine optischen Unterschiede, die Spieler verraten. |
 | Ausrichtung übernehmen | Beim Verwandeln übernimmt man die Drehung des Vorbilds und sperrt sie automatisch, damit man sich sauber in Reihen einfügt. |
 | Drehung mit Kollision | Große Objekte lassen sich nicht in Wände drehen. Ein Sofa muss sich seitlich durch die Tür schieben. |
-| Taunts mit Punkten | 16 Taunts (Präsidentenglocke, Applaus, Kuckuck, Quietscheente …). Längere Taunts bringen mehr Punkte. |
+| Schwere Props schlagen zurück | Mit Umschalt und 1,5 m freiem Anlauf rammen; aus ausreichender Höhe auf Sucher fallen. HUD markiert geeignete Formen und zeigt die Abklingzeit. |
+| Taunts mit Punkten | 16 Taunts mit je drei Varianten (Präsidentenglocke, Applaus, Kuckuck, Quietscheente …). Längere Taunts bringen mehr Punkte. |
 | Zwangs-Taunt | Wer zu lange still ist, tauntet automatisch: alle 45 s, im Endspurt alle 20 s. |
 | Köder | Props stellen zwei Kopien ihrer Tarnung auf. Treffer darauf kosten die Jäger Lebenspunkte. |
 | Sonar | Jäger lösen einen Ping aus, auf den nahe Props hörbar antworten. |
 | Granate | Eine pro Runde, für verdächtige Gruppen. |
+| Waffenwerkbank | MP und Schrotflinte mit sechs Anschlüssen, vier Build-Vorlagen, 3D-Vorschau und wirksamen Handhabungswerten. |
 | 3D-Klang mit Verdeckung | Geräusche hinter Wänden klingen gedämpft. So lassen sich Taunts orten. |
 | Bots für beide Teams | Prop-Bots suchen sich passende Gruppen gleicher Objekte, richten sich aus, verteilen sich über die Karte und fliehen bei Treffern. Jäger-Bots gehen Geräuschen nach, nutzen Sonar und geben Testschüsse ab. |
 | Ausgerüstete Sucher | Geformte Uniformen, Plattenträger mit Taschen und Funkgerät, Schutzbrille, Headset und Stiefel. Arme greifen die Waffe per Zweigelenk-IK; Lauf- und Hockposen werden animiert. |
@@ -80,11 +98,45 @@ Danach `KekMeIfYouCan.exe` starten. Voraussetzung: Visual Studio 2022/2026 mit �
 | Freie Durchgänge | Gegenstände, die eine Tür versperren würden, werden beim Kartenbau automatisch weggelassen. Ein Test prüft jede Tür. |
 | Mehrspieler übers Internet | Bis zu 16 Spieler. Einladungscode, automatische Portfreigabe am Router (UPnP) und Discord-Einladungen (siehe unten). |
 
+## Waffenwerkbank
+
+Im **Hauptmenü**, bei der Spielvorbereitung oder über **Esc → Waffenwerkbank** baust du MP und Schrotflinte um.
+Waffe auswählen, links einen Anschluss anklicken und rechts das gewünschte Teil montieren.
+Die 3D-Vorschau lässt sich mit gedrückter linker Maustaste drehen; Werte und Unterschiede zum Werksbuild stehen darunter.
+
+![Waffenwerkbank mit Holo-Visier, Präzisionslauf und Trommelmagazin](docs/screenshots/v1.0.5-workbench.png)
+
+| Anschluss | Auswahl |
+|---|---|
+| Visierung | Kimme/Korn, Reflex, Holo und Prisma mit 2,5× Zielansicht |
+| Lauf | Standard, Kompakt, Präzision/Sport |
+| Mündung | Offen/Feuerdämpfer, Kompensator bzw. Choke, Schalldämpfer |
+| Schaft | Standard, leicht, stabil/gepolstert |
+| Magazin | MP: 20/30/50 Schuss; Schrotflinte: 4/6/8 Patronen |
+| Vordergriff | Standard, vertikal/taktisch, Winkelgriff/leichte Pumpe |
+
+Die vier Vorlagen **Standard, Kompakt, Kontrolle und Gedämpft** sind sofort spielbar. Jeder Build bleibt in
+`prophunt.ini` gespeichert. Gewicht, Anschlagzeit, Rückstoß, Streuung, Kapazität und Nachladezeit ändern sich mit den Teilen;
+es gibt keinen Build ohne Nachteile. Schalldämpfer reduzieren Schussknall, Hörweite und Mündungsblitz.
+Gesperrte Kombinationen zeigen beim Überfahren mit der Maus den Grund: Der kurze MP-Handschutz nimmt keinen
+Vertikalgriff auf; unter den kurzen Schrotlauf passt keine 8er-Magazinverlängerung.
+
+Der Gastgeber prüft alle Teile. **Bis zum Ende der Versteckphase** werden Umbauten übernommen;
+während der Jagd gilt eine Änderung **ab der nächsten Runde**. Auch bei einem späten Beitritt während der Jagd
+wird der gespeicherte Build erst zur nächsten Runde angelegt. Alle Teilnehmer müssen **Version 1.0.5** verwenden
+(Netzwerkprotokoll 5). Andere Spieler sehen dieselben montierten Bauteile.
+
+Die Handhabung nutzt zeitabhängigen Anschlag, serverseitigen Rückstoß, Sprint-Erholung und getrennte Bewegungen
+für Hände, Magazin, Verschluss und Pumpgriff. Die Schrotflinte lädt **Patronen einzeln**; mit Feuer lässt sich
+unterbrechen, sobald mindestens eine Patrone geladen ist. Ein Waffenwechsel bricht das Nachladen ab.
+Die Modelle sind eigene prozedurale Spielmodelle. Die Werkbank ist eine erste modulare Ausbaustufe mit sechs
+Anschlüssen; ein Inventar mit hunderten Einzelteilen, Verschleiß und eine ballistische Simulation gehören noch nicht dazu.
+
 ## Spezialmodi
 
 Der **Lobbyleiter** wählt im Startmenü den Modus. Im **Esc-Menü** kann er einen Modus für die nächste Runde
 vormerken; die laufende Runde behält ihre Regeln. Gäste sehen die Auswahl, können sie aber nicht ändern.
-Alle Modi funktionieren mit Bots und Freunden auf allen vier Karten. Infektion ist zusätzlich einschaltbar.
+Alle Modi funktionieren mit Bots und Freunden auf allen fünf Karten. Infektion ist zusätzlich einschaltbar.
 
 | Modus | So spielt er sich |
 |---|---|
@@ -100,6 +152,23 @@ das Netzwerkprotokoll wurde für die neuen Regeln erweitert.
 ## Karten
 
 Die Karte wählst du im Hauptmenü über die Kartenkarte unten rechts oder beim Spielstart.
+
+### Dresdner Zwinger
+
+Eine für Prop Hunt verkleinerte, stilisierte Interpretation mit eigener Geometrie:
+
+![Dresdner Zwinger als Prop-Hunt-Karte](docs/screenshots/v1.0.5-zwinger.png)
+
+- Innenhof mit **vier Brunnenbecken**, Orangenkübeln und Bänken
+- **Kronentor** mit goldener Krone, Brücke und Graben; Wall- und Glockenspielpavillon
+- Offene Bogengalerien und **begehbare Terrassen** mit zwei Treppen und Verbindung über das Kronentor
+- Sempergalerie, Porzellansammlung, Mathematisch-Physikalischer Salon und **Nymphenbad** mit Kaskade
+- Sechs neue Tarnungen: Porzellanvase, Barockurne, Orangenkübel, Sandsteinfigur, historisches Fernrohr und Kunsttransportkiste
+
+Architekturorientierung: [Schlösserland Sachsen – Highlights des Dresdner Zwingers](https://wissen.schloesserland-sachsen.de/haeuser-gaerten/dresdner-zwinger/highlights-der-architektur/).
+Die Spielkarte ist kein maßstabsgetreuer Museumsplan. Alle Modelle entstehen im Spielcode.
+
+Für einen dedizierten Server: `KekMeIfYouCanCLI.exe --server --map zwinger --bots 8`.
 
 ### Bundestag
 
@@ -158,7 +227,7 @@ Für einen dedizierten Server: `KekMeIfYouCanCLI.exe --server --map paketzentrum
 
 ### Gegenstände
 
-149 verschiedene Gegenstände. Im Bundestag gibt es unter anderem Aktenordner, Wasserglas, Laptop, Mate-Flasche,
+155 verschiedene Gegenstände. Im Bundestag gibt es unter anderem Aktenordner, Wasserglas, Laptop, Mate-Flasche,
 Currywurst, Wahlurne, Präsidentenglocke, Büste und Ficus. Auf dem Oktoberfest kommen Maßkrug, Wiesnbrezn,
 Lebkuchenherz, Bierfass, Hendl, Radi, Trachtenhut, Tuba, Teddybär, Gartenzwerg, Karussellpferd, Autoscooter und
 viele mehr dazu. Die Nudelfabrik ergänzt 32 Gegenstände, darunter Mehlsack, Europalette, Spaghetti-Packung,
@@ -243,7 +312,7 @@ KekMeIfYouCanCLI.exe --nettest
 KekMeIfYouCan.exe --gameshot build\game
 ```
 
-`--test` prüft Einladungscodes, Updater, Bewegung, Türen und Wegfindung auf allen Karten. Für die Nudelfabrik werden
+`--test` prüft Einladungscodes, Updater, Audio, Bewegung, Türen und Wegfindung auf allen Karten. Für die Nudelfabrik werden
 zusätzlich alle Startplätze, die Förderband-Umläufe und die Sperre der Spaghetti-Bahn geprüft. Danach spielt es auf jeder
 Karte ein komplettes Bot-Match im Zeitraffer (etwa 1000- bis 2000-fache Echtzeit). Zwei Prüfungen gelten der Grafik und
 der Fairness:
@@ -254,6 +323,10 @@ der Fairness:
 
 Die Spezialregeln werden zusätzlich in einer kontrollierten Arena und mit Bot-Matches im Paketzentrum geprüft.
 `--nettest` testet Server und Client über Loopback, einschließlich Moduswechseln und voller Lobby mit vielen Klonen.
+`--soundcheck build/audio-preview` prüft die Aufnahme-Bank, Mixer-Transienten und alle 48 Taunt-Varianten.
+Es exportiert die eigenen prozeduralen Taunts und eine zusammenhängende Hörprobe als WAV. Die lizenzpflichtigen
+Waffenaufnahmen werden dabei nicht als Einzeldateien ausgegeben. Zum Neuaufbereiten der vom Projektinhaber
+bereitgestellten Aufnahmen dient `python tools/build_sound_bank.py <Downloadordner>` (benötigt NumPy).
 `--gameshot` klickt sich automatisch durch Menüs und Spiel und
 speichert Screenshots, auch vom Einladungsmenü. Dabei werden weder der Router noch Discord angesprochen.
 

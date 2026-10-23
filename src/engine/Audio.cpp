@@ -52,7 +52,9 @@ void Mix(short* out) {
   {
     std::lock_guard<std::mutex> lock(g_mutex);
     for (Voice& v : g_voices) {
-      if (!v.active || !v.data) continue;
+      // Erst nach dem ersten Update sind Position und Lautstärke bekannt. Sonst
+      // würde der Audiothread den Schuss-/Klickanfang mit Pegel null verbrauchen.
+      if (!v.active || !v.data || v.first) continue;
       const std::vector<float>& d = *v.data;
       size_t n = d.size() / v.channels;
       if (n == 0) { v.active = false; continue; }
@@ -173,6 +175,25 @@ void Shutdown() {
 }
 
 bool Available() { return g_available; }
+
+bool TestTransientStart() {
+  if (g_running || g_available) return false;
+  Voice saved[MAX_VOICES];
+  for (int k = 0; k < MAX_VOICES; k++) { saved[k] = g_voices[k]; g_voices[k] = Voice(); }
+  Voice& v = g_voices[0];
+  v.active = true;
+  v.data = std::make_shared<std::vector<float>>(64, .8f);
+  short output[FRAMES * 2] = {};
+  Mix(output);
+  bool pending = v.cursor == 0 && v.active;
+  for (short sample : output) pending &= sample == 0;
+  v.first = false;
+  v.targetL = v.curL = .7f; v.targetR = v.curR = .7f;
+  Mix(output);
+  bool audible = output[0] > 0 && v.cursor > 0;
+  for (int k = 0; k < MAX_VOICES; k++) g_voices[k] = std::move(saved[k]);
+  return pending && audible;
+}
 
 int CreateSound(std::vector<float> samples) {
   std::lock_guard<std::mutex> lock(g_mutex);

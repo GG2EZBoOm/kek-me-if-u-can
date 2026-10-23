@@ -55,7 +55,8 @@ Vec3 ThirdPersonCamera(const World& w, Vec3 pivot, float yaw, float pitch, float
 namespace {
 
 struct Candidates {
-  std::vector<const OBox*> boxes;
+  struct Box { const OBox* box; int other; };
+  std::vector<Box> boxes;
 };
 
 void Gather(const MoveEnv& env, Vec3 mn, Vec3 mx, Candidates& out) {
@@ -64,14 +65,15 @@ void Gather(const MoveEnv& env, Vec3 mn, Vec3 mx, Candidates& out) {
   env.world->Query(mn, mx, idx);
   for (int i : idx) {
     const Collider& c = env.world->cols[i];
-    if (c.flags & COL_PLAYER) out.boxes.push_back(&c.box);
+    if (c.flags & COL_PLAYER) out.boxes.push_back({&c.box, -1});
   }
   if (env.others) {
-    for (const OBox& b : *env.others) {
+    for (int i = 0; i < (int)env.others->size(); i++) {
+      const OBox& b = (*env.others)[i];
       Vec3 bmn, bmx;
       b.Bounds(bmn, bmx);
       if (bmx.x < mn.x || bmn.x > mx.x || bmx.y < mn.y || bmn.y > mx.y || bmx.z < mn.z || bmn.z > mx.z) continue;
-      out.boxes.push_back(&b);
+      out.boxes.push_back({&b, i});
     }
   }
 }
@@ -86,8 +88,8 @@ OBox Shrink(const OBox& b, float lift) {
 }
 
 bool BlockedBy(const Candidates& c, const OBox& b) {
-  for (const OBox* o : c.boxes)
-    if (OverlapOBox(b, *o, nullptr)) return true;
+  for (const auto& o : c.boxes)
+    if (OverlapOBox(b, *o.box, nullptr)) return true;
   return false;
 }
 
@@ -135,15 +137,18 @@ bool FindFreeSpot(const MoveEnv& env, MoveState& s, int propType) {
   return false;
 }
 
-bool ApplyMovement(const MoveEnv& env, MoveState& s, const UserCmd& cmd, int propType, bool frozen) {
+bool ApplyMovement(const MoveEnv& env, MoveState& s, const UserCmd& cmd, int propType, bool frozen,
+                   std::vector<MoveContact>* contacts) {
   if (propType >= 0 && !frozen && (cmd.buttons & BTN_LOCK) && !(s.lastButtons & BTN_LOCK)) s.rotLock = !s.rotLock;
   bool ground = s.onGround;
-  PlayerMove(env, s, cmd, propType, frozen, TICK_DT);
+  PlayerMove(env, s, cmd, propType, frozen, TICK_DT, contacts);
   if (propType >= 0) UpdatePropRotation(env, s, propType);
   return ground && !s.onGround && s.vel.y > 3.0f;
 }
 
-void PlayerMove(const MoveEnv& env, MoveState& s, const UserCmd& cmd, int propType, bool frozen, float dt) {
+void PlayerMove(const MoveEnv& env, MoveState& s, const UserCmd& cmd, int propType, bool frozen, float dt,
+                std::vector<MoveContact>* contacts) {
+  if (contacts) contacts->clear();
   MoveConfig cfg = MoveConfigFor(propType);
   if (env.mode == MODE_MOON) cfg.gravity *= 0.4f;
   s.yaw = cmd.yaw;
@@ -169,6 +174,7 @@ void PlayerMove(const MoveEnv& env, MoveState& s, const UserCmd& cmd, int propTy
   float wl = Length(wish);
   if (wl > 0) wish = wish / wl;
   bool sprint = (b & BTN_SPRINT) && fm > 0 && s.stamina > 0.02f && !s.crouching;
+  if (propType < 0 && (b & (BTN_AIM | BTN_FIRE))) sprint = false;
   float speed = cfg.maxSpeed * (sprint ? cfg.sprintMul : 1.0f) * (s.crouching ? cfg.crouchMul : 1.0f);
   if (sprint && wl > 0) s.stamina = std::max(0.0f, s.stamina - cfg.staminaDrain * dt);
   else s.stamina = std::min(1.0f, s.stamina + cfg.staminaRegen * dt);
@@ -218,7 +224,8 @@ void PlayerMove(const MoveEnv& env, MoveState& s, const UserCmd& cmd, int propTy
     s.pos += sd;
     for (int iter = 0; iter < 5; iter++) {
       bool any = false;
-      for (const OBox* o : cand.boxes) {
+      for (const auto& candidate : cand.boxes) {
+        const OBox* o = candidate.box;
         OBox box = PlayerBox(s, propType);
         Vec3 mtv;
         if (!OverlapOBox(box, *o, &mtv)) continue;
@@ -236,9 +243,13 @@ void PlayerMove(const MoveEnv& env, MoveState& s, const UserCmd& cmd, int propTy
             continue;
           }
         }
-        s.pos += mtv;
         Vec3 n = Normalize(mtv);
         float vn = Dot(s.vel, n);
+        if (contacts && candidate.other >= 0 && vn < -0.01f) {
+          float radius = fabsf(Dot(n, o->AxisX())) * o->h.x + fabsf(n.y) * o->h.y + fabsf(Dot(n, o->AxisZ())) * o->h.z;
+          contacts->push_back({candidate.other, n, s.vel, o->c + n * radius});
+        }
+        s.pos += mtv;
         if (vn < 0) s.vel -= n * vn;
         if (n.y > 0.7f) s.onGround = true;
       }
@@ -256,7 +267,8 @@ void PlayerMove(const MoveEnv& env, MoveState& s, const UserCmd& cmd, int propTy
     probe.h.x -= 0.01f;
     probe.h.z -= 0.01f;
     float best = -1e9f;
-    for (const OBox* o : cand.boxes) {
+    for (const auto& candidate : cand.boxes) {
+      const OBox* o = candidate.box;
       if (!OverlapOBox(probe, *o, nullptr)) continue;
       float top = o->c.y + o->h.y;
       if (top <= feet + 0.01f) best = std::max(best, top);

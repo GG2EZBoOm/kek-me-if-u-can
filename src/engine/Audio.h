@@ -39,5 +39,7 @@ void SetMasterVolume(float v);
 void SetOcclusionTest(std::function<bool(Vec3, Vec3)> fn);
 // Einmal pro Frame im Spiel-Thread: berechnet Pegel, Panning und Verdeckung
 void Update(float dt);
+// Offline-Prüfung: kurze Transienten dürfen vor dem ersten Positions-/Pegelupdate nicht verloren gehen.
+bool TestTransientStart();
 
 }  // namespace audio

@@ -712,6 +712,7 @@ void Renderer::ClearPropMeshes() {
 }
 
 void Renderer::Begin(const Camera& cam, const Environment& env, int width, int height, float time) {
+  showWorld_ = true;
   cam_ = cam;
   env_ = env;
   time_ = time;
@@ -893,7 +894,7 @@ void Renderer::DrawItems(Shader& sh, bool viewModel, bool shadowPass) {
 
 void Renderer::DrawScene(Shader& sh, bool shadowPass) {
   sh.Set("uModel", Mat4::Identity());
-  if (world_.Valid()) {
+  if (showWorld_ && world_.Valid()) {
     glBindVertexArray(world_.Vao());
     SetConstInstance(1, Vec3(1), 0, 0);
     world_.Draw();
@@ -1023,7 +1024,7 @@ void Renderer::Render(const ScreenFX& fx) {
   glEnable(GL_BLEND);
   glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
   lit_.Use();
-  if (decalMesh_.Valid()) {
+  if (showWorld_ && decalMesh_.Valid()) {
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(-1.0f, -4.0f);
     lit_.Set("uModel", Mat4::Identity());
@@ -1032,7 +1033,7 @@ void Renderer::Render(const ScreenFX& fx) {
     decalMesh_.Draw();
     glDisable(GL_POLYGON_OFFSET_FILL);
   }
-  if (glass_.Valid()) {
+  if (showWorld_ && glass_.Valid()) {
     lit_.Set("uGlass", 1);
     lit_.Set("uModel", Mat4::Identity());
     glBindVertexArray(glass_.Vao());

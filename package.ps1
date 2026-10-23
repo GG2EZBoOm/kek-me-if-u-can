@@ -8,6 +8,10 @@ New-Item -ItemType Directory -Force -Path $videoDir | Out-Null
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'KekMeIfYouCan-Ordner.exe') -Destination (Join-Path $stage 'KekMeIfYouCan.exe') -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'KekMeIfYouCanCLI.exe') -Destination $stage -Force
 $files = @('KekMeIfYouCan.exe', 'KekMeIfYouCanCLI.exe', 'folder-install.txt', 'LIESMICH.txt')
+foreach ($credit in @('CREDITS.txt', 'ZapSplat-EULA.pdf', 'sources.json')) {
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "res\audio\$credit") -Destination $stage -Force
+    $files += $credit
+}
 foreach ($video in @('kekishintro.mp4', 'engineintro.mp4', 'spielintro.mp4')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "res\video\$video") -Destination $videoDir -Force
     $files += "data/video/$video"
@@ -22,14 +26,24 @@ KEK ME IF YOU CAN $version - Windows x64
 3. data/video und folder-install.txt neben der EXE behalten.
 
 Enthalten: Spiel, Konsolen-/Serverprogramm und alle drei Intro-Videos.
-Karten, Figuren, Schrift und Sounds werden von der Engine erzeugt oder
-nutzen Windows-Komponenten. Es fehlen keine zusaetzlichen Asset-Pakete.
+Karten, Figuren und Taunts werden von der Engine erzeugt. Waffenaufnahmen
+sind in der EXE enthalten; Audio-Quellen und Lizenz stehen in CREDITS.txt.
+Es fehlen keine zusaetzlichen Asset-Pakete.
 Kein Installer und keine Administratorrechte erforderlich.
 
-Vier Karten: Bundestag, Oktoberfest, Nudelfabrik, KEK-Paketzentrum.
+Fuenf Karten: Bundestag, Oktoberfest, Nudelfabrik, KEK-Paketzentrum,
+Dresdner Zwinger mit Kronentor, Galerieterrassen und Nymphenbad.
+Schwere Props koennen Sucher rammen (Umschalt + 1,5 m Anlauf) oder
+aus ausreichender Hoehe erschlagen. Nach einem Treffer: 2 s Pause.
 Spezialmodi: Prop-Roulette, Klon-Alarm, Hummeln im Hintern, Mondschicht.
 Wundertuete waehlt pro Runde einen anderen Spezialmodus.
 Der Gastgeber waehlt vor dem Start oder per Esc fuer die naechste Runde.
+
+Waffenwerkbank im Hauptmenue oder per Esc: MP und Schrotflinte mit
+Visierungen, Laeufen, Muendungen, Schaeften, Magazinen und Griffen umbauen.
+Builds werden gespeichert. Aenderungen waehrend der Jagd gelten ab der
+naechsten Runde. Alle Mitspieler brauchen Version 1.0.5 (Protokoll 5).
+Schrot einzeln nachladen; Feuer unterbricht, sobald eine Patrone bereit ist.
 
 Der automatische Updater aktualisiert beide EXEs. Bei neuen Videodateien
 das aktuelle vollstaendige ZIP entpacken. Eigene Einstellungen stehen in

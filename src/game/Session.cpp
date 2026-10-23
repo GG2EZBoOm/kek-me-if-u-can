@@ -41,6 +41,11 @@ void FillClientState(const Sim& sim, ClientState& out, float alpha) {
     c.maxHealth = p.maxHealth;
     c.weapon = p.weapon;
     memcpy(c.ammo, p.ammo, sizeof(c.ammo));
+    memcpy(c.builds, p.builds, sizeof(c.builds));
+    c.aimProgress = p.aimProgress;
+    c.recoilPitch = p.recoilPitch;
+    c.recoilYaw = p.recoilYaw;
+    c.reloadDuration = p.reloadDuration;
     c.reloadTimer = p.reloadTimer;
     c.switchTimer = p.switchTimer;
     c.fireTimer = p.fireTimer;

@@ -574,6 +574,10 @@ void BotManager::OnEvents(const Sim& sim, const std::vector<GameEvent>& evs) {
     } else if (e.type == EV_PENALTY) {
       if (e.a < MAX_PLAYERS) brains_[e.a].testProp = -1;
     } else if (e.type == EV_HIT) {
+      if ((e.c == KILL_RAM || e.c == KILL_CRUSH) && e.b < MAX_PLAYERS && e.a < MAX_PLAYERS && sim.players[e.b].bot) {
+        Brain& b = brains_[e.b];
+        b.suspicion[e.a] = 5.0f; b.target = e.a; b.targetSeen = 0; b.reaction = .15f; b.testProp = -1;
+      }
       if (e.a < MAX_PLAYERS && e.b < MAX_PLAYERS && sim.players[e.a].bot && sim.players[e.b].team == TEAM_PROPS) {
         Brain& b = brains_[e.a];
         b.suspicion[e.b] = 5.0f;

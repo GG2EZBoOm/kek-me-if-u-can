@@ -85,8 +85,7 @@ void GearPanel(MeshBuilder& b, Vec3 mn, Vec3 mx, float cut) {
   ExtrudeConvex(b, p, mn.z, mx.z);
 }
 
-void BuildMeshes(Mesh& torso, Mesh& head, Mesh& thigh, Mesh& shin, Mesh& upperArm, Mesh& foreArm, Mesh& smg3p, Mesh& shotgun3p,
-                 Mesh& grenade) {
+void BuildMeshes(Mesh& torso, Mesh& head, Mesh& thigh, Mesh& shin, Mesh& upperArm, Mesh& foreArm, Mesh& grenade) {
   const u32 uniform = 0x39495d, uniformD = 0x283647, vest = 0x343d3e, vestL = 0x505c5b;
   const u32 black = 0x191d22, skin = 0xc99573, hiVis = 0xe8c454;
   MeshData d;
@@ -323,52 +322,6 @@ void BuildMeshes(Mesh& torso, Mesh& head, Mesh& thigh, Mesh& shin, Mesh& upperAr
   foreArm.Upload(d);
   d.Clear();
 
-  // --- MP in dritter Person (Ursprung = Drehpunkt, vorne = -Z) ---
-  b.Mat(MAT_METAL); b.ColorHex(0x2a2c30);
-  b.Box({-0.026f, -0.03f, -0.3f}, {0.026f, 0.035f, 0.06f});
-  b.ColorHex(0x1f2124);
-  b.Box({-0.01f, 0.035f, -0.25f}, {0.01f, 0.047f, 0.03f});
-  b.Mat(MAT_PLASTIC); b.ColorHex(0x161719);
-  b.Box({-0.03f, -0.05f, -0.3f}, {-0.0f + 0.03f, 0.018f, -0.15f});
-  b.Mat(MAT_METAL); b.ColorHex(0x2a2c30);
-  b.CylinderZ({0, 0.002f, -0.37f}, 0.01f, 0.14f, 10);
-  b.CylinderZ({0, 0.002f, -0.45f}, 0.016f, 0.06f, 10);
-  b.ColorHex(0x1b1c1f);
-  b.Push(Translation({0, -0.03f, -0.1f}) * RotationX(0.2f));
-  b.Box({-0.015f, -0.15f, -0.024f}, {0.015f, 0.0f, 0.024f});  // Magazin
-  b.Pop();
-  b.Push(Translation({0, -0.03f, 0.02f}) * RotationX(-0.25f));
-  b.Box({-0.018f, -0.1f, -0.024f}, {0.018f, 0.0f, 0.022f});   // Griff
-  b.Pop();
-  b.ColorHex(0x2a2c30);
-  b.Box({-0.012f, -0.02f, 0.06f}, {0.012f, 0.0f, 0.24f});     // Schulterstütze
-  b.Box({-0.02f, -0.06f, 0.21f}, {0.02f, 0.02f, 0.25f});
-  b.ColorHex(0x111214);
-  b.Box({-0.016f, 0.047f, -0.08f}, {0.016f, 0.085f, -0.02f});  // Rotpunktvisier
-  b.Mat(MAT_PLASTIC); b.ColorHex(0xff3020); b.Emissive(1.0f);
-  b.Box({-0.004f, 0.062f, -0.083f}, {0.004f, 0.07f, -0.079f});
-  b.Emissive(0);
-  smg3p.Upload(d);
-  d.Clear();
-
-  // --- Schrotflinte in dritter Person ---
-  b.Mat(MAT_METAL); b.ColorHex(0x26282b);
-  b.Box({-0.028f, -0.035f, -0.2f}, {0.028f, 0.035f, 0.07f});
-  b.CylinderZ({0, 0.015f, -0.44f}, 0.016f, 0.5f, 10);
-  b.CylinderZ({0, -0.016f, -0.4f}, 0.014f, 0.4f, 10);
-  b.Mat(MAT_WOOD); b.ColorHex(0x6b4a2e);
-  b.CylinderZ({0, -0.016f, -0.38f}, 0.026f, 0.15f, 12);      // Pumpe
-  b.Push(Translation({0, -0.03f, 0.05f}) * RotationX(-0.3f));
-  b.Box({-0.02f, -0.1f, -0.026f}, {0.02f, 0.0f, 0.024f});
-  b.Pop();
-  b.Push(Translation({0, -0.02f, 0.07f}) * RotationX(-0.12f));
-  b.Box({-0.022f, -0.045f, 0.0f}, {0.022f, 0.025f, 0.18f});   // Schaft endet an der Schulter
-  b.Pop();
-  b.Mat(MAT_LEATHER); b.ColorHex(black);
-  b.Box({-0.024f, -0.08f, 0.23f}, {0.024f, 0.01f, 0.25f});
-  shotgun3p.Upload(d);
-  d.Clear();
-
   b.Mat(MAT_METAL); b.ColorHex(0x3d4a2e);
   b.Sphere({0, 0, 0}, 0.06f, 10, 7);
   b.ColorHex(0x8d9299);
@@ -399,8 +352,9 @@ void Tube(MeshBuilder& b, Vec3 a, Vec3 c, float ra, float rc) {
 }
 
 // Arme mit Handschuhen: rechte Hand am Griff, linke Hand vorne (z = linke Handposition)
-void BuildArms(MeshBuilder& b, Vec3 rightHand, Vec3 leftHand, bool leftVisible) {
+void BuildArms(MeshBuilder& b, Vec3 rightHand, Vec3 leftHand, bool leftVisible, bool rightVisible = true) {
   const u32 glove = 0x272c2f, sleeve = 0x39495d, cuff = 0x283647;
+  if (rightVisible) {
   b.Mat(MAT_LEATHER); b.ColorHex(glove);
   b.Push(Translation(rightHand) * RotationX(-0.25f));
   b.Ellipsoid({0.002f, -0.052f, 0.006f}, {0.036f, 0.052f, 0.04f}, 12, 7);  // Handrücken/Ballen
@@ -415,6 +369,7 @@ void BuildArms(MeshBuilder& b, Vec3 rightHand, Vec3 leftHand, bool leftVisible) 
   Tube(b, rw, rw + Vec3(0.02f, -0.03f, 0.05f), 0.036f, 0.038f);
   b.ColorHex(sleeve);
   Tube(b, rw + Vec3(0.015f, -0.02f, 0.04f), rw + Vec3(0.13f, -0.24f, 0.38f), 0.038f, 0.046f);
+  }
   if (!leftVisible) return;
   b.Mat(MAT_LEATHER); b.ColorHex(glove);
   b.Ellipsoid(leftHand + Vec3(-0.003f, -0.027f, 0.0f), {0.04f, 0.022f, 0.05f}, 12, 6);  // Handfläche unter dem Vorderschaft
@@ -428,92 +383,9 @@ void BuildArms(MeshBuilder& b, Vec3 rightHand, Vec3 leftHand, bool leftVisible) 
   Tube(b, lw + Vec3(-0.025f, -0.02f, 0.04f), lw + Vec3(-0.2f, -0.24f, 0.3f), 0.037f, 0.045f);
 }
 
-void BuildViewModels(Mesh& smg, Mesh& shotgun, Mesh& gren, Mesh* hands, Mesh& flash) {
+void BuildViewModels(Mesh& gren, Mesh& hands, Mesh& flash) {
   MeshData d;
   MeshBuilder b(&d);
-  // --- MP (vorne = -Z, Ursprung über dem Griff) ---
-  const u32 steel = 0x16181b, poly = 0x1b1c1f, polyD = 0x121315;
-  // Oberbau (Stahl, oben gerundet) und Unterbau (Kunststoff)
-  b.Mat(MAT_METAL); b.ColorHex(steel);
-  b.Box({-0.025f, -0.006f, -0.2f}, {0.025f, 0.034f, 0.075f});
-  b.CylinderZ({0, 0.03f, -0.0625f}, 0.022f, 0.275f, 14);
-  b.Mat(MAT_PLASTIC); b.ColorHex(poly);
-  b.Box({-0.028f, -0.046f, -0.17f}, {0.028f, -0.004f, 0.07f});
-  b.ColorHex(polyD);
-  b.Box({-0.029f, -0.03f, -0.13f}, {0.029f, -0.024f, -0.02f});  // Trennfuge
-  // Handschutz achteckig mit Schlitzen
-  b.ColorHex(poly);
-  b.CylinderZ({0, -0.006f, -0.265f}, 0.031f, 0.13f, 8);
-  b.ColorHex(polyD);
-  for (int i = 0; i < 4; i++)
-    for (float sx : {-1.0f, 1.0f}) b.Box({sx * 0.03f - 0.002f, -0.002f, -0.31f + i * 0.026f}, {sx * 0.03f + 0.002f, 0.008f, -0.296f + i * 0.026f});
-  // Lauf und Mündungsaufsatz
-  b.Mat(MAT_METAL); b.ColorHex(steel);
-  b.CylinderZ({0, 0.004f, -0.36f}, 0.0105f, 0.08f, 12);
-  b.CylinderZ({0, 0.004f, -0.42f}, 0.016f, 0.07f, 12);
-  b.ColorHex(0x060708);
-  for (int i = 0; i < 3; i++) b.Box({-0.0165f, 0.0f, -0.445f + i * 0.018f}, {0.0165f, 0.008f, -0.437f + i * 0.018f});
-  // Schiene mit Zähnen
-  b.ColorHex(0x1f2124);
-  b.Box({-0.011f, 0.046f, -0.2f}, {0.011f, 0.055f, 0.06f});
-  for (int i = 0; i < 9; i++) b.Box({-0.0115f, 0.055f, -0.19f + i * 0.028f}, {0.0115f, 0.059f, -0.178f + i * 0.028f});
-  // Rotpunktvisier: Gehäuse, Tubus, Linse, Punkt
-  b.ColorHex(0x111214);
-  b.Box({-0.016f, 0.055f, -0.05f}, {0.016f, 0.066f, 0.012f});
-  b.CylinderZ({0, 0.08f, -0.02f}, 0.018f, 0.064f, 14);
-  b.Mat(MAT_PLASTIC); b.ColorHex(0x24384a);
-  b.CylinderZ({0, 0.08f, 0.0125f}, 0.0145f, 0.002f, 14);
-  b.ColorHex(0xff3a2a); b.Emissive(1.0f);
-  b.Box({-0.0025f, 0.0775f, 0.0135f}, {0.0025f, 0.0825f, 0.0145f});
-  b.Emissive(0);
-  // Magazin (leicht gebogen) und Griff mit Fingermulden
-  b.Mat(MAT_PLASTIC); b.ColorHex(polyD);
-  b.Push(Translation({0, -0.04f, -0.1f}) * RotationX(0.18f));
-  b.Box({-0.016f, -0.09f, -0.024f}, {0.016f, 0.0f, 0.024f});
-  b.Pop();
-  b.Push(Translation({0, -0.125f, -0.112f}) * RotationX(0.32f));
-  b.Box({-0.0165f, -0.07f, -0.025f}, {0.0165f, 0.004f, 0.025f});
-  b.Pop();
-  b.ColorHex(poly);
-  b.Push(Translation({0, -0.034f, 0.035f}) * RotationX(-0.25f));
-  b.Box({-0.019f, -0.11f, -0.022f}, {0.019f, 0.0f, 0.024f});
-  b.ColorHex(polyD);
-  for (int i = 0; i < 3; i++) b.Box({-0.0195f, -0.03f - i * 0.026f, -0.0235f}, {0.0195f, -0.022f - i * 0.026f, -0.02f});
-  b.Pop();
-  b.Mat(MAT_METAL); b.ColorHex(0x2a2c30);
-  b.Box({-0.004f, -0.062f, -0.048f}, {0.004f, -0.056f, 0.02f});  // Abzugsbügel
-  b.Box({0.025f, 0.012f, -0.03f}, {0.034f, 0.02f, 0.0f});        // Spannhebel
-  // Schulterstütze ganz eingeschoben: Gummikappe direkt hinter dem Gehäuse (ragt sonst ins Bild)
-  b.Mat(MAT_LEATHER); b.ColorHex(0x0d0d0e);
-  b.Box({-0.018f, -0.05f, 0.075f}, {0.018f, 0.022f, 0.088f});
-  smg.Upload(d);
-  d.Clear();
-  // --- Schrotflinte (brünierter Stahl, Walnuss) ---
-  b.Mat(MAT_METAL); b.ColorHex(steel);
-  b.Box({-0.03f, -0.04f, -0.17f}, {0.03f, 0.04f, 0.06f});
-  b.CylinderZ({0, 0.03f, -0.055f}, 0.03f, 0.23f, 14);   // gerundeter Rücken
-  b.CylinderZ({0, 0.022f, -0.48f}, 0.016f, 0.62f, 14);
-  b.CylinderZ({0, -0.016f, -0.43f}, 0.013f, 0.5f, 12);
-  b.CylinderZ({0, 0.003f, -0.77f}, 0.02f, 0.02f, 12);    // Laufschelle
-  b.Mat(MAT_GOLD); b.ColorHex(0xc9a24a);
-  b.Sphere({0, 0.042f, -0.78f}, 0.005f, 6, 4);
-  b.Mat(MAT_WOOD); b.ColorHex(0x7a4a26);
-  b.CylinderZ({0, -0.02f, -0.445f}, 0.031f, 0.17f, 14);  // Pumpe
-  b.ColorHex(0x4e2e16);
-  for (int i = 0; i < 6; i++) b.CylinderZ({0, -0.02f, -0.515f + i * 0.028f}, 0.0322f, 0.008f, 14);
-  b.ColorHex(0x7a4a26);
-  b.Push(Translation({0, -0.034f, 0.03f}) * RotationX(-0.25f));
-  b.Box({-0.021f, -0.11f, -0.025f}, {0.021f, 0.0f, 0.03f});
-  b.Pop();
-  b.Push(Translation({0, -0.01f, 0.05f}) * RotationX(0.14f));
-  b.Box({-0.023f, -0.06f, 0.0f}, {0.023f, 0.035f, 0.26f});
-  b.Mat(MAT_LEATHER); b.ColorHex(0x0d0d0e);
-  b.Box({-0.024f, -0.062f, 0.26f}, {0.024f, 0.037f, 0.28f});
-  b.Pop();
-  b.Mat(MAT_METAL); b.ColorHex(0x2a2c30);
-  b.Box({-0.004f, -0.062f, -0.05f}, {0.004f, -0.056f, 0.02f});
-  shotgun.Upload(d);
-  d.Clear();
   // --- Granate ---
   b.Mat(MAT_PLASTIC); b.ColorHex(0x4a5a32);
   b.Sphere({0, 0.01f, -0.06f}, 0.045f, 12, 8);
@@ -527,16 +399,8 @@ void BuildViewModels(Mesh& smg, Mesh& shotgun, Mesh& gren, Mesh* hands, Mesh& fl
   b.Pop();
   gren.Upload(d);
   d.Clear();
-  // Hände je Waffe
-  BuildArms(b, Vec3(0, -0.034f, 0.035f), Vec3(0, -0.05f, -0.23f), true);
-  hands[0].Upload(d);
-  d.Clear();
-  BuildArms(b, Vec3(0, -0.034f, 0.03f), Vec3(0, -0.04f, -0.45f), true);
-  hands[1].Upload(d);
-  d.Clear();
   BuildArms(b, Vec3(0, 0.05f, -0.03f), Vec3(), false);
-  hands[2].Upload(d);
-  d.Clear();
+  hands.Upload(d); d.Clear();
   b.Mat(MAT_PLASTIC); b.ColorHex(0xffc060); b.Emissive(1.0f);
   b.Box({-0.08f, -0.01f, -0.01f}, {0.08f, 0.01f, 0.01f});
   b.Box({-0.01f, -0.08f, -0.01f}, {0.01f, 0.08f, 0.01f});
@@ -560,14 +424,26 @@ Vec4 V4(u32 hex, float a) {
 void GameView::Init(Renderer& r) {
   renderer_ = &r;
   wr_.Init(r);
-  BuildMeshes(torso_, head_, thigh_, shin_, upperArm_, foreArm_, smg3p_, shotgun3p_, grenade_);
-  BuildViewModels(vmSmg_, vmShotgun_, vmGrenade_, vmHands_, flash_);
+  BuildMeshes(torso_, head_, thigh_, shin_, upperArm_, foreArm_, grenade_);
+  BuildViewModels(vmGrenade_, grenadeHands_, flash_);
+  weapons_.Init();
+  MeshData d; MeshBuilder b(&d);
+  BuildArms(b, {}, {}, false); rightHand_.Upload(d); d.Clear();
+  BuildArms(b, {}, {}, true, false); leftHand_.Upload(d); d.Clear();
+  b.Mat(MAT_METAL); b.ColorHex(0x1d2931); b.Box({-8,-.03f,-8},{8,0,8});
+  b.ColorHex(0x354650);
+  for(int i=-16;i<=16;i++) { float q=i*.25f; b.Box({q,0,-4},{q+.001f,.0005f,4}); b.Box({-4,0,q},{4,.0005f,q+.001f}); }
+  b.Mat(MAT_PLAIN); b.ColorHex(0x101c29); b.Box({-8,0,-3.05f},{8,5,-3});
+  bench_.Upload(d); d.Clear();
+  b.Mat(MAT_GOLD); b.ColorHex(0xb7a16a); b.CylinderZ({},.007f,.028f,10); casing_.Upload(d);
 }
 
 void GameView::LoadWorld(Renderer& r, const World& w) {
   wr_.Load(r, w);
   fx_.clear();
   lights_.clear();
+  casings_.clear();
+  aimBlend_ = 0; cameraRecoil_ = {}; lastWeapon_ = -1;
 }
 
 void GameView::Burst(Vec3 pos, int n, float speed, Vec4 c0, Vec4 c1, float size, float life, bool additive, float gravity, float up) {
@@ -625,11 +501,16 @@ void GameView::AddLight(Vec3 pos, float radius, Vec3 color, float life) { lights
 void GameView::OnEvent(const GameEvent& e, const ClientState& s, int localId, const World& w) {
   (void)w;
   switch (e.type) {
-    case EV_SHOT:
+    case EV_SHOT: {
+      WeaponStats stats = GetWeaponStats(e.b, e.c);
+      Vec3 right = RightFromYaw(YawFromDir(e.dir));
+      casings_.push_back({e.pos + right * .16f + e.dir * .27f - Vec3(0,.12f,0),
+                         right * rng_.Range(1.5f,2.7f) + Vec3(0,1.5f,0), 1.8f,
+                         e.b == WPN_SHOTGUN ? .23f : 0, rng_.Range(0,TAU)});
       if (e.a == localId) {
-        recoil_ = 1.0f;
-        flashTimer_ = 0.05f;
-        Shake(e.b == WPN_SHOTGUN ? 0.35f : 0.08f);
+        recoil_ = stats.recoil;
+        flashTimer_ = stats.suppressed ? .015f : .045f;
+        Shake((e.b == WPN_SHOTGUN ? .07f : .012f) * stats.recoil);
       } else {
         Vec3 muzzle = e.pos + e.dir * 0.7f - Vec3(0, 0.15f, 0);
         for (int i = 0; i < 14; i++) {
@@ -643,10 +524,11 @@ void GameView::OnEvent(const GameEvent& e, const ClientState& s, int localId, co
           f.additive = true;
           fx_.push_back(f);
         }
-        Burst(muzzle, 4, 2.0f, Vec4(6, 4, 1.5f, 1), Vec4(2, 1, 0.2f, 0), 0.06f, 0.05f, true, 0);
+        Burst(muzzle, stats.suppressed ? 1 : 4, 2.0f, Vec4(6, 4, 1.5f, 1), Vec4(2, 1, 0.2f, 0), 0.06f, 0.05f, true, 0);
       }
-      AddLight(e.pos + e.dir * 0.8f, 5.0f, Vec3(4.0f, 2.8f, 1.4f), 0.06f);
+      if (!stats.suppressed) AddLight(e.pos + e.dir * .8f, 5.0f, Vec3(4.0f, 2.8f, 1.4f), .045f);
       break;
+    }
     case EV_IMPACT: {
       bool metal = e.b == MAT_METAL || e.b == MAT_MIRROR || e.b == MAT_GOLD;
       if (e.c) Burst(e.pos, 7, 2.5f, V4(0x8a5a33, 1), V4(0x5a3a23, 0), 0.025f, 0.6f, false, 9.0f);
@@ -656,7 +538,10 @@ void GameView::OnEvent(const GameEvent& e, const ClientState& s, int localId, co
       break;
     }
     case EV_HIT:
-      Burst(e.pos, 10, 3.0f, V4(0xa87a4a, 1), V4(0x6b4a2e, 0), 0.03f, 0.7f, false, 9.0f);
+      if (e.c == KILL_RAM || e.c == KILL_CRUSH) {
+        Burst(e.pos, 18, 4.5f, V4(0xffd34e, 1), V4(0xff9256, 0), .055f, .55f, true, 7);
+        Smoke(e.pos, 10, .4f, Vec4(.8f, .72f, .55f, .55f));
+      } else Burst(e.pos, 10, 3.0f, V4(0xa87a4a, 1), V4(0x6b4a2e, 0), 0.03f, 0.7f, false, 9.0f);
       break;
     case EV_KILL: {
       const ClientPlayer& v = s.players[ClampI(e.b, 0, MAX_PLAYERS - 1)];
@@ -721,6 +606,13 @@ void GameView::OnEvent(const GameEvent& e, const ClientState& s, int localId, co
 
 void GameView::Update(float dt) {
   time_ += dt;
+  frameDt_ = Clamp(dt, .001f, .1f);
+  for (auto& c : casings_) {
+    if(c.delay > 0) { c.delay -= dt; continue; }
+    c.life -= dt; c.vel.y -= 9.8f * dt; c.pos += c.vel * dt; c.spin += dt * 13;
+  }
+  casings_.erase(std::remove_if(casings_.begin(),casings_.end(),[](const Casing& c){return c.life<=0;}),casings_.end());
+  if(casings_.size()>96) casings_.erase(casings_.begin(),casings_.begin()+casings_.size()-96);
   for (Fx& f : fx_) {
     f.life -= dt;
     f.vel.y -= f.gravity * dt;
@@ -796,18 +688,20 @@ void GameView::DrawHunter(Renderer& r, const ClientPlayer& p, int id, float sky)
   it.model = torsoM * Translation({0, 0.56f, 0}) * RotationX(Clamp(p.pitch, -0.8f, 0.8f) * 0.6f - lean * 0.8f);
   r.Draw(it);
   // Waffe vor der Brust, zielt unabhängig von der Rumpfneigung in Blickrichtung
-  Mat4 gunM = Translation({0.12f, 0.44f, -0.14f}) * RotationX(pitch - lean);
+  u16 build=p.weapon<2?p.builds[p.weapon]:0;
+  WeaponPose pose=MakeWeaponPose(p.weapon,build,p.reloadTimer,p.reloadDuration,p.fireTimer);
+  Mat4 gunM = Translation({0.12f, 0.44f, -0.14f}) * RotationX(pitch - lean + pose.reload*.15f) * RotationZ(-pose.reload*.35f);
   Vec3 gripR(0, -0.075f, 0.012f), gripL(0, -0.04f, -0.24f);
-  const Mesh* gun = &smg3p_;
+  bool gun = p.weapon < WPN_GRENADE;
   if (p.weapon == WPN_SHOTGUN) {
-    gun = &shotgun3p_;
     gripR = Vec3(0, -0.07f, 0.06f);
     gripL = Vec3(0, -0.03f, -0.34f);
   } else if (p.weapon == WPN_GRENADE) {
-    gun = nullptr;
+    gun = false;
     gripR = Vec3(0.04f, -0.06f, -0.1f);
     gripL = Vec3(-0.2f, -0.12f, -0.02f);
   }
+  if(p.weapon<2) { gripR={0,-.075f,.035f}; gripL=pose.leftHand; }
   // Arme per IK an Griff und Vorderschaft, Ellbogen nach unten außen
   struct ArmDef {
     Vec3 shoulder, grip, pole;
@@ -829,11 +723,7 @@ void GameView::DrawHunter(Renderer& r, const ClientPlayer& p, int id, float sky)
       r.Draw(it);
     }
   }
-  if (gun) {
-    it.mesh = gun;
-    it.model = torsoM * gunM;
-    r.Draw(it);
-  }
+  if (gun) weapons_.Draw(r,p.weapon,build,torsoM*gunM,sky,false,pose);
 }
 
 void GameView::DrawHunterPreview(Renderer& r, Vec3 pos, float yaw, float pitch, float walkPhase, float speed, bool crouch,
@@ -852,46 +742,58 @@ void GameView::DrawHunterPreview(Renderer& r, Vec3 pos, float yaw, float pitch, 
 }
 
 void GameView::DrawViewModel(Renderer& r, const ClientPlayer& me, const ViewInput& in, float sky) {
-  if (me.weapon != lastWeapon_) {
-    switchAnim_ = 1.0f;
-    lastWeapon_ = me.weapon;
+  if(me.weapon != lastWeapon_) { switchAnim_=1; lastWeapon_=me.weapon; lastYaw_=in.yaw; lastPitch_=in.pitch; sway_={}; }
+  int weapon=ClampI(me.weapon,0,2); u16 build=weapon<2?me.builds[weapon]:0;
+  float speed=sqrtf(me.vel.x*me.vel.x+me.vel.z*me.vel.z);
+  bool sprint=(me.lastButtons & BTN_SPRINT) && !(me.lastButtons & (BTN_AIM|BTN_FIRE)) && speed>4.5f;
+  sprintBlend_=Damp(sprintBlend_,sprint?1.0f:0.0f,10,frameDt_);
+  sway_.x=Damp(sway_.x,Clamp(WrapAngle(in.yaw-lastYaw_)/frameDt_,-3.0f,3.0f)*.012f,8,frameDt_);
+  sway_.y=Damp(sway_.y,Clamp((in.pitch-lastPitch_)/frameDt_,-3.0f,3.0f)*.010f,8,frameDt_);
+  lastYaw_=in.yaw; lastPitch_=in.pitch;
+  float bobAmt=me.onGround?Saturate(speed/5):.15f;
+  Vec3 base=Lerp(Vec3(.19f,-.18f,-.44f),Vec3(0,-WeaponSightHeight(weapon,build)*.80f,-.33f),aimBlend_);
+  Vec3 bob(sinf(bobPhase_)*.007f*bobAmt,-fabsf(cosf(bobPhase_))*.009f*bobAmt,0);
+  bob*=1-aimBlend_;  // sight axis remains aligned with the authoritative shot during ADS
+  WeaponPose pose=MakeWeaponPose(weapon,build,me.reloadTimer,me.reloadDuration,me.fireTimer);
+  float sw=std::max(switchAnim_,Saturate(me.switchTimer*2.5f));
+  Vec3 off=base+bob+Vec3(-sway_.x*(1-aimBlend_),sway_.y*(1-aimBlend_)-.055f*pose.reload-.32f*sw-.09f*sprintBlend_,.045f*recoil_);
+  Mat4 camM=Translation(cam_.pos)*RotationY(cam_.yaw)*RotationX(cam_.pitch);
+  Mat4 model=camM*Translation(off)*RotationX(.045f*recoil_*(1-aimBlend_*.85f)+.15f*pose.reload-.30f*sprintBlend_)*
+             RotationZ(-.45f*pose.reload+.45f*sprintBlend_)*Scaling(Vec3(.80f));
+  DrawItem it; it.viewModel=true; it.castShadow=false; it.sky=sky; it.model=model;
+  if(weapon<2) {
+    weapons_.Draw(r,weapon,build,model,sky,true,pose);
+    it.mesh=&rightHand_; it.model=model*Translation({0,-.025f,.035f}); r.Draw(it);
+    it.mesh=&leftHand_; it.model=model*Translation(pose.leftHand); r.Draw(it);
+  } else {
+    if(me.ammo[WPN_GRENADE]) { it.mesh=&vmGrenade_; r.Draw(it); }
+    it.mesh=&grenadeHands_; r.Draw(it);
   }
-  const Mesh* gun = me.weapon == WPN_SHOTGUN ? &vmShotgun_ : (me.weapon == WPN_GRENADE ? &vmGrenade_ : &vmSmg_);
-  if (me.weapon == WPN_GRENADE && me.ammo[WPN_GRENADE] == 0) gun = nullptr;
-  float speed = sqrtf(me.vel.x * me.vel.x + me.vel.z * me.vel.z);
-  float bobAmt = me.onGround ? Saturate(speed / 5.0f) : 0.2f;
-  Vec3 base = Lerp(Vec3(0.165f, -0.165f, -0.42f), Vec3(0.0f, -0.044f, -0.3f), aimBlend_);
-  Vec3 bob(sinf(bobPhase_) * 0.012f * bobAmt, -fabsf(cosf(bobPhase_)) * 0.014f * bobAmt, 0);
-  bob *= 1.0f - aimBlend_ * 0.7f;
-  float reload = me.reloadTimer > 0 ? Saturate(std::min(me.reloadTimer, GetWeapon(me.weapon).reload - me.reloadTimer) * 3.0f) : 0.0f;
-  float sw = std::max(switchAnim_, Saturate(me.switchTimer * 3));
-  Vec3 off = base + bob + Vec3(0, -0.25f * reload - 0.3f * sw, 0.06f * recoil_);
-  Mat4 camM = Translation(cam_.pos) * RotationY(cam_.yaw) * RotationX(cam_.pitch);
-  Mat4 m = camM * Translation(off) * RotationX(0.09f * recoil_ + 0.5f * reload) * RotationZ(-0.4f * reload) * Scaling(Vec3(0.58f));
-  DrawItem it;
-  it.viewModel = true;
-  it.castShadow = false;
-  it.sky = sky;
-  if (gun) {
-    it.mesh = gun;
-    it.model = m;
-    r.Draw(it);
+  if(flashTimer_>0 && weapon<2) {
+    it.mesh=&flash_; float scale=GetWeaponStats(weapon,build).suppressed?.12f:.55f;
+    it.model=model*Translation({0,.025f,WeaponMuzzleZ(weapon,build)-.025f})*RotationZ(rng_.Range(0,TAU))*Scaling(Vec3(scale)); r.Draw(it);
   }
-  it.mesh = &vmHands_[ClampI(me.weapon, 0, 2)];
-  it.model = m;
-  r.Draw(it);
-  if (flashTimer_ > 0 && me.weapon != WPN_GRENADE) {
-    it.mesh = &flash_;
-    float z = me.weapon == WPN_SHOTGUN ? -0.81f : -0.47f;
-    it.model = m * Translation({0, 0.02f, z}) * RotationZ(rng_.Range(0, TAU)) * Scaling(Vec3(rng_.Range(0.8f, 1.3f)));
-    r.Draw(it);
-  }
+}
+
+void GameView::RenderWorkbench(Renderer& r,int weapon,u16 build,float angle,float elevation,int slot,float time,int width,int height) {
+  Camera cam; cam.pos={0,.75f,1.8f}; cam.pitch=-.22f; cam.fovDeg=42;
+  Environment env; env.sunDir=Normalize(Vec3(-.4f,.8f,.5f)); env.sunColor=Vec3(2.3f,2.5f,2.7f);
+  env.skyZenith=Hex(0x111b25); env.skyHorizon=Hex(0x263747); env.skyAmbient=Vec3(.55f,.65f,.75f);
+  env.groundAmbient=Vec3(.26f,.32f,.38f); env.fogDensity=.008f; env.exposure=1.15f;
+  r.Begin(cam,env,width,height,time); r.ShowWorld(false); cam_=r.Cam();
+  DrawItem table; table.mesh=&bench_; r.Draw(table);
+  // Move the inspection model into the open right side of the panel layout.
+  float scale=weapon==WPN_SHOTGUN?1.00f:1.25f;
+  Mat4 model=Translation({.30f,.46f,0})*RotationY(angle)*RotationZ(elevation)*Scaling(Vec3(scale));
+  weapons_.Draw(r,weapon,build,model,1,false,WeaponPose(),slot);
+  r.SetLights({{{-.7f,1.4f,.7f},3,Vec3(2.8f,2.3f,1.7f)},{{1.1f,.8f,-.8f},3,Vec3(1.4f,2.2f,3.0f)}});
+  ScreenFX fx; fx.vignette=.38f; r.Render(fx);
 }
 
 void GameView::Render(Renderer& r, const ClientState& s, int localId, const World& w, const ViewInput& in, float time,
                       int width, int height, ScreenFX& fx) {
   const ClientPlayer* me = (localId >= 0 && localId < MAX_PLAYERS) ? &s.players[localId] : nullptr;
-  float dt = 1.0f / 60.0f;
+  float dt = frameDt_;
   for (int i = 0; i < MAX_PLAYERS; i++) {
     const ClientPlayer& p = s.players[i];
     float sp = sqrtf(p.vel.x * p.vel.x + p.vel.z * p.vel.z);
@@ -907,8 +809,12 @@ void GameView::Render(Renderer& r, const ClientState& s, int localId, const Worl
     float target = me->crouching ? 1.0f : 1.62f;
     eyeH_ = Damp(eyeH_, target, 14.0f, dt);
     cam.pos = me->pos + Vec3(0, eyeH_, 0);
-    aimBlend_ = Damp(aimBlend_, in.aiming && me->weapon != WPN_GRENADE ? 1.0f : 0.0f, 14.0f, dt);
-    cam.fovDeg = Lerp(in.fov, in.fov * 0.62f, aimBlend_);
+    WeaponStats stats = GetWeaponStats(me->weapon, me->weapon < 2 ? me->builds[me->weapon] : 0);
+    aimBlend_ = Damp(aimBlend_, me->aimProgress, 24.0f, dt);
+    cam.fovDeg = Lerp(in.fov, in.fov / stats.zoom, aimBlend_);
+    cameraRecoil_.x = Damp(cameraRecoil_.x, me->recoilYaw, 35, dt);
+    cameraRecoil_.y = Damp(cameraRecoil_.y, me->recoilPitch, 35, dt);
+    cam.yaw += cameraRecoil_.x; cam.pitch += cameraRecoil_.y;
     float sp = sqrtf(me->vel.x * me->vel.x + me->vel.z * me->vel.z);
     if (me->onGround) bobPhase_ += sp * dt * 2.4f;
     firstPerson = true;
@@ -943,7 +849,7 @@ void GameView::Render(Renderer& r, const ClientState& s, int localId, const Worl
     cam.yaw += rng_.Range(-1, 1) * shake_ * 0.02f;
     cam.pitch += rng_.Range(-1, 1) * shake_ * 0.02f;
   }
-  cam.pitch += recoil_ * 0.012f * (firstPerson ? 1.0f : 0.0f);
+
 
   r.Begin(cam, w.env, width, height, time);
   cam_ = r.Cam();
@@ -1002,12 +908,16 @@ void GameView::Render(Renderer& r, const ClientState& s, int localId, const Worl
     p.additive = f.additive;
     r.AddParticle(p);
   }
+  for(const auto& c : casings_) if(c.delay<=0) {
+    DrawItem shell; shell.mesh=&casing_; shell.model=Translation(c.pos)*RotationX(c.spin)*RotationZ(c.spin*.7f);
+    shell.sky=w.SkyAt(c.pos); r.Draw(shell);
+  }
   lightBuf_ = w.lights;
   for (const FxLight& l : lights_) {
     float k = l.life / l.maxLife;
     lightBuf_.push_back({l.pos, l.radius, l.color * k});
   }
-  if (flashTimer_ > 0 && firstPerson) lightBuf_.push_back({cam_.pos + cam_.Forward() * 0.8f, 5.0f, Vec3(3.5f, 2.5f, 1.2f)});
+  if (flashTimer_ > .02f && firstPerson) lightBuf_.push_back({cam_.pos + cam_.Forward() * 0.8f, 5.0f, Vec3(3.5f, 2.5f, 1.2f)});
   r.SetLights(lightBuf_);
 
   fx.viewModelFov = 68;

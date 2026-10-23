@@ -1,4 +1,5 @@
 #include "game/Session.h"
+#include "game/Taunts.h"
 
 // Kleine kontrollierte Arena: Regeln unabhängig von Bot-Zufall und Kartengeometrie prüfen.
 int RunModeTests() {
@@ -69,6 +70,16 @@ int RunModeTests() {
   check(active == 3 && cp.decoys == 1, "Vierter aktiver Klon abgewiesen, Ladung erhalten");
   sim.events.clear(); press(prop, BTN_TAUNT);
   check(count(EV_TAUNT) == 4, "Alle drei Klone ahmen den Taunt ihres Besitzers nach");
+  bool variants = true;
+  int lastVariant = cp.tauntVariant;
+  for (int repeat = 0; repeat < 12; repeat++) {
+    cp.tauntTimer = cp.tauntCooldown = 0;
+    sim.events.clear(); press(prop, BTN_TAUNT);
+    variants &= count(EV_TAUNT) == 4 && cp.tauntVariant >= 0 && cp.tauntVariant < TAUNT_VARIANTS && cp.tauntVariant != lastVariant;
+    for (const auto& e : sim.events) if (e.type == EV_TAUNT) variants &= e.c == cp.tauntVariant;
+    lastVariant = cp.tauntVariant;
+  }
+  check(variants, "Taunts wechseln die Klangvariante; alle Klone übernehmen dieselbe Variante");
   cp.abilityTimer = 0; cp.health = cp.maxHealth * .35f;
   oldPos = cp.ms.pos; sim.events.clear(); press(prop, BTN_ABILITY);
   check(count(EV_CLONE_SWAP) == 1 && Distance(cp.ms.pos, oldPos) > 1 && cp.abilityTimer > 9 &&

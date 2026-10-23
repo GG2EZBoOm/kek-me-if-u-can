@@ -18,6 +18,7 @@ struct PropDef {
   Vec3 colCenter, colHalf;   // Kollisionsbox lokal
   float health = 100;
   float volume = 0;
+  float ramDamage = 0;      // nur schwere, massive Tarnungen; 0 = kein Kollisionsangriff
   bool light = false;        // Lampe
   Vec3 lightOffset;
   Vec3 lightColor;

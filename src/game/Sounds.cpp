@@ -1,13 +1,19 @@
 #include "game/Sounds.h"
 #include "engine/Audio.h"
 #include "engine/Math.h"
+#include "game/Taunts.h"
+#include "game/RecordedSounds.h"
+#include <array>
+#include <filesystem>
+#include <fstream>
 
 namespace {
 
 const float SR = (float)audio::SAMPLE_RATE;
 using Buf = std::vector<float>;
 Rng g_rng(2024);
-int g_ids[SND_COUNT];
+std::vector<int> g_ids[SND_COUNT];
+int g_tauntVariant = 0;
 
 float Noise() { return g_rng.Float() * 2.0f - 1.0f; }
 float Fract(float x) { return x - floorf(x); }
@@ -255,230 +261,308 @@ Buf Melody(const std::vector<std::pair<int, float>>& notes, const std::function<
   return b;
 }
 
-// --- Taunts ----------------------------------------------------------------------------------
+// --- Taunts: kurze, komponierte Gags mit drei eigenständigen Darbietungen ----------------------
+
+float CharacterPitch() { return 1.0f + (g_tauntVariant - 1) * 0.045f; }
+
+Buf WoodenTap(float f, float len = .13f) {
+  Buf b = Make(len);
+  for (size_t i = 0; i < b.size(); i++) {
+    float t = T(i);
+    b[i] = (SinC(f * t) + .42f * SinC(f * 1.73f * t) + .19f * SinC(f * 3.12f * t)) * expf(-t * 48);
+  }
+  Mix(b, NoiseHit(.018f, 3600, 170, 500), 0, .7f);
+  Fade(b, .001f, .015f);
+  return b;
+}
+
+// Weiche, obertonreiche Anregung statt ungefilterter Rechteckwellen. Kleine Atem-
+// und Tonhöhenschwankungen machen Tiere und Lacher weniger mechanisch.
+Buf ComicVoice(float len, const std::function<float(float)>& pitch,
+               const std::function<Vec3(float)>& vowels, float breath = .07f) {
+  Buf b = Make(len);
+  Biquad f1, f2, f3, air;
+  air.BP(2300, .7f);
+  float phase = 0, drift = 0;
+  for (size_t i = 0; i < b.size(); i++) {
+    float t = T(i), u = t / len;
+    if (i % 64 == 0) {
+      Vec3 fm = vowels(u);
+      f1.BP(fm.x, 3.0f); f2.BP(fm.y, 4.2f); f3.BP(fm.z, 5.0f);
+    }
+    drift += (Noise() - drift) * .0008f;
+    phase += std::max(35.0f, pitch(u) * CharacterPitch() * (1 + drift * .04f)) / SR;
+    float excitation = 0;
+    for (int h = 1; h <= 14; h++) excitation += SinC(phase * h) * expf(-h * .11f) / h;
+    float aspiration = air.Run(Noise());
+    float voice = f1.Run(excitation) + .85f * f2.Run(excitation) + .35f * f3.Run(excitation);
+    float env = Smoothstep(0.0f, .035f, t) * Smoothstep(0.0f, .07f, len - t);
+    b[i] = (voice * 2.8f + aspiration * breath) * env;
+  }
+  return b;
+}
+
+Buf SlideWhistle(float len, float from, float to, float curve = 1) {
+  Buf b = Make(len);
+  float phase = 0;
+  Biquad air; air.BP(3100, 1);
+  for (size_t i = 0; i < b.size(); i++) {
+    float t = T(i), u = t / len;
+    phase += (from + (to - from) * powf(u, curve)) * CharacterPitch() * (1 + .004f * SinC(t * 7)) / SR;
+    b[i] = (SinC(phase) + .1f * SinC(phase * 2) + air.Run(Noise()) * .075f) *
+           Smoothstep(0.0f, .025f, t) * Smoothstep(0.0f, .06f, len - t);
+  }
+  return b;
+}
 
 Buf Kuckuck() {
   Buf b = Make(1.6f);
-  auto tone = [](float f, float len) {
-    Buf t = Make(len);
-    float ph = 0;
-    for (size_t i = 0; i < t.size(); i++) {
-      float x = T(i);
-      ph += f * (1.0f - 0.03f * x / len) / SR;
-      t[i] = (SinC(ph) + 0.2f * SinC(ph * 2) + 0.05f * Noise()) * std::min(1.0f, x * 40.0f) * expf(-x * 5.0f);
-    }
-    return t;
-  };
-  for (int r = 0; r < 2; r++) {
-    Mix(b, tone(NoteHz(76), 0.32f), r * 0.75f);
-    Mix(b, tone(NoteHz(72), 0.38f), r * 0.75f + 0.3f);
+  for (int k = 0; k < 2; k++) {
+    float at = k * (.72f + .018f * g_tauntVariant);
+    Mix(b, WoodenTap(760), at, .35f);
+    Mix(b, SlideWhistle(.23f, 940, 875), at + .035f, .65f);
+    Mix(b, SlideWhistle(.28f, 740, 680), at + .29f, .75f);
+    Mix(b, WoodenTap(510), at + .59f, .2f);
   }
-  Echo(b, 0.18f, 0.25f, 2);
+  Echo(b, .062f, .13f, 2);
   return b;
 }
 
 Buf Ente() {
   Buf b = Make(1.7f);
+  const float times[3][4] = {{.01f,.31f,.66f,1.12f},{.01f,.24f,.55f,1.02f},{.01f,.38f,.69f,1.09f}};
   for (int k = 0; k < 4; k++) {
-    float len = 0.2f + 0.05f * (k % 2);
-    Buf q = Make(len);
-    Biquad f;
-    f.BP(1500, 3.0f);
-    float ph = 0;
-    for (size_t i = 0; i < q.size(); i++) {
-      float t = T(i) / len;
-      float fr = 900.0f + 600.0f * sinf(t * PI) + 150.0f * k;
-      ph += fr / SR;
-      q[i] = f.Run(Sq(ph, 0.25f) + Noise() * 0.3f) * sinf(t * PI) * 3.0f;
-    }
-    Mix(b, q, k * 0.38f);
+    float len = k == 3 ? .43f : .22f + .02f * k;
+    Buf q = ComicVoice(len, [=](float u) { return 540 + 570 * sinf(u * PI) - 180 * u + k * 35; },
+        [](float u) { return Vec3(900 + 600 * sinf(u * PI), 2300 - 700 * u, 3700); }, .16f);
+    Mix(b, q, times[g_tauntVariant][k]);
+    Mix(b, NoiseHit(.07f, 1600, 35, 400), times[g_tauntVariant][k] + .01f, .18f);
   }
   return b;
 }
 
 Buf Pupser() {
   Buf b = Make(1.3f);
-  Biquad f;
-  f.LP(450.0f, 2.0f);
-  float ph = 0, jitter = 0;
+  Biquad body, rasp; body.LP(680, 1.1f); rasp.BP(850, 1.2f);
+  float phase = 0, wobble = 0;
   for (size_t i = 0; i < b.size(); i++) {
     float t = T(i);
-    jitter += (Noise() * 40.0f - jitter) * 0.01f;
-    float fr = 80.0f + 30.0f * sinf(t * 11.0f) + jitter + (t > 1.0f ? (t - 1.0f) * 900.0f : 0.0f);
-    ph += fr / SR;
-    float flutter = 0.6f + 0.4f * sinf(t * 70.0f + sinf(t * 13.0f) * 3.0f);
-    float env = std::min(1.0f, t * 20.0f) * std::min(1.0f, (1.3f - t) * 6.0f);
-    b[i] = f.Run(Sq(ph, 0.35f) + Noise() * 0.25f) * flutter * env;
+    wobble += (Noise() - wobble) * .004f;
+    float f = 90 - 28 * t + 18 * SinC(t * 3.7f) + wobble * 95 + g_tauntVariant * 6;
+    phase += f / SR;
+    float flap = powf(.5f + .5f * SinC(phase), 3);
+    float pulse = .45f + .55f * powf(.5f + .5f * SinC(t * (11 + g_tauntVariant) + .18f * SinC(t * 2)), 2);
+    float env = Smoothstep(0.0f, .018f, t) * (1 - Smoothstep(.84f, 1.06f, t));
+    b[i] = (body.Run(flap - .3f) * 2 + rasp.Run(Noise()) * .22f) * pulse * env;
   }
-  SoftClip(b, 2.0f);
+  Mix(b, SlideWhistle(.23f, 410, 1400 + 110 * g_tauntVariant, 2), 1.02f, .28f);
   return b;
 }
 
 Buf Klingel() {
   Buf b = Make(1.2f);
-  for (int s = 0; s < 2; s++)
-    for (int k = 0; k < 7; k++) Mix(b, Bell(0.8f, 1050.0f, 7.0f, 1.3f), s * 0.42f + k * 0.035f, 0.35f);
+  for (int ring = 0; ring < 2; ring++) {
+    float at = ring * (.47f + .02f * g_tauntVariant);
+    Mix(b, WoodenTap(1300, .06f), at, .25f);
+    for (int k = 0; k < 5; k++) {
+      float f = (k % 2 ? 1670.0f : 1190.0f) * CharacterPitch();
+      Mix(b, Bell(.58f, f, 9, .55f), at + .01f + k * .033f, .38f - k * .035f);
+    }
+  }
   return b;
 }
 
 Buf TrompeteFail() {
   Buf b = Make(2.6f);
-  const int notes[4] = {55, 54, 53, 52};
-  const float lens[4] = {0.45f, 0.45f, 0.45f, 1.15f};
-  float at = 0;
   for (int k = 0; k < 4; k++) {
-    float len = lens[k], f = NoteHz(notes[k]);
-    bool last = k == 3;
-    Buf n = Voice(len, [&](float t) { return f * (last ? 1.0f + 0.03f * sinf(t * 6.0f * TAU) * std::min(1.0f, t * 2) : 1.0f); },
-                  [&](float t) {
-                    float o = std::min(1.0f, t / 0.15f);
-                    return Vec3(400.0f + 500.0f * o, 900.0f + 500.0f * o, 2500.0f);
-                  },
-                  [&](float t) { return std::min(1.0f, t * 30.0f) * std::min(1.0f, (len - t) * 12.0f); }, 0.2f, 0.02f);
-    Mix(b, n, at);
-    at += len;
+    float len = k == 3 ? 1.16f : .43f, f = NoteHz(57 - k * 2);
+    Buf n = ComicVoice(len, [=](float u) {
+      float fall = k == 3 ? powf(2.0f, -(.38f + g_tauntVariant * .05f) * u * u) : 1;
+      return f * fall * (1 + .026f * SinC(u * len * 6) * Smoothstep(.15f, .6f, u));
+    }, [=](float u) { return Vec3(600 + 350 * sinf(u * PI), 1250 - (k == 3 ? 450 * u : 0), 2500); }, .035f);
+    Mix(b, n, k * .46f);
   }
-  Normalize(b, 0.85f);
+  Echo(b, .047f, .1f, 2);
   return b;
 }
 
 Buf Muh() {
-  float len = 1.8f;
-  Buf b = Voice(len, [](float t) { return 125.0f - 25.0f * t + 3.0f * sinf(t * 5.0f * TAU); },
-                [](float t) {
-                  float o = Smoothstep(0.1f, 0.5f, t);
-                  return Vec3(250.0f + 80.0f * o, 600.0f + 150.0f * o, 2300.0f);
-                },
-                [&](float t) { return Smoothstep(0.0f, 0.25f, t) * std::min(1.0f, (len - t) * 3.0f); }, 0.1f, 0.04f);
-  Normalize(b, 0.9f);
+  Buf b = Make(1.8f);
+  Mix(b, NoiseHit(.16f, 1200, 12, 100), 0, .28f);
+  Buf moo = ComicVoice(1.65f, [](float u) { return 125 + 38 * sinf(u * PI) - 43 * u + 3 * SinC(u * 8); },
+      [](float u) { float open = sinf(u * PI); return Vec3(250 + 260 * open, 620 + 300 * open, 2100); }, .1f);
+  Mix(b, moo, .08f);
   return b;
 }
 
 Buf Miau() {
-  float len = 1.2f;
-  Buf b = Voice(len, [](float t) { return 480.0f + 380.0f * sinf(Clamp(t / 0.9f, 0.0f, 1.0f) * PI) - 60.0f * t; },
-                [](float t) {
-                  float u = t / 1.2f;
-                  Vec3 i(300, 2300, 3000), a(750, 1150, 2700), o(350, 800, 2500);
-                  return u < 0.45f ? Lerp(i, a, u / 0.45f) : Lerp(a, o, (u - 0.45f) / 0.55f);
-                },
-                [&](float t) { return Smoothstep(0.0f, 0.08f, t) * std::min(1.0f, (len - t) * 5.0f); }, 0.6f, 0.03f);
-  Normalize(b, 0.85f);
+  Buf b = ComicVoice(1.2f, [](float u) { return 430 + 370 * sinf(powf(u, .65f) * PI) - 120 * u + 13 * SinC(u * 9); },
+      [](float u) {
+        return u < .35f ? Lerp(Vec3(300,2400,3400), Vec3(850,1400,2900), u/.35f)
+                        : Lerp(Vec3(850,1400,2900), Vec3(330,750,2100), (u-.35f)/.65f);
+      }, .07f);
+  for (size_t i = 0; i < b.size(); i++) b[i] *= .86f + .14f * SinC(T(i) * 27);
   return b;
 }
 
 Buf Hupe() {
   Buf b = Make(1.1f);
-  for (int k = 0; k < 2; k++) {
-    float len = 0.38f;
-    Buf h = Make(len);
-    Biquad f;
-    f.BP(700, 1.5f);
-    float ph = 0;
-    for (size_t i = 0; i < h.size(); i++) {
-      float t = T(i);
-      ph += (330.0f - 30.0f * t / len) / SR;
-      h[i] = f.Run(Saw(ph) + Saw(ph * 1.26f) * 0.6f) * std::min(1.0f, t * 50.0f) * std::min(1.0f, (len - t) * 20.0f) * 2.5f;
-    }
-    Mix(b, h, k * 0.5f);
+  const float at[] = {0, .37f, .84f};
+  for (int k = 0; k < 3; k++) {
+    float len = k == 2 ? .2f : .29f + k * .09f;
+    float f = k == 1 ? 260.0f : 390.0f;
+    Buf honk = ComicVoice(len, [=](float u) { return f * (1 - .18f * u * u); },
+        [](float u) { return Vec3(550 + 240 * sinf(u * PI), 1200, 2800); }, .045f);
+    Mix(b, honk, at[k], k == 2 ? .55f : 1);
+    Mix(b, WoodenTap(500, .06f), at[k], .12f);
   }
-  SoftClip(b, 1.5f);
   return b;
 }
 
 Buf Pfiff() {
   Buf b = Make(1.4f);
-  auto sweep = [](float len, const std::function<float(float)>& f) {
-    Buf s = Make(len);
-    float ph = 0;
-    for (size_t i = 0; i < s.size(); i++) {
-      float t = T(i) / len;
-      ph += f(t) / SR;
-      s[i] = (SinC(ph) + Noise() * 0.04f) * sinf(t * PI);
-    }
-    return s;
-  };
-  Mix(b, sweep(0.35f, [](float t) { return 900.0f + 1700.0f * t; }), 0.0f);
-  Mix(b, sweep(0.75f, [](float t) { return t < 0.35f ? 1000.0f + 1800.0f * (t / 0.35f) : 2800.0f - 1300.0f * ((t - 0.35f) / 0.65f); }), 0.5f);
+  Mix(b, SlideWhistle(.3f, 1050, 2100, .7f), .01f, .65f);
+  Mix(b, SlideWhistle(.23f, 1200, 2300, .7f), .49f, .7f);
+  Mix(b, SlideWhistle(.55f, 2300, 1150, .8f), .70f, .7f);
+  Echo(b, .085f, .1f, 1);
   return b;
 }
 
 Buf Glockenspiel() {
-  return Chime({84, 88, 91, 96, 91, 88, 84, 79}, 0.22f, 2.4f, 4.0f);
+  Buf b = Make(2.4f);
+  const int notes[] = {84,88,91,96,93,88,85};
+  for (int k = 0; k < 7; k++) {
+    float at = k * (.19f + .006f * g_tauntVariant);
+    Mix(b, Bell(1.0f, NoteHz(notes[k]) * CharacterPitch(), 5.5f, .32f), at, .55f);
+    Mix(b, WoodenTap(1700, .03f), at, .08f);
+  }
+  Mix(b, SlideWhistle(.47f, 1050, 360, .6f), 1.65f, .2f);
+  return b;
 }
 
 Buf Hahaha() {
   Buf b = Make(1.9f);
+  const float at[] = {.02f,.27f,.51f,.78f,1.06f};
   for (int k = 0; k < 5; k++) {
-    float len = 0.2f;
-    float f0 = 230.0f - k * 12.0f;
-    Buf h = Voice(len, [&](float t) { return f0 - 40.0f * t; }, [](float) { return Vec3(820, 1250, 2650); },
-                  [&](float t) { return Smoothstep(0.0f, 0.03f, t) * std::min(1.0f, (len - t) * 15.0f); }, 0.3f, 0.12f);
-    Buf asp = NoiseHit(0.05f, 3000, 40, 800);
-    Mix(b, asp, k * 0.3f, 0.3f);
-    Mix(b, h, k * 0.3f + 0.03f, 1.0f);
+    float base = 245 + (k % 2 ? 45 : 0) - k * 13;
+    Buf laugh = ComicVoice(.21f + .012f * k, [=](float u) { return base + 65 * sinf(u * PI) - 70 * u; },
+        [=](float u) { return Vec3(650 + 260 * sinf(u * PI), 1250 + k * 35, 2800); }, .22f);
+    Mix(b, NoiseHit(.06f, 4200, 33, 1000), at[k], .28f);
+    Mix(b, laugh, at[k] + .018f, 1 - k * .07f);
   }
-  Normalize(b, 0.85f);
+  Buf snort = ComicVoice(.3f, [](float u) { return 115 + 70 * sinf(u * PI); },
+      [](float) { return Vec3(390,1050,2100); }, .3f);
+  Mix(b, snort, 1.5f, .55f);
   return b;
 }
 
 Buf Boing() {
   Buf b = Make(1.0f);
-  float ph = 0;
+  float phase = 0, shimmer = 0;
   for (size_t i = 0; i < b.size(); i++) {
     float t = T(i);
-    float f = 140.0f + 260.0f * t + 60.0f * sinf(t * 28.0f) * expf(-t * 3.0f);
-    ph += f / SR;
-    b[i] = (SinC(ph) + 0.3f * Tri(ph * 2)) * expf(-t * 3.0f) * std::min(1.0f, t * 200.0f);
+    float f = (105 + 380 * expf(-t * 4) + 125 * SinC(t * (8 + g_tauntVariant)) * expf(-t * 3)) * CharacterPitch();
+    phase += f / SR; shimmer += f * 2.73f / SR;
+    b[i] = (sinf(TAU * phase + 1.5f * SinC(shimmer) * expf(-t * 5)) + .2f * SinC(shimmer)) * expf(-t * 4.5f);
   }
+  Mix(b, WoodenTap(1100, .05f), 0, .2f);
   return b;
 }
 
 Buf Praesidentenglocke() {
   Buf b = Make(2.0f);
-  for (int k = 0; k < 6; k++) {
-    float f = k % 2 ? 1220.0f : 1180.0f;
-    Mix(b, Bell(1.2f, f, 3.5f, 1.1f), k * 0.24f, 0.4f);
+  const float times[] = {.02f,.22f,.46f,.72f,1.05f};
+  for (int k = 0; k < 5; k++) {
+    float f = (k % 2 ? 1030 : 980) * CharacterPitch();
+    Mix(b, Bell(.95f, f, 6, .58f), times[k], .55f + .06f * (k % 2));
+    Mix(b, WoodenTap(650, .04f), times[k], .16f);
   }
+  Mix(b, WoodenTap(240, .22f), 1.58f, .65f);
+  return b;
+}
+
+Buf HandClap(float tone) {
+  Buf b = Make(.12f);
+  Biquad f; f.BP(tone, .65f);
+  for (size_t i = 0; i < b.size(); i++) {
+    float t = T(i), envelope = expf(-t * 85);
+    if (t > .009f) envelope += .55f * expf(-(t-.009f)*120);
+    if (t > .018f) envelope += .35f * expf(-(t-.018f)*140);
+    b[i] = f.Run(Noise()) * envelope;
+  }
+  Mix(b, Thump(.08f, 430, 220, 65), 0, .15f);
+  Echo(b, .027f, .16f, 2);
   return b;
 }
 
 Buf Applaus() {
   Buf b = Make(3.0f);
-  for (float t = 0; t < 2.9f;) {
-    float density = 8.0f + 35.0f * sinf(Clamp(t / 2.9f, 0.0f, 1.0f) * PI);
-    t += -logf(std::max(1e-4f, g_rng.Float())) / density;
-    Buf c = Make(0.025f);
-    Biquad f;
-    f.BP(g_rng.Range(900.0f, 2800.0f), 1.5f);
-    for (size_t i = 0; i < c.size(); i++) c[i] = f.Run(Noise()) * expf(-T(i) * 220.0f) * 2.5f;
-    Mix(b, c, t, g_rng.Range(0.3f, 1.0f));
+  for (int person = 0; person < 7; person++) {
+    float at = person * .031f;
+    while (at < 2.25f) {
+      Mix(b, HandClap(1000 + person * 240), at, g_rng.Range(.4f,.75f));
+      at += .24f + person * .012f + g_rng.Range(-.038f,.038f);
+    }
   }
-  Normalize(b, 0.85f);
+  Mix(b, HandClap(1550), 2.56f, .8f);  // einer klatscht peinlich spät
+  Echo(b, .063f, .18f, 2);
   return b;
 }
 
 Buf Tusch() {
   Buf b = Make(2.2f);
-  std::vector<float> cmaj = {NoteHz(60), NoteHz(64), NoteHz(67), NoteHz(72)};
-  Mix(b, Brass(0.16f, cmaj), 0.0f);
-  Mix(b, Brass(0.16f, cmaj), 0.2f);
-  Mix(b, Brass(0.16f, cmaj), 0.4f);
-  Mix(b, Brass(1.3f, {NoteHz(67), NoteHz(71), NoteHz(74), NoteHz(79)}, 0.05f, 0.4f), 0.62f);
-  Normalize(b, 0.9f);
+  Mix(b, Thump(.23f, 170, 65, 16), 0, .6f);
+  Mix(b, WoodenTap(870, .1f), .16f, .6f);
+  Mix(b, HandClap(1500), .34f, .8f);
+  Mix(b, HandClap(1900), .49f, .7f);
+  Mix(b, Brass(1.1f, {NoteHz(60),NoteHz(64),NoteHz(67)}, .035f, .5f), .65f, .5f);
+  Mix(b, NoiseHit(1.45f, 8500, 4.8f, 3100), .65f, .5f);
+  Mix(b, Bell(1.5f, 3400, 5, .35f), .65f, .12f);
   return b;
 }
 
 Buf KazooHymne() {
-  std::vector<std::pair<int, float>> tune = {{60, 0.45f}, {62, 0.2f}, {64, 0.45f}, {65, 0.3f}, {67, 0.5f},
-                                             {67, 0.25f}, {69, 0.35f}, {67, 0.35f}, {65, 0.3f}, {64, 0.3f}, {62, 0.3f}, {60, 0.6f}};
-  Buf b = Melody(tune, [](float f, float len) {
-    return Voice(len, [&](float t) { return f * (1.0f + 0.01f * sinf(t * 7.0f * TAU)); }, [](float) { return Vec3(600, 1400, 2800); },
-                 [&](float t) { return std::min(1.0f, t * 25.0f) * std::min(1.0f, (len - t) * 15.0f); }, 0.15f, 0.25f);
-  });
-  b.resize((size_t)(4.2f * SR));
-  Normalize(b, 0.85f);
+  Buf b = Make(4.2f);
+  const int notes[] = {60,64,67,64,65,69,67,62,65,64,62,60};
+  const float lengths[] = {.28f,.17f,.33f,.17f,.26f,.23f,.38f,.22f,.23f,.23f,.23f,.55f};
+  float at = .02f;
+  for (int k = 0; k < 12; k++) {
+    float f = NoteHz(notes[k]), len = lengths[k];
+    Buf note = ComicVoice(len, [=](float u) { return f * (1 + .014f * SinC(u * len * 6.4f)); },
+        [](float u) { return Vec3(620 + 90 * sinf(u * PI), 1500, 2800); }, .16f);
+    Mix(b, note, at, .7f);
+    at += len + .025f;
+  }
+  for (int k = 0; k < 6; k++) {
+    Mix(b, Thump(.3f, NoteHz(k % 2 ? 43 : 36), NoteHz(k % 2 ? 43 : 36), 10), .03f + k * .56f, .2f);
+    Mix(b, WoodenTap(1050, .055f), .31f + k * .56f, .1f);
+  }
+  Echo(b, .051f, .11f, 2);
   return b;
+}
+
+using TauntMaker = Buf (*)();
+const TauntMaker kTauntMakers[NUM_TAUNTS] = {Kuckuck, Ente, Pupser, Klingel, TrompeteFail, Muh, Miau, Hupe,
+    Pfiff, Glockenspiel, Hahaha, Boing, Praesidentenglocke, Applaus, Tusch, KazooHymne};
+
+void MasterTaunt(Buf& b, float duration) {
+  b.resize((size_t)llround(duration * SR), 0);
+  Biquad hp, lp; hp.HP(65); lp.LP(8500, .65f);
+  float peak = 0;
+  for (float& x : b) { x = lp.Run(hp.Run(x)); peak = std::max(peak, fabsf(x)); }
+  if (peak < 1e-7f) return;
+  // Die Sättigung einer asymmetrischen Stimme kann Gleichspannung erzeugen.
+  // Deshalb auch nach der Dynamikbearbeitung filtern und zentrieren.
+  Biquad post; post.HP(65);
+  double mean = 0;
+  for (float& x : b) { x = post.Run(tanhf(x / peak * 2.2f)); mean += x; }
+  mean /= b.size();
+  double power = 0; peak = 0;
+  for (float& x : b) { x -= (float)mean; power += x * x; peak = std::max(peak, fabsf(x)); }
+  float rms = (float)sqrt(power / b.size());
+  float gain = std::min(.82f / std::max(peak,.001f), .21f / std::max(rms, .001f));
+  for (float& x : b) x *= gain;
+  Fade(b, .002f, .045f);
 }
 
 // --- Oberfläche, Fanfaren, Atmosphäre --------------------------------------------------------
@@ -574,7 +658,9 @@ Buf MenuMusic() {
 
 }  // namespace
 
-void BuildSounds() {
+static std::vector<Buf> MakeBaseSounds() {
+  g_rng = Rng(2024);
+  g_tauntVariant = 0;
   std::vector<Buf> s(SND_COUNT);
   s[SND_SMG] = Gunshot(false);
   s[SND_SHOTGUN] = Gunshot(true);
@@ -593,6 +679,13 @@ void BuildSounds() {
     Mix(e, Click(2400, 0.03f), 0.16f);
     Normalize(e, 0.5f);
     s[SND_SWITCH] = e;
+    s[SND_SHELL] = e;
+  }
+  for (int w = 0; w < 2; w++) {
+    Buf quiet = s[w ? SND_SHOTGUN : SND_SMG];
+    Biquad low; low.LP(1400);
+    for (float& sample : quiet) sample = low.Run(sample) * .55f;
+    s[w ? SND_SHOTGUN_SUPPRESSED : SND_SMG_SUPPRESSED] = std::move(quiet);
   }
   {
     Buf w = NoiseHit(0.18f, 1600, 45, 80);
@@ -741,13 +834,155 @@ void BuildSounds() {
   s[SND_AMB_OUTDOOR] = Ambience(true);
   s[SND_AMB_INDOOR] = Ambience(false);
   s[SND_MUSIC_MENU] = MenuMusic();
-  Buf (*taunts[16])() = {Kuckuck, Ente, Pupser, Klingel, TrompeteFail, Muh, Miau, Hupe,
-                         Pfiff, Glockenspiel, Hahaha, Boing, Praesidentenglocke, Applaus, Tusch, KazooHymne};
-  for (int k = 0; k < 16; k++) {
-    s[SND_TAUNT_FIRST + k] = taunts[k]();
-    Normalize(s[SND_TAUNT_FIRST + k], 0.9f);
+  for (int k = 0; k < NUM_TAUNTS; k++) {
+    g_rng = Rng(202410u + k * 397u);
+    s[SND_TAUNT_FIRST + k] = kTauntMakers[k]();
+    MasterTaunt(s[SND_TAUNT_FIRST + k], kTaunts[k].duration);
   }
-  for (int i = 0; i < SND_COUNT; i++) g_ids[i] = audio::CreateSound(std::move(s[i]));
+  return s;
 }
 
-int Snd(int id) { return (id >= 0 && id < SND_COUNT) ? g_ids[id] : -1; }
+using SoundVariations = std::vector<std::vector<Buf>>;
+
+static SoundVariations MakeSoundVariations() {
+  auto base = MakeBaseSounds();
+  SoundVariations sounds(SND_COUNT);
+  for (int i = 0; i < SND_COUNT; i++) sounds[i].push_back(std::move(base[i]));
+  for (int v = 1; v < TAUNT_VARIANTS; v++) {
+    g_tauntVariant = v;
+    for (int k = 0; k < NUM_TAUNTS; k++) {
+      g_rng = Rng(202410u + k * 397u + v * 7919u);
+      Buf b = kTauntMakers[k]();
+      MasterTaunt(b, kTaunts[k].duration);
+      sounds[SND_TAUNT_FIRST + k].push_back(std::move(b));
+    }
+  }
+  g_tauntVariant = 0;
+  RecordedSoundBank recordings;
+  bool recorded = LoadRecordedSounds(recordings);
+  for (const char* key : {"smg_shot", "smg_burst", "arcade_punch", "empty", "switch_0", "switch_1"})
+    recorded &= recordings.count(key) != 0;
+  for (const char* group : {"load", "unload", "wall", "wood", "metal", "glass"})
+    for (int v = 0; v < 3; v++) recorded &= recordings.count(StrFormat("%s_%d", group, v)) != 0;
+  if (!recorded) {
+    LOG("Audio: Aufnahme-Bank fehlt oder ist beschädigt; Synthese-Ersatz wird verwendet.");
+    return sounds;
+  }
+  for (int id : {SND_SMG, SND_RELOAD_SMG, SND_RELOAD_SHOTGUN, SND_SWITCH, SND_SHELL, SND_SMG_SUPPRESSED,
+                 SND_IMPACT_WALL, SND_IMPACT_WOOD, SND_IMPACT_METAL, SND_IMPACT_GLASS}) sounds[id].clear();
+  sounds[SND_EMPTY][0] = recordings.at("empty");
+  for (int v = 0; v < 3; v++) {
+    Buf shot = Make(.72f);
+    Mix(shot, recordings.at("smg_shot"), 0, .9f);
+    Mix(shot, recordings.at("smg_burst"), .001f * v, .13f + v * .045f);
+    Mix(shot, recordings.at("arcade_punch"), 0, .07f);
+    Normalize(shot, .86f); Fade(shot, .001f, .06f);
+    Buf quiet = shot; Biquad low; low.LP(1400);
+    for (float& sample : quiet) sample = low.Run(sample) * .55f;
+    sounds[SND_SMG_SUPPRESSED].push_back(std::move(quiet));
+    sounds[SND_SMG].push_back(std::move(shot));
+    const Buf& unload = recordings.at(StrFormat("unload_%d", v));
+    const Buf& load = recordings.at(StrFormat("load_%d", v));
+    const Buf& latch = recordings.at(StrFormat("switch_%d", v % 2));
+    Buf shell = Make(.22f); Mix(shell, load, 0, .7f); Mix(shell, latch, .10f, .25f);
+    Fade(shell,.002f,.025f); sounds[SND_SHELL].push_back(std::move(shell));
+    Buf reload = Make(1.9f);
+    Mix(reload, unload, .09f, .85f);
+    Mix(reload, load, 1.10f);
+    Mix(reload, latch, 1.65f);
+    Fade(reload, .002f, .035f);
+    sounds[SND_RELOAD_SMG].push_back(std::move(reload));
+    Buf shotgun = Make(2.4f);
+    for (int k = 0; k < 3; k++) Mix(shotgun, load, .24f + k * .43f, .65f);
+    Mix(shotgun, unload, 1.75f, .8f);
+    Mix(shotgun, latch, 2.21f);
+    Fade(shotgun, .002f, .035f);
+    sounds[SND_RELOAD_SHOTGUN].push_back(std::move(shotgun));
+    Buf change = Make(.24f);
+    Mix(change, latch, 0, .8f);
+    Mix(change, load, .07f, .3f);
+    Fade(change, .001f, .03f);
+    sounds[SND_SWITCH].push_back(std::move(change));
+    const char* materials[] = {"wall", "wood", "metal", "glass"};
+    for (int k = 0; k < 4; k++) sounds[SND_IMPACT_WALL + k].push_back(recordings.at(StrFormat("%s_%d", materials[k], v)));
+  }
+  LOG("Audio: 24 aufbereitete Aufnahmen und %d Taunt-Varianten bereit.", NUM_TAUNTS * TAUNT_VARIANTS);
+  return sounds;
+}
+
+void BuildSounds() {
+  if (!g_ids[0].empty()) return;
+  auto sounds = MakeSoundVariations();
+  for (int id = 0; id < SND_COUNT; id++)
+    for (Buf& b : sounds[id]) g_ids[id].push_back(audio::CreateSound(std::move(b)));
+}
+
+int Snd(int id, u32 variant) {
+  return id >= 0 && id < SND_COUNT && !g_ids[id].empty() ? g_ids[id][variant % g_ids[id].size()] : -1;
+}
+
+static bool WritePreviewWav(const std::filesystem::path& path, const Buf& samples) {
+  std::ofstream out(path, std::ios::binary);
+  auto word = [&](u32 value, int bytes) { for (int k = 0; k < bytes; k++) out.put((char)(value >> (8*k))); };
+  out.write("RIFF", 4); word(36 + (u32)samples.size()*2, 4); out.write("WAVEfmt ", 8);
+  word(16,4); word(1,2); word(1,2); word(audio::SAMPLE_RATE,4); word(audio::SAMPLE_RATE*2,4);
+  word(2,2); word(16,2); out.write("data",4); word((u32)samples.size()*2,4);
+  for (float s : samples) word((u16)(i16)lroundf(Clamp(s,-1,1)*32767),2);
+  return out.good();
+}
+
+int RunSoundTests(const std::string& previewDir) {
+  int fails = 0;
+  auto check = [&](bool ok, const std::string& msg) { LOG("[%s]   %s", ok ? "OK" : "FAIL", msg.c_str()); if (!ok) fails++; };
+  check(audio::TestTransientStart(), "Kurze Klanganfänge bleiben bis zum ersten Mixer-Update erhalten");
+  RecordedSoundBank recordings;
+  check(LoadRecordedSounds(recordings) && recordings.size() == 24, "Alle 24 eingebetteten Aufnahmen lesbar");
+  std::vector<u8> packet = {'K','S','B','1',0x44,0xac,0,0,1,0,0,0,1,0,0,0,2,0,0,0,'a',0,0x80,0xff,0x7f};
+  RecordedSoundBank decoded;
+  check(DecodeRecordedSounds(packet.data(),packet.size(),decoded) && decoded.at("a")[0] == -1 && decoded.at("a")[1] > .999f,
+        "PCM-Bank dekodiert vorzeichenbehaftete Samples");
+  bool rejects = true;
+  for (size_t n = 0; n < packet.size(); n++) rejects &= !DecodeRecordedSounds(packet.data(),n,decoded) && decoded.empty();
+  auto huge = packet; huge[16] = 0xff; huge[17] = 0xff; huge[18] = 0xff; huge[19] = 0xff;
+  rejects &= !DecodeRecordedSounds(huge.data(),huge.size(),decoded) && decoded.empty();
+  auto wrongRate = packet; wrongRate[4] = 0;
+  rejects &= !DecodeRecordedSounds(wrongRate.data(),wrongRate.size(),decoded);
+  auto trailing = packet; trailing.push_back(0);
+  rejects &= !DecodeRecordedSounds(trailing.data(),trailing.size(),decoded);
+  check(rejects, "Abgeschnittene, übergroße und falsche Aufnahme-Banken werden verworfen");
+  auto sounds = MakeSoundVariations();
+  bool valid = true;
+  for (const auto& variants : sounds) for (const Buf& b : variants) {
+    valid &= !b.empty();
+    for (float s : b) valid &= std::isfinite(s);
+  }
+  check(valid, "Alle Klänge enthalten endliche, nichtleere Audiodaten");
+  std::filesystem::path dir(Utf8ToWide(previewDir));
+  if (!previewDir.empty()) std::filesystem::create_directories(dir);
+  Buf montage;
+  for (int k = 0; k < NUM_TAUNTS; k++) {
+    const auto& versions = sounds[SND_TAUNT_FIRST+k];
+    bool good = versions.size() == TAUNT_VARIANTS;
+    for (size_t v = 0; v < versions.size(); v++) {
+      const Buf& b = versions[v];
+      good &= b.size() == (size_t)llround(kTaunts[k].duration * SR);
+      double power = 0, dc = 0; float peak = 0;
+      for (float s : b) { power += s*s; dc += s; peak = std::max(peak, fabsf(s)); }
+      float rms = (float)sqrt(power / b.size());
+      good &= rms > .04f && rms < .24f && peak <= .83f && fabs(dc / b.size()) < .002f;
+      good &= fabsf(b.front()) < .0001f && fabsf(b.back()) < .0001f;
+      if (v) good &= versions[v] != versions[v-1];
+      if (!previewDir.empty()) good &= WritePreviewWav(dir / StrFormat("taunt_%02d_v%d.wav",k+1,(int)v+1), b);
+    }
+    check(good, std::string(kTaunts[k].name) + ": drei Varianten, korrekte Dauer, Pegel und weiche Ränder");
+    montage.insert(montage.end(), versions[0].begin(), versions[0].end());
+    montage.resize(montage.size() + (size_t)(.35f * SR), 0);
+  }
+  bool reloads = true;
+  for (int id : {SND_RELOAD_SMG,SND_RELOAD_SHOTGUN}) for (const Buf& b : sounds[id])
+    reloads &= fabsf((float)b.size()/SR - (id == SND_RELOAD_SMG ? 1.9f : 2.4f)) < .001f;
+  check(reloads, "Aufgenommene Nachladegeräusche passen zu den Waffen-Timern");
+  if (!previewDir.empty()) check(WritePreviewWav(dir / "taunts_preview.wav",montage), "Taunt-Hörprobe exportiert");
+  LOG("Soundtest beendet: %d Fehler", fails);
+  return fails;
+}

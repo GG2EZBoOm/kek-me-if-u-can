@@ -90,6 +90,7 @@ class Game {
   void DrawHUD();
   void DrawScoreboard(float alpha);
   void DrawPause();
+  void DrawWorkbench();
   void DrawHelp();
   void DrawTauntMenu();
   void DrawCrosshair(const ClientPlayer& me);
@@ -130,6 +131,12 @@ class Game {
   bool settingsOverlay_ = false;
   bool inviteOpen_ = false;
   bool paused_ = false, chatOpen_ = false, tauntMenu_ = false, help_ = false;
+  bool workbenchOpen_ = false;
+  bool ignoreMenuEscape_ = false;
+  int benchWeapon_ = 0, benchSlot_ = WS_OPTIC;
+  float benchAngle_ = -1.25f, benchElevation_ = 0;
+  Vec2 benchMouse_;
+  std::vector<int> reloadVoices_ = std::vector<int>(MAX_PLAYERS, -1);
   std::string chatInput_;
   std::string error_;
   float errorTime_ = 0;
@@ -216,7 +223,7 @@ int Game::Run(int argc, char** argv) {
   if (autopilot_) cfg_.masterVolume = 0.0f;  // Testlauf stumm
   double s0 = plat::Time();
   BuildSounds();
-  LOG("Klänge synthetisiert in %.0f ms", (plat::Time() - s0) * 1000);
+  LOG("Spielklänge vorbereitet in %.0f ms", (plat::Time() - s0) * 1000);
   props::BuildCatalog();
   view_.Init(r_);
   cfg_.match.mapIndex = ClampI(cfg_.match.mapIndex, 0, (int)AllMaps().size() - 1);
@@ -287,7 +294,7 @@ void Game::ApplySettings() {
 }
 
 bool Game::InGameInput() const {
-  return screen_ == Screen::InGame && session_ && session_->Ready() && !paused_ && !chatOpen_ && plat::IsFocused() && !settingsOverlay_;
+  return screen_ == Screen::InGame && session_ && session_->Ready() && !paused_ && !chatOpen_ && plat::IsFocused() && !settingsOverlay_ && !workbenchOpen_;
 }
 
 void Game::StartLocal(bool host) {
@@ -355,7 +362,7 @@ void Game::LeaveGame(const std::string& reason) {
   view_.LoadWorld(r_, menuWorld_);
   loadedWorld_ = &menuWorld_;
   screen_ = Screen::Main;
-  paused_ = chatOpen_ = tauntMenu_ = settingsOverlay_ = false;
+  paused_ = chatOpen_ = tauntMenu_ = settingsOverlay_ = workbenchOpen_ = false;
   inviteOpen_ = false;
   if (!reason.empty()) {
     error_ = reason;
@@ -391,6 +398,7 @@ UserCmd Game::MakeCmd() {
   c.yaw = yaw_;
   c.pitch = pitch_;
   c.weapon = weapon_;
+  memcpy(c.builds, cfg_.builds, sizeof(c.builds));
   if (!InGameInput()) return c;
   const ClientState& st = session_->State();
   int me = session_->LocalId();
@@ -432,7 +440,8 @@ void Game::UpdateView(float dt) {
   plat::SetMouseCaptured(look);
   if (look) {
     Vec2 md = plat::MouseDelta();
-    float sens = 0.0022f * cfg_.sensitivity * (plat::MouseDown(plat::MOUSE_RIGHT) && lp && lp->team == TEAM_HUNTERS ? 0.62f : 1.0f);
+    float zoom = lp && lp->weapon<2 ? GetWeaponStats(lp->weapon,lp->builds[lp->weapon]).zoom : 1;
+    float sens = .0022f * cfg_.sensitivity * (lp && lp->team==TEAM_HUNTERS ? Lerp(1.0f,1/zoom,lp->aimProgress) : 1.0f);
     yaw_ = WrapAngle(yaw_ - md.x * sens);
     pitch_ = Clamp(pitch_ - md.y * sens * (cfg_.invertY ? -1.0f : 1.0f), -1.52f, 1.52f);
   }
@@ -548,9 +557,10 @@ void Game::HandleEvent(const GameEvent& e) {
   float rp = rng_.Range(0.94f, 1.06f);
   switch (e.type) {
     case EV_SHOT: {
-      int snd = e.b == WPN_SHOTGUN ? SND_SHOTGUN : SND_SMG;
-      if (e.a == me) audio::Play(Snd(snd), P2(0.55f, rp));
-      else audio::Play(Snd(snd), P3(e.pos, 1.0f, 4.0f, 110.0f, rp));
+      const WeaponStats stats=GetWeaponStats(e.b,e.c);
+      int snd = stats.suppressed ? (e.b==WPN_SHOTGUN?SND_SHOTGUN_SUPPRESSED:SND_SMG_SUPPRESSED) : (e.b == WPN_SHOTGUN ? SND_SHOTGUN : SND_SMG);
+      if (e.a == me) audio::Play(Snd(snd, e.id), P2(0.55f, rp));
+      else audio::Play(Snd(snd, e.id), P3(e.pos, 1.0f, 4.0f, stats.soundRadius, rp));
       break;
     }
     case EV_IMPACT: {
@@ -558,17 +568,26 @@ void Game::HandleEvent(const GameEvent& e) {
       if (e.b == MAT_METAL || e.b == MAT_MIRROR || e.b == MAT_GOLD) snd = SND_IMPACT_METAL;
       else if (e.b == MAT_GLASS) snd = SND_IMPACT_GLASS;
       else if (e.c || e.b == MAT_WOOD || e.b == MAT_PARQUET) snd = SND_IMPACT_WOOD;
-      audio::Play(Snd(snd), P3(e.pos, 0.5f, 1.5f, 30.0f, rp));
+      audio::Play(Snd(snd, e.id), P3(e.pos, 0.5f, 1.5f, 30.0f, rp));
       break;
     }
-    case EV_HIT:
-      audio::Play(Snd(SND_HIT_PROP), P3(e.pos, 0.8f, 2.0f, 35.0f, rp));
+    case EV_HIT: {
+      bool heavy = e.c == KILL_RAM || e.c == KILL_CRUSH;
+      audio::Play(Snd(heavy ? SND_IMPACT_WALL : SND_HIT_PROP, e.id), P3(e.pos, heavy ? 1.0f : 0.8f, 2.0f, 35.0f, heavy ? .65f : rp));
       if (e.a == me) {
         hitMarker_ = 0.25f;
         audio::Play(Snd(SND_HITMARKER), P2(0.5f));
       }
-      if (e.b == me) view_.Shake(0.25f);
+      if (e.b == me || (heavy && e.a == me)) view_.Shake(heavy ? .65f : .25f);
+      if (heavy && (e.a == me || e.b == me)) {
+        Popup p;
+        p.text = StrFormat(e.c == KILL_CRUSH ? "VOLLTREFFER VON OBEN! · %.0f Schaden" : "AUS DEM WEG! · %.0f Schaden", e.f);
+        p.color = e.a == me ? kProp : kRed;
+        p.life = p.time = 2.0f;
+        popups_.push_back(p);
+      }
       break;
+    }
     case EV_PENALTY:
       if (e.a == me) {
         audio::Play(Snd(SND_PENALTY), P2(0.5f));
@@ -588,27 +607,30 @@ void Game::HandleEvent(const GameEvent& e) {
       fe.time = (float)time_;
       if (e.a < MAX_PLAYERS && e.a != e.b) {
         fe.killer = name(e.a);
-        fe.kt = TEAM_HUNTERS;
+        fe.kt = e.c == KILL_RAM || e.c == KILL_CRUSH ? TEAM_PROPS : TEAM_HUNTERS;
       }
       if (propVictim) fe.extra = "als " + props::Get((int)e.f).name;
       else if (e.c == KILL_PENALTY) fe.extra = "zu viele Fehlschüsse";
       else if (e.c == KILL_FALL) fe.extra = "abgestürzt";
+      else if (e.c == KILL_RAM) fe.extra = "überrollt";
+      else if (e.c == KILL_CRUSH) fe.extra = "erschlagen";
       feed_.push_back(fe);
       if (feed_.size() > 6) feed_.erase(feed_.begin());
       if (e.a == me && e.b != me) {
         killMarker_ = 0.5f;
-        Center(StrFormat("Gefunden: %s", name(e.b).c_str()), kHunter, 2.0f);
+        Center(StrFormat(propVictim ? "Gefunden: %s" : "Plattgemacht: %s", name(e.b).c_str()), TeamColor(fe.kt), 2.0f);
         centerSub_ = "+100 Punkte, +25 HP";
       }
       if (e.b == me) {
         if (e.c == KILL_PENALTY) Center("Zu viele Fehlschüsse!", kRed, 4.0f);
+        else if (e.c == KILL_RAM || e.c == KILL_CRUSH) Center((e.c == KILL_RAM ? "Überrollt von " : "Erschlagen von ") + name(e.a), kRed, 4.0f);
         else Center(e.a < MAX_PLAYERS && e.a != me ? "Gefunden von " + name(e.a) : "Ausgeschieden", kRed, 4.0f);
         centerSub_ = st.infection && propVictim ? "Du jagst gleich mit!" : "Linke/rechte Maustaste: Spieler wechseln · Leertaste: freie Kamera";
       }
       break;
     }
     case EV_TAUNT:
-      audio::Play(Snd(SND_TAUNT_FIRST + ClampI(e.b, 0, NUM_TAUNTS - 1)), P3(e.pos, 1.0f, 4.0f, 75.0f));
+      audio::Play(Snd(SND_TAUNT_FIRST + ClampI(e.b, 0, NUM_TAUNTS - 1), e.c), P3(e.pos, 1.0f, 4.0f, 75.0f));
       break;
     case EV_DISGUISE:
       audio::Play(Snd(SND_DISGUISE), P3(e.pos, 0.6f, 2.0f, 22.0f));
@@ -684,9 +706,18 @@ void Game::HandleEvent(const GameEvent& e) {
     case EV_JUMP:
       if (e.a != me) audio::Play(Snd(SND_JUMP), P3(e.pos, 0.4f, 1.5f, 15.0f, rp));
       break;
-    case EV_RELOAD:
-      if (e.a == me) audio::Play(Snd(e.b == WPN_SHOTGUN ? SND_RELOAD_SHOTGUN : SND_RELOAD_SMG), P2(0.5f));
-      else audio::Play(Snd(e.b == WPN_SHOTGUN ? SND_RELOAD_SHOTGUN : SND_RELOAD_SMG), P3(e.pos + Vec3(0, 1, 0), 0.5f, 1.5f, 18.0f));
+    case EV_RELOAD: {
+      int snd=e.b==WPN_SHOTGUN?SND_SWITCH:SND_RELOAD_SMG;
+      float pitch=e.b==WPN_SHOTGUN?1:1.9f/std::max(.5f,e.f);
+      if(e.a < MAX_PLAYERS) {
+        audio::Stop(reloadVoices_[e.a]);
+        reloadVoices_[e.a] = audio::Play(Snd(snd,e.id), e.a==me ? P2(.5f,pitch) : P3(e.pos+Vec3(0,1,0),.5f,1.5f,18,pitch));
+      }
+      break;
+    }
+    case EV_SHELL:
+      if(e.a==me) audio::Play(Snd(SND_SHELL,e.id),P2(.5f));
+      else audio::Play(Snd(SND_SHELL,e.id),P3(e.pos+Vec3(0,1,0),.5f,1.5f,15));
       break;
     case EV_EMPTY:
       if (e.a == me) audio::Play(Snd(SND_EMPTY), P2(0.5f));
@@ -735,6 +766,9 @@ void Game::HandleEvent(const GameEvent& e) {
 
 void Game::UpdateAudio(float dt) {
   bool inGame = screen_ == Screen::InGame && session_ && session_->Ready();
+  for(int i=0;i<MAX_PLAYERS;i++) if(reloadVoices_[i]>=0 && (!inGame || !session_->State().players[i].alive || session_->State().players[i].reloadTimer<=0)) {
+    audio::Stop(reloadVoices_[i]); reloadVoices_[i]=-1;
+  }
   const Camera& cam = view_.Cam();
   audio::SetListener(cam.pos, cam.Forward(), cam.Right());
   float sky = 0.5f;
@@ -789,8 +823,11 @@ void Game::Frame(float dt) {
   if (plat::KeyPressed(VK_F11)) plat::SetFullscreen(!plat::IsFullscreen());
 
   // Tasten mit Vorrang
+  bool closedWorkbench = workbenchOpen_ && plat::KeyPressed(VK_ESCAPE);
+  ignoreMenuEscape_ = closedWorkbench;
+  if(closedWorkbench) { workbenchOpen_=false; SaveCfg(); }
   if (screen_ == Screen::InGame && session_) {
-    if (plat::KeyPressed(VK_ESCAPE)) {
+    if (plat::KeyPressed(VK_ESCAPE) && !closedWorkbench && !workbenchOpen_) {
       if (settingsOverlay_) settingsOverlay_ = false, SaveCfg();
       else if (chatOpen_) chatOpen_ = false;
       else if (tauntMenu_) tauntMenu_ = false;
@@ -842,11 +879,13 @@ void Game::Frame(float dt) {
     vi.freeCamPos = freeCamPos_;
     ScreenFX fx;
     double r0 = plat::Time();
-    view_.Render(r_, st, me, session_->GetWorld(), vi, (float)time_, W, H, fx);
+    if(workbenchOpen_) view_.RenderWorkbench(r_,benchWeapon_,cfg_.builds[benchWeapon_],benchAngle_,benchElevation_,benchSlot_,(float)time_,W,H);
+    else view_.Render(r_, st, me, session_->GetWorld(), vi, (float)time_, W, H, fx);
     frameMs_ = Lerp(frameMs_, (float)(plat::Time() - r0) * 1000.0f, 0.1f);
   } else {
     plat::SetMouseCaptured(false);
-    view_.RenderFlyby(r_, menuWorld_, (float)(time_ - flybyStart_), W, H);
+    if(workbenchOpen_) view_.RenderWorkbench(r_,benchWeapon_,cfg_.builds[benchWeapon_],benchAngle_,benchElevation_,benchSlot_,(float)time_,W,H);
+    else view_.RenderFlyby(r_, menuWorld_, (float)(time_ - flybyStart_), W, H);
   }
   UpdateAudio(dt);
   // Discord: Ereignisse, Beitritt über Einladung, Anzeige im Profil
@@ -885,7 +924,8 @@ void Game::Frame(float dt) {
   }
   screenT_ = std::min(3.0f, screenT_ + dt);
   if (!paused_) ui_.Anim("pause_in", 0.0f, 60.0f);
-  switch (screen_) {
+  if(workbenchOpen_) DrawWorkbench();
+  else switch (screen_) {
     case Screen::Main: DrawMenuBackground(); DrawMain(); break;
     case Screen::Play: DrawMenuBackground(); DrawPlaySetup(); break;
     case Screen::Join: DrawMenuBackground(); DrawJoin(); break;
@@ -1037,6 +1077,7 @@ void Game::DrawMain() {
   DrawMapCard({W - ui_.S(510) + (1 - ac) * ui_.S(40), H - ui_.S(268), ui_.S(460), ui_.S(218)}, true);
   ui_.SetAlpha(Appear(0.2f));
   DrawProfileChip();
+  if(ui_.MenuItem("m_bench",{W-ui_.S(510),H-ui_.S(350),ui_.S(460),ui_.S(68)},"Waffenwerkbank","Deine MP und Schrotflinte umbauen",icon::Settings)) workbenchOpen_=true;
   if (discord_.Connected()) {
     std::string t = "Discord verbunden" + (discord_.UserName().empty() ? std::string() : " · " + discord_.UserName());
     float tw = ui_.Measure(FONT_SMALL, t).x;
@@ -1149,7 +1190,7 @@ void Game::DrawPlaySetup() {
   y += 12;
   if (ui_.ButtonEx("p_start", R(x, y, w * 0.62f, 58), hostSetup_ ? "Server starten" : "Spiel starten", icon::Play, UI::BTN_PRIMARY)) StartLocal(hostSetup_);
   if (ui_.ButtonEx("p_back", R(x + w * 0.65f, y, w * 0.35f, 58), "Zurück", nullptr, UI::BTN_SECONDARY) || back ||
-      (plat::KeyPressed(VK_ESCAPE) && !ui_.AnyActive())) {
+      (plat::KeyPressed(VK_ESCAPE) && !ignoreMenuEscape_ && !ui_.AnyActive())) {
     SaveCfg();
     screen_ = Screen::Main;
   }
@@ -1157,6 +1198,7 @@ void Game::DrawPlaySetup() {
   ui_.SetAlpha(ac);
   DrawMapCard({W - ui_.S(510) + (1 - ac) * ui_.S(40), H - ui_.S(268), ui_.S(460), ui_.S(218)}, true);
   DrawModePanel({W - ui_.S(510), ui_.S(152), ui_.S(460), ui_.S(350)}, false);
+  if(ui_.ButtonEx("p_bench",{W-ui_.S(510),ui_.S(522),ui_.S(460),ui_.S(64)},"Waffenwerkbank",icon::Settings,UI::BTN_SECONDARY)) workbenchOpen_=true;
   ui_.SetAlpha(1);
 }
 
@@ -1235,7 +1277,7 @@ void Game::DrawJoin() {
     ui_.TextIn(FONT_LABEL, pill, StrFormat("%d / %d", s.players, s.maxPlayers), kWhite);
     y += 72;
   }
-  if (back || (plat::KeyPressed(VK_ESCAPE) && !ui_.AnyActive())) {
+  if (back || (plat::KeyPressed(VK_ESCAPE) && !ignoreMenuEscape_ && !ui_.AnyActive())) {
     lan_.Stop();
     SaveCfg();
     screen_ = Screen::Main;
@@ -1319,9 +1361,11 @@ void Game::DrawSettings(bool overlay) {
   ui_.Checkbox("s_fps", R(x2, yr, cw, h), "FPS anzeigen", &cfg_.showFps);
   yr += h + gap;
   ui_.Checkbox("s_intro", R(x2, yr, cw, h), "Intros beim Start zeigen", &cfg_.intros);
+  ui_.Text(FONT_SMALL, ui_.S(x2 + 4), ui_.S(yr + h + 14), "Zusätzliche Soundeffekte: www.zapsplat.com", theme::Dim);
+  ui_.Text(FONT_SMALL, ui_.S(x2 + 4), ui_.S(yr + h + 35), "ZapSplat · GMA · Skyclad Sound", theme::Dim);
   float by = py + ph - 24 - 56;
   if (ui_.ButtonEx("s_back", R(x + w - 220, by, 220, 56), "Fertig", icon::Check, UI::BTN_PRIMARY) || back ||
-      (plat::KeyPressed(VK_ESCAPE) && !ui_.AnyActive() && !overlay)) {
+      (plat::KeyPressed(VK_ESCAPE) && !ignoreMenuEscape_ && !ui_.AnyActive() && !overlay)) {
     cfg_.fullscreen = plat::IsFullscreen();
     SaveCfg();
     if (overlay) settingsOverlay_ = false;
@@ -1746,17 +1790,16 @@ void Game::UpdatePresence() {
 void Game::DrawCrosshair(const ClientPlayer& me) {
   float cx = ui_.W() * 0.5f, cy = ui_.H() * 0.5f;
   if (me.team == TEAM_HUNTERS) {
-    const WeaponInfo& wi = GetWeapon(me.weapon);
+    const WeaponStats wi = GetWeaponStats(me.weapon,me.weapon<2?me.builds[me.weapon]:0);
     float speed = sqrtf(me.vel.x * me.vel.x + me.vel.z * me.vel.z);
-    bool aim = plat::MouseDown(plat::MOUSE_RIGHT);
-    float spread = (aim ? wi.spreadAim : wi.spreadHip) * (1.0f + speed * 0.12f) * (me.onGround ? 1.0f : 2.0f);
+    float spread = Lerp(wi.spreadHip,wi.spreadAim,me.aimProgress) * (1.0f + speed * 0.12f) * (me.onGround ? 1.0f : 2.0f);
     float gap = ui_.S(6) + spread * ui_.H() * 1.1f;
     float len = ui_.S(9), th = std::max(1.5f, ui_.S(2));
     Color c = Color(255, 255, 255, 235);
     if (me.weapon == WPN_GRENADE) {
       ui_.Ring({cx, cy}, ui_.S(11), th + 2, Color(0, 0, 0, 120));
       ui_.Ring({cx, cy}, ui_.S(11), th, c);
-    } else {
+    } else if(me.aimProgress < .85f) {
       Color o(0, 0, 0, 140);
       float e = std::max(1.0f, ui_.S(1));
       ui_.Rect_({cx - th * 0.5f - e, cy - gap - len - e, th + 2 * e, len + 2 * e}, o, e);
@@ -1903,6 +1946,78 @@ void Game::DrawScoreboard(float alpha) {
   ui_.SetAlpha(1);
 }
 
+void Game::DrawWorkbench() {
+  float W=ui_.W()/ui_.Scale(), H=ui_.H()/ui_.Scale();
+  ui_.SetAlpha(1);
+  ui_.Panel(R(30,30,420,H-60),ui_.S(20),1,Color::Hex(0x0c151d,230));
+  if(PageHeader(ui_.S(54),ui_.S(48),ui_.S(372),"Waffenwerkbank","Zwei Waffen · sechs Anschlüsse")) { workbenchOpen_=false; SaveCfg(); }
+  for(int w=0;w<2;w++) if(ui_.ButtonEx(StrFormat("wb_gun%d",w).c_str(),R(54+w*190,140,182,48),w?"Schrotflinte":"MP",nullptr,
+      benchWeapon_==w?UI::BTN_PRIMARY:UI::BTN_SECONDARY)) benchWeapon_=w;
+  u16& build=cfg_.builds[benchWeapon_];
+  for(int slot=0;slot<WS_COUNT;slot++) {
+    Rect row=R(54,208+slot*75,372,66);
+    if(ui_.MenuItem(StrFormat("wb_slot%d",slot).c_str(),row,WeaponSlotName(slot),WeaponPartName(benchWeapon_,slot,WeaponPart(build,slot)),
+                    slot==WS_OPTIC?icon::Target:icon::Settings,benchSlot_==slot)) benchSlot_=slot;
+  }
+  ui_.Label(ui_.S(56),ui_.S(678),"Schnell-Builds",theme::Dim);
+  const char* presets[]={"Standard","Kompakt","Kontrolle","Gedämpft"};
+  for(int i=0;i<4;i++) if(ui_.ButtonEx(StrFormat("wb_preset%d",i).c_str(),R(54+(i%2)*190,705+(i/2)*50,182,42),presets[i],nullptr,UI::BTN_SECONDARY)) {
+    build=WeaponPreset(benchWeapon_,i); SaveCfg();
+  }
+  ui_.Text(FONT_SMALL,ui_.S(56),ui_.S(H-62),"Builds werden automatisch gespeichert.",theme::Dim);
+  float x=490, rw=W-x-40;
+  ui_.Label(ui_.S(x),ui_.S(48),"DEIN BUILD",theme::Accent);
+  ui_.Text(FONT_LARGE,ui_.S(x),ui_.S(72),benchWeapon_?"Schrotflinte / 12 Gauge":"MP / 9 mm",kWhite);
+  bool queued=session_ && session_->Ready() && session_->State().phase!=Phase::Waiting && session_->State().phase!=Phase::Hiding;
+  ui_.Text(FONT_NORMAL,ui_.S(x),ui_.S(118),queued?"Änderungen gelten ab der nächsten Runde.":"Dein Build wird vor Beginn der Jagd angelegt.",queued?theme::Accent:theme::Dim);
+  Rect inspect=R(x,155,rw,H-505);
+  Vec2 mouse=ui_.Mouse();
+  if(ui_.Hovered(inspect) && plat::MouseDown(plat::MOUSE_LEFT) && !plat::MousePressed(plat::MOUSE_LEFT)) {
+    benchAngle_+=(mouse.x-benchMouse_.x)*.008f;
+    benchElevation_=Clamp(benchElevation_+(mouse.y-benchMouse_.y)*.004f,-.65f,.65f);
+  }
+  benchMouse_=mouse;
+  ui_.Text(FONT_SMALL,ui_.S(W-44),ui_.S(158),"Zum Drehen mit der Maus ziehen",theme::Dim,ALIGN_RIGHT);
+  ui_.Panel(R(x,H-334,rw,184),ui_.S(18),1,Color::Hex(0x0c151d,225));
+  ui_.Label(ui_.S(x+20),ui_.S(H-318),WeaponSlotName(benchSlot_),theme::Accent);
+  int count=WeaponPartCount(benchSlot_), selected=WeaponPart(build,benchSlot_); float bw=(rw-40-(count-1)*8)/count;
+  const char* description=WeaponPartDescription(benchWeapon_,benchSlot_,selected);
+  Color descColor=theme::Dim;
+  for(int n=0;n<count;n++) {
+    Rect button=R(x+20+n*(bw+8),H-285,bw,54);
+    const char* blocked=WeaponPartBlock(benchWeapon_,build,benchSlot_,n);
+    if(ui_.ButtonEx(StrFormat("wb_part%d",n).c_str(),button,WeaponPartName(benchWeapon_,benchSlot_,n),nullptr,
+                   selected==n?UI::BTN_PRIMARY:UI::BTN_SECONDARY,!blocked)) {
+      build=WithWeaponPart(benchWeapon_,build,benchSlot_,n); SaveCfg();
+      description=WeaponPartDescription(benchWeapon_,benchSlot_,n);
+    }
+    if(ui_.Hovered(button)) {
+      description=blocked?blocked:WeaponPartDescription(benchWeapon_,benchSlot_,n);
+      descColor=blocked?theme::Danger:theme::Dim;
+    }
+  }
+  float dy=H-214;
+  for(const auto& line:ui_.Wrap(FONT_NORMAL,description,ui_.S(rw-40))) {
+    ui_.Text(FONT_NORMAL,ui_.S(x+20),ui_.S(dy),line,descColor); dy+=24;
+  }
+  WeaponStats stats=GetWeaponStats(benchWeapon_,build), base=GetWeaponStats(benchWeapon_,0);
+  ui_.Panel(R(x,H-136,rw,106),ui_.S(18),1,Color::Hex(0x0c151d,225));
+  const char* labels[]={"GEWICHT","ANSCHLAG","RÜCKSTOSS","STREUUNG / ADS","KAPAZITÄT","VOLLES NACHLADEN"};
+  std::string values[]={StrFormat("%.2f kg",stats.weight),StrFormat("%.0f ms",stats.adsTime*1000),
+    StrFormat("%.0f %%",stats.recoil*100),StrFormat("%.0f %%",stats.spreadAim/base.spreadAim*100),
+    StrFormat("%d",stats.magazine),StrFormat("%.2f s",stats.reload)};
+  float diffs[]={stats.weight-base.weight,(stats.adsTime-base.adsTime)*1000,(stats.recoil-1)*100,
+    (stats.spreadAim/base.spreadAim-1)*100,(float)(stats.magazine-base.magazine),stats.reload-base.reload};
+  float col=(rw-36)/6;
+  for(int i=0;i<6;i++) {
+    float sx=x+18+i*col;
+    ui_.Text(FONT_SMALL,ui_.S(sx),ui_.S(H-120),labels[i],theme::Dim);
+    ui_.Text(FONT_MEDIUM,ui_.S(sx),ui_.S(H-94),values[i],kWhite);
+    Color delta=fabsf(diffs[i])<.001f?theme::Faint:((i==4?diffs[i]>0:diffs[i]<0)?theme::Ok:theme::Accent);
+    ui_.Text(FONT_SMALL,ui_.S(sx),ui_.S(H-64),i==0||i==5?StrFormat("%+.2f ab Werk",diffs[i]):StrFormat("%+.0f ab Werk",diffs[i]),delta);
+  }
+}
+
 void Game::DrawPause() {
   float W = (float)ui_.W(), H = (float)ui_.H();
   float a = ui_.Anim("pause_in", 1.0f, 10.0f);
@@ -1917,6 +2032,7 @@ void Game::DrawPause() {
   DrawLogo(ui_.S(cx) - tw * 0.5f, ui_.S(y - 70), false);
   if (online && inviteOpen_) DrawInvitePanel(R(cx + w * .5f + 40, y - 110, 460, 388));
   else DrawModePanel(R(cx + w * .5f + 40, y - 110, 460, 350), true);
+  if(ui_.ButtonEx("pa_bench",R(cx+w*.5f+40,y+256,460,40),"Waffenwerkbank",icon::Settings,UI::BTN_SECONDARY)) workbenchOpen_=true;
   if (online) {
     if (ui_.ButtonEx("pa_invite", R(cx + w * .5f + 40, y + 300, 460, 58), inviteOpen_ ? "Zurück zu den Spielmodi" : "Freunde einladen", icon::Globe, UI::BTN_SECONDARY)) {
       inviteOpen_ = !inviteOpen_;
@@ -1984,7 +2100,7 @@ void Game::DrawHelp() {
   }
   ui_.Icon(p.x + ui_.S(30), p.y + p.h - ui_.S(40), icon::Info, theme::Accent);
   ui_.Text(FONT_SMALL, p.x + ui_.S(56), p.y + p.h - ui_.S(41),
-           "Tipp für Props: Stell dich neben Gleichartiges und richte dich aus. Jäger: Falsche Treffer kosten Lebenspunkte!", theme::Dim);
+           "Schwere Props: mit Umschalt + 1,5 m Anlauf rammen oder von oben erschlagen. Nach einem Treffer: 2 s Pause.", theme::Dim);
 }
 
 void Game::DrawHUD() {
@@ -2145,7 +2261,7 @@ void Game::DrawHUD() {
       ui_.Rect_({r.x, r.y + ui_.S(7), ui_.S(3), r.h - ui_.S(14)}, TeamColor(it->vt), ui_.S(2));
       float x = r.x + ui_.S(14), ty = r.y + (r.h - ui_.LineHeight(FONT_SMALL)) * 0.5f;
       if (!it->killer.empty()) {
-        x += ui_.Text(FONT_SMALL, x, ty, it->killer, kHunter);
+        x += ui_.Text(FONT_SMALL, x, ty, it->killer, TeamColor(it->kt));
         ui_.IconIn(FONT_ICON, {x + ui_.S(4), r.y, ui_.S(24), r.h}, icon::Target, theme::Dim);
         x += ui_.S(32);
       }
@@ -2182,6 +2298,15 @@ void Game::DrawHUD() {
     ui_.Rect_({stb.x, stb.y, stb.w * lp->stamina, stb.h}, Color(170, 205, 255, 200), ui_.S(2));
 
     if (lp->team == TEAM_PROPS) {
+      const PropDef& form = props::Get(lp->propType);
+      if (form.ramDamage > 0) {
+        Rect hint = {p.x, p.y - ui_.S(50), ui_.S(570), ui_.S(44)};
+        ui_.Panel(hint, ui_.S(12));
+        std::string status = st.phase != Phase::Hunting ? "ab Jagdbeginn" : lp->switchTimer > 0 ?
+            StrFormat("bereit in %.1f s", lp->switchTimer) : StrFormat("Rammen: %.0f Schaden", form.ramDamage);
+        ui_.Text(FONT_SMALL, hint.x + ui_.S(12), hint.y + ui_.S(5), "SCHWERES PROP · " + status, kProp);
+        ui_.Text(FONT_SMALL, hint.x + ui_.S(12), hint.y + ui_.S(23), "Umschalt + 1,5 m Anlauf · Von oben: Erschlagen · 2 s Pause", theme::Dim);
+      }
       float ix = p.x + p.w + ui_.S(12);
       auto chip = [&](const char* key, const std::string& t, Color c, bool active) {
         float kw = ui_.KeyCapWidth(key, ui_.S(22));
@@ -2214,7 +2339,7 @@ void Game::DrawHUD() {
       if (hp >= 0 && hp < (int)w.props.size() && !(st.mode == MODE_ROULETTE && st.phase == Phase::Hunting)) {
         const PropDef& d = props::Get(w.props[hp].type);
         std::string t = "Verwandeln in " + d.name;
-        std::string hpS = StrFormat("%.0f HP", d.health);
+        std::string hpS = StrFormat(d.ramDamage > 0 ? "%.0f HP · Schwer" : "%.0f HP", d.health);
         float kw = ui_.KeyCapWidth("E", ui_.S(24));
         float tw = ui_.Measure(FONT_MEDIUM, t).x, hw = ui_.Measure(FONT_LABEL, hpS).x;
         float rw = kw + tw + hw + ui_.S(44);
@@ -2225,7 +2350,7 @@ void Game::DrawHUD() {
         ui_.Text(FONT_LABEL, r.x + r.w - ui_.S(14), r.y + (r.h - ui_.LineHeight(FONT_LABEL)) * 0.5f, hpS, theme::Dim, ALIGN_RIGHT);
       }
     } else if (lp->team == TEAM_HUNTERS) {
-      const WeaponInfo& wi = GetWeapon(lp->weapon);
+      const WeaponStats wi = GetWeaponStats(lp->weapon,lp->weapon<2?lp->builds[lp->weapon]:0);
       Rect a = {W - ui_.S(24) - ui_.S(320), H - ui_.S(112), ui_.S(320), ui_.S(88)};
       ui_.Panel(a, ui_.S(18));
       ui_.Label(a.x + ui_.S(18), a.y + ui_.S(13), wi.name, kHunter);
@@ -2246,7 +2371,7 @@ void Game::DrawHUD() {
       }
       ui_.Text(FONT_SMALL, sx + ui_.S(4), a.y + ui_.S(43), StrFormat("Granaten %d", lp->ammo[WPN_GRENADE]), theme::Dim);
       if (lp->reloadTimer > 0) {
-        float f = 1.0f - lp->reloadTimer / std::max(0.01f, wi.reload);
+        float f = 1.0f - lp->reloadTimer / std::max(0.01f, lp->reloadDuration);
         Rect rb = {a.x + ui_.S(18), a.y + a.h - ui_.S(10), a.w - ui_.S(36), ui_.S(4)};
         ui_.Rect_(rb, Color(255, 255, 255, 26), ui_.S(2));
         ui_.RectGradH({rb.x, rb.y, std::max(rb.h, rb.w * f), rb.h}, theme::Accent2, theme::Accent, ui_.S(2));
@@ -2319,7 +2444,8 @@ void Game::DrawHUD() {
 
   // Chat
   {
-    float y = H - ui_.S(150);
+    float chatLift = lp && lp->alive && lp->team==TEAM_PROPS && lp->propType>=0 && props::Get(lp->propType).ramDamage>0 ? 54.0f : 0;
+    float y = H - ui_.S(150+chatLift);
     int shown = 0;
     for (auto it = chat_.rbegin(); it != chat_.rend() && shown < 7; ++it) {
       float age = (float)time_ - it->time;
@@ -2344,7 +2470,7 @@ void Game::DrawHUD() {
     }
     ui_.SetAlpha(1);
     if (chatOpen_) {
-      Rect cr = {ui_.S(24), H - ui_.S(150), ui_.S(540), ui_.S(40)};
+      Rect cr = {ui_.S(24), H - ui_.S(150+chatLift), ui_.S(540), ui_.S(40)};
       ui_.TextField("chat", cr, &chatInput_, 100, "Nachricht – Enter sendet, Esc bricht ab", icon::Chat);
     }
   }
@@ -2418,6 +2544,10 @@ void Game::Autopilot() {
   hostSetup_ = false;
   frames(45);
   Shot("setup");
+  u16 savedBuilds[2]; memcpy(savedBuilds,cfg_.builds,sizeof(savedBuilds));
+  workbenchOpen_=true; cfg_.builds[0]=WeaponPreset(0,2); frames(3); Shot("workbench_smg");
+  benchWeapon_=1; benchSlot_=WS_MAGAZINE; cfg_.builds[1]=WeaponPreset(1,3); frames(3); Shot("workbench_shotgun");
+  workbenchOpen_=false; benchWeapon_=0; memcpy(cfg_.builds,savedBuilds,sizeof(savedBuilds));
   screen_ = Screen::Join;
   frames(45);
   Shot("join");
@@ -2440,6 +2570,31 @@ void Game::Autopilot() {
   fastForward(30);
   frames(40);
   Shot("hunt");
+  {
+    auto& sampleSim=static_cast<LocalSession*>(session_.get())->GetSim();
+    Player& player=sampleSim.players[session_->LocalId()]; Player saved=player;
+    float oldTimer=sampleSim.phaseTimer, oldYaw=yaw_, oldPitch=pitch_;
+    Phase oldPhase=sampleSim.phase; auto oldCmd=session_->makeCmd;
+    u16 oldBuilds[2]; memcpy(oldBuilds,cfg_.builds,sizeof(oldBuilds));
+    u16 sampleButtons=0;
+    session_->makeCmd=[&](){ UserCmd c; c.yaw=yaw_; c.pitch=pitch_; c.weapon=weapon_; c.buttons=sampleButtons; memcpy(c.builds,cfg_.builds,sizeof(c.builds)); return c; };
+    player.alive=true; player.team=TEAM_HUNTERS; player.propType=-1; player.ms.pos={0,0,8}; player.ms.vel={};
+    yaw_=0; pitch_=0; sampleSim.phase=Phase::Hunting; sampleSim.phaseTimer=300; player.switchTimer=0;
+    weapon_=WPN_SMG; player.weapon=WPN_SMG;
+    for(int optic=0;optic<4;optic++) {
+      cfg_.builds[0]=WithWeaponPart(0,WeaponPreset(0,2),WS_OPTIC,optic); player.builds[0]=cfg_.builds[0];
+      player.ammo[0]=50; sampleButtons=BTN_AIM; frames(60); Shot(StrFormat("aim_%d",optic));
+    }
+    sampleButtons=0; frames(35); player.ammo[0]=10;
+    sampleButtons=BTN_RELOAD; frames(1); sampleButtons=0; frames(32); Shot("reload_smg_remove");
+    frames(55); Shot("reload_smg_insert"); frames(70);
+    weapon_=WPN_SHOTGUN; cfg_.builds[1]=WeaponPreset(1,3); player.builds[1]=cfg_.builds[1]; frames(35);
+    player.ammo[1]=0; sampleButtons=BTN_RELOAD; frames(1); sampleButtons=0; frames(40); Shot("reload_shotgun_shell");
+    frames(60); sampleButtons=BTN_FIRE; frames(18); Shot("shotgun_pump");
+    sampleButtons=0; frames(4);
+    player=saved; sampleSim.phase=oldPhase; sampleSim.phaseTimer=oldTimer; yaw_=oldYaw; pitch_=oldPitch;
+    memcpy(cfg_.builds,oldBuilds,sizeof(oldBuilds)); session_->makeCmd=oldCmd;
+  }
   weapon_ = WPN_SHOTGUN;
   frames(50);
   Shot("shotgun");
@@ -2459,6 +2614,15 @@ void Game::Autopilot() {
   fastForward(2);
   frames(30);
   Shot("prop");
+  {
+    Player saved = sim.players[session_->LocalId()];
+    Player& p = sim.players[session_->LocalId()];
+    p.team = TEAM_PROPS; p.alive = true; p.propType = props::Find("autoscooter");
+    p.health = p.maxHealth = 150; p.switchTimer = 1.8f;
+    frames(4); Shot("heavy_prop");
+    p = saved;
+    frames(4);
+  }
   help_ = true;
   frames(2);
   Shot("help");

@@ -9,6 +9,8 @@ void Sim::SetDisguise(int id, int type, const MoveState& state) {
   p.health = std::max(1.0f, fraction * p.maxHealth);
   p.ms = state;
   p.disguiseTimer = .8f;
+  p.ramDistance = 0;
+  p.switchTimer = std::max(p.switchTimer, 1.0f);
   GameEvent& e = Emit(EV_DISGUISE);
   e.a = (u8)id; e.c = (u16)type; e.pos = p.ms.pos;
 }

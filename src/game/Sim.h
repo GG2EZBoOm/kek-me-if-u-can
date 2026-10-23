@@ -3,6 +3,7 @@
 #include "game/GameTypes.h"
 #include "game/Movement.h"
 #include "game/World.h"
+#include "game/Weapons.h"
 
 struct Player {
   bool active = false;
@@ -17,10 +18,17 @@ struct Player {
   float health = 100, maxHealth = 100;
   u8 weapon = WPN_SMG;
   u8 ammo[WPN_COUNT] = {};
+  u16 builds[2] = {}, nextBuilds[2] = {};
+  float aimProgress = 0, recoilPitch = 0, recoilYaw = 0, sprintRecover = 0;
+  float reloadDuration = 0, reloadNextShell = 0;
+  u32 shotsFired = 0;
   float fireTimer = 0, reloadTimer = 0, switchTimer = 0;
+  // Props verwenden den bereits übertragenen switchTimer als Aufprall-Abklingzeit.
+  float ramDistance = 0;  // tatsächlich gelaufener Sprint-Anlauf, nur serverseitig
   float abilityTimer = 0;
   u8 decoys = 0;
   float tauntTimer = 0, tauntCooldown = 0, autoTaunt = 45;
+  int tauntVariant = -1;
   float disguiseTimer = 0;
   float pingTimer = -1;
   float respawnTimer = -1;
@@ -53,19 +61,6 @@ struct Grenade {
   Vec3 pos, vel;
   float fuse = 0;
 };
-
-struct WeaponInfo {
-  const char* name;
-  int magazine;
-  int pellets;
-  float damage;
-  float interval;
-  float reload;
-  float spreadHip, spreadAim;
-  float penalty;  // Strafschaden pro Treffer auf ein falsches Objekt
-  bool automatic;
-};
-const WeaponInfo& GetWeapon(int w);
 
 // Wonach ein Prop-Spieler gerade zielt (für Verwandlung)
 int FindDisguiseTarget(const World& w, const MoveState& ms, int propType, Vec3* hitPos = nullptr);
@@ -108,7 +103,10 @@ class Sim {
   void ProcessCmd(int id, const UserCmd& cmd);
   void HunterActions(int id, const UserCmd& cmd, u16 pressed);
   void PropActions(int id, const UserCmd& cmd, u16 pressed);
+  void PropCollisions(int id, const UserCmd& cmd, const MoveState& before,
+                      const std::vector<MoveContact>& contacts, const std::vector<int>& playerIds);
   void FireWeapon(int id);
+  void BeginReload(int id);
   void ThrowGrenade(int id);
   void Damage(int victim, int attacker, float dmg, u8 cause, Vec3 pos);
   void Kill(int victim, int attacker, u8 cause);

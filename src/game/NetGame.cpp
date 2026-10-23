@@ -58,6 +58,11 @@ static void WritePlayer(Writer& w, const Player& p, int i, bool full) {
   w.U16((u16)Clamp(p.health * 10, 0.0f, 65535.0f));
   w.U16((u16)Clamp(p.maxHealth * 10, 0.0f, 65535.0f));
   w.U8(p.weapon);
+  for (u16 b : p.builds) w.U16(b);
+  w.U8(Q8(p.aimProgress, 255));
+  w.I16((i16)(p.recoilPitch * 10000)); w.I16((i16)(p.recoilYaw * 10000));
+  w.U8(Q8(p.reloadDuration, 20));
+  w.U8(Q8(p.fireTimer, 200));
   for (int k = 0; k < WPN_COUNT; k++) w.U8(p.ammo[k]);
   w.U8(Q8(p.reloadTimer, 20));
   w.U8(Q8(p.switchTimer, 20));
@@ -101,6 +106,11 @@ static void ReadPlayer(Reader& r, ClientPlayer& p, bool full) {
   p.health = r.U16() / 10.0f;
   p.maxHealth = r.U16() / 10.0f;
   p.weapon = r.U8();
+  for (int i = 0; i < 2; i++) p.builds[i] = ValidateWeaponBuild(i, r.U16());
+  p.aimProgress = r.U8() / 255.0f;
+  p.recoilPitch = r.I16() / 10000.0f; p.recoilYaw = r.I16() / 10000.0f;
+  p.reloadDuration = r.U8() / 20.0f;
+  p.fireTimer = r.U8() / 200.0f;
   for (int k = 0; k < WPN_COUNT; k++) p.ammo[k] = r.U8();
   p.reloadTimer = r.U8() / 20.0f;
   p.switchTimer = r.U8() / 20.0f;
@@ -262,6 +272,7 @@ void NetServer::Receive(Sim& sim, double now) {
           cmds[k].buttons = r.U16();
           cmds[k].weapon = r.U8();
           cmds[k].taunt = r.U8();
+          for (u16& b : cmds[k].builds) b = r.U16();
         }
         u32 ackEvent = r.U32();
         u32 ackTick = r.U32();
@@ -681,6 +692,7 @@ void NetClient::Update(double frameDt) {
       w.U16(c.buttons);
       w.U8(c.weapon);
       w.U8(c.taunt);
+      for (u16 b : c.builds) w.U16(b);
     }
     w.U32(ackEvent_);
     w.U32(lastSnapTick_);

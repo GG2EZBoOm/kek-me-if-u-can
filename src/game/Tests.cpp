@@ -5,6 +5,7 @@
 #include "game/Maps.h"
 #include "game/NetGame.h"
 #include "game/Taunts.h"
+#include "game/Sounds.h"
 #include "game/Updater.h"
 #include <chrono>
 #include <map>
@@ -411,6 +412,37 @@ static void NudelfabrikTests(const World& w, const NavGrid& nav, int& fails) {
   }
 }
 
+static void ZwingerTests(const World& w, const NavGrid& nav, int& fails) {
+  MoveState s;
+  for (float z : {-13.0f, 13.0f}) {
+    WalkTest(w, {-19.3f, .05f, z}, PI * .5f, 2.1f, s);
+    Check(fabsf(s.pos.y - 4.3f) < .1f, "Zwinger: Sucher erreicht die Galerieterrasse über die Treppe", fails);
+    WalkTest(w, {-19.3f, .05f, z}, PI * .5f, 2.3f, s, props::Find("zwinger_vase"));
+    Check(fabsf(s.pos.y - 4.3f) < .1f, "Zwinger: Porzellanvase erreicht die Galerieterrasse", fails);
+  }
+  WalkTest(w, {-41.5f, .05f, 0}, -PI * .5f, 5.0f, s);
+  Check(s.pos.x > -23, "Zwinger: Brücke und Kronentor durchgängig begehbar", fails);
+  CheckPaths(nav, {{{0, 0, 47}, {0, 0, 0}, "Glockenspielpavillon -> Innenhof"},
+                   {{0, 0, 0}, {-27, 0, 22}, "Innenhof -> Porzellansammlung"},
+                   {{0, 0, 0}, {-27, 0, -22}, "Innenhof -> Mathematisch-Physikalischer Salon"},
+                   {{0, 0, 0}, {30, 0, 0}, "Innenhof -> Sempergalerie"},
+                   {{0, 0, 0}, {27, 0, -37}, "Innenhof -> Nymphenbad"},
+                   {{0, 0, 0}, {0, 0, -39}, "Innenhof -> Wallpavillon"},
+                   {{0, 0, 0}, {-28, 4.3f, 10}, "Innenhof -> Galerieterrasse"},
+                   {{-28, 4.3f, 10}, {-28, 4.3f, -10}, "Galerieterrasse über Kronentor zur Gegenseite"},
+                   {{-28, 4.3f, -10}, {-12, 4.3f, -37}, "Galerieterrasse -> nördliche Bogengalerie"}}, fails);
+  MoveEnv env; env.world = &w;
+  bool free = w.hunterSpawns.size() >= 16 && w.propSpawns.size() >= 16;
+  for (const auto* starts : {&w.hunterSpawns, &w.propSpawns}) for (const auto& spawn : *starts) {
+    s = MoveState(); s.pos = spawn.pos + Vec3(0, .05f, 0);
+    free &= !BoxBlocked(env, PlayerBox(s, -1)) && nav.Nearest(spawn.pos, .8f) >= 0;
+  }
+  Check(free, "Zwinger: 32 freie, über Wege erreichbare Startplätze", fails);
+  int themes = 0, heavy = 0;
+  for (const auto& p : w.props) { const auto& d = props::Get(p.type); themes += d.id.rfind("zwinger_", 0) == 0; heavy += d.ramDamage > 0; }
+  Check(themes >= 50 && heavy >= 20, "Zwinger: thematische Tarnungen und schwere Formen ausreichend verteilt", fails);
+}
+
 static void PaketzentrumTests(const World& w, const NavGrid& nav, int& fails) {
   MoveState s;
   for (float x : {-21.0f, 21.0f}) {
@@ -589,9 +621,14 @@ int RunTests(int matchRounds) {
   int fails = 0;
   InviteTests(fails);
   UpdaterTests(fails);
+  fails += RunSoundTests();
   props::BuildCatalog();
   extern int RunModeTests();
   fails += RunModeTests();
+  extern int RunImpactTests();
+  fails += RunImpactTests();
+  extern int RunWeaponTests();
+  fails += RunWeaponTests();
   for (int m = 0; m < (int)AllMaps().size(); m++) {
     World w;
     double t0 = Now();
@@ -608,8 +645,9 @@ int RunTests(int matchRounds) {
     if (w.id == "oktoberfest") OktoberfestTests(w, bots.Nav(), fails);
     if (w.id == "nudelfabrik") NudelfabrikTests(w, bots.Nav(), fails);
     if (w.id == "paketzentrum") PaketzentrumTests(w, bots.Nav(), fails);
+    if (w.id == "zwinger") ZwingerTests(w, bots.Nav(), fails);
     if (matchRounds > 0) BotMatch(w, bots, matchRounds, fails);
-    if (matchRounds > 0 && w.id == "paketzentrum") for (int mode = MODE_ROULETTE; mode < MODE_COUNT; mode++) {
+    if (matchRounds > 0 && (w.id == "paketzentrum" || w.id == "zwinger")) for (int mode = MODE_ROULETTE; mode < MODE_COUNT; mode++) {
       bots.Init(w);
       BotMatch(w, bots, 1, fails, (GameMode)mode);
     }
@@ -696,15 +734,29 @@ int RunNetTest() {
   full.phase = Phase::Hiding; full.phaseTimer = 100; full.mode = MODE_CLONES;
   while (full.CountActive() < MAX_PLAYERS) full.AddPlayer("Langer Testspielername", false);
   for (int i = 0; i < MAX_DECOYS; i++) {
-    auto& d = full.decoys[i]; d.active = true; d.owner = 0; d.propType = props::Find("paket_s");
+    auto& d = full.decoys[i]; d.active = true; d.owner = i / 3; d.propType = props::Find("paket_s");
     d.pos = {-37 + (i % 8) * .9f, .02f, 30 + (i / 8) * .9f}; d.life = 45;
   }
   for (int i = 0; i < 30; i++) full.Chat(0, StrFormat("Klonlast %d: ", i) + std::string(90, 'x'));
-  int chatEvents = 0;
+  int taunter = -1;
+  for (int i = 0; i < MAX_PLAYERS; i++) if (full.players[i].active && full.players[i].alive && !full.players[i].bot &&
+      full.players[i].team == TEAM_PROPS && i != client.LocalId()) { taunter = i; break; }
+  if (taunter >= 0) {
+    auto& p = full.players[taunter]; p.tauntTimer = p.tauntCooldown = 0; p.autoTaunt = 1000; p.tauntVariant = 0; p.prevButtons = 0;
+    UserCmd taunt; taunt.buttons = BTN_TAUNT; taunt.taunt = 6; full.QueueCmd(taunter, taunt);
+  }
+  int chatEvents = 0, tauntEvents = 0;
+  bool sameTauntVariant = true;
   for (int i = 0; i < 180; i++) {
     host.Update(TICK_DT); client.Update(TICK_DT);
     std::vector<GameEvent> evs; client.TakeEvents(evs);
-    for (auto& e : evs) if (e.type == EV_CHAT && e.text.rfind("Klonlast ", 0) == 0) chatEvents++;
+    for (auto& e : evs) {
+      if (e.type == EV_CHAT && e.text.rfind("Klonlast ", 0) == 0) chatEvents++;
+      if (e.type == EV_TAUNT && e.a == taunter && e.b == 5) {
+        tauntEvents++;
+        sameTauntVariant &= e.c == full.players[taunter].tauntVariant && e.c > 0 && e.c < TAUNT_VARIANTS;
+      }
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   int receivedPlayers = 0, receivedClones = 0;
@@ -712,6 +764,95 @@ int RunNetTest() {
   for (auto& d : client.State().decoys) if (d.active) receivedClones++;
   Check(receivedPlayers == MAX_PLAYERS && receivedClones == MAX_DECOYS && chatEvents == 30,
         "Volle Lobby mit 48 Klonen: Snapshots und alle 30 Ereignisse kommen genau einmal an", fails);
+  Check(taunter >= 0 && tauntEvents == 4 && sameTauntVariant,
+        "Klangvariante von Prop und drei Klonen kommt identisch und genau einmal beim Gast an", fails);
+  {
+    World zw; BuildMap(FindMap("zwinger"), zw);
+    MatchSettings settings; settings.mapIndex = FindMap("zwinger"); settings.bots = 0;
+    Sim impact; impact.Init(&zw, settings); impact.AddPlayer("Sucher", false);
+    NetServer server;
+    if (Check(server.Start(27016, "Zwinger-Aufpralltest"), "Zwinger-Netzserver startet", fails)) {
+      NetClient guest;
+      Check(guest.Connect("127.0.0.1:27016", "Orangenkuebel"), "Gast verbindet sich zur neuen Karte", fails);
+      guest.makeCmd = []() { return UserCmd(); };
+      double now = 0;
+      auto pump = [&]() {
+        now += TICK_DT; server.Receive(impact, now); impact.Tick();
+        server.PostTick(impact, impact.events, now); impact.events.clear(); guest.Update(TICK_DT);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      };
+      for (int i = 0; i < 90; i++) pump();
+      Check(guest.Ready() && guest.GetWorld().id == "zwinger", "Gast baut den Dresdner Zwinger und empfängt seinen Zustand", fails);
+      int remote = guest.LocalId();
+      if (remote > 0) {
+        for (int i : {0, remote}) {
+          Player& p = impact.players[i]; p.alive = true; p.bot = false; p.ms = MoveState();
+          p.ms.pos = i ? Vec3(0, 0, 6) : Vec3(); p.ms.onGround = true; p.ms.rotLock = true;
+          p.team = i ? TEAM_PROPS : TEAM_HUNTERS; p.propType = i ? props::Find("zwinger_orange") : -1;
+          p.health = p.maxHealth = i ? 150.0f : 100.0f; p.switchTimer = p.disguiseTimer = p.ramDistance = 0;
+          p.pending.clear(); p.autoTaunt = 1000;
+        }
+        impact.phase = Phase::Hunting; impact.phaseTimer = 300;
+        std::vector<GameEvent> discard; guest.TakeEvents(discard);
+        guest.makeCmd = []() { UserCmd c; c.buttons = BTN_FORWARD | BTN_SPRINT; return c; };
+        int hits = 0; bool cooldown = false;
+        for (int i = 0; i < 100; i++) {
+          pump(); std::vector<GameEvent> evs; guest.TakeEvents(evs);
+          for (const auto& e : evs) if (e.type == EV_HIT && e.a == remote && e.b == 0 && e.c == KILL_RAM && e.f == 70) hits++;
+          cooldown |= guest.State().players[remote].switchTimer > 1;
+        }
+        Check(hits == 1 && cooldown && guest.State().players[0].health == 30 &&
+              guest.State().players[remote].propType == props::Find("zwinger_orange"),
+              "Gast rammt autoritativ: neue Tarnung, 70 Schaden, genau ein Ereignis und Abklingzeit übertragen", fails);
+        guest.makeCmd = []() { return UserCmd(); };
+        for (int i = 0; i < 15; i++) pump();
+        Player& falling = impact.players[remote];
+        falling.ms.pos = {0, 6, 0}; falling.ms.vel = {0, -8, 0}; falling.ms.onGround = false; falling.switchTimer = 0;
+        falling.pending.clear();
+        int kills = 0;
+        for (int i = 0; i < 90; i++) {
+          pump(); std::vector<GameEvent> evs; guest.TakeEvents(evs);
+          for (const auto& e : evs) if (e.type == EV_KILL && e.a == remote && e.b == 0 && e.c == KILL_CRUSH) kills++;
+        }
+        Check(kills == 1 && !guest.State().players[0].alive && guest.State().players[remote].kills == 1 &&
+              guest.State().winner == TEAM_PROPS, "Erschlagen durch Gast überträgt Abschuss, Punkte und Props-Rundensieg", fails);
+        // Reuse the real guest connection to test the entire gunsmith command/snapshot path.
+        impact.phase=Phase::Hiding; impact.phaseTimer=300;
+        impact.players[0].team=TEAM_PROPS; impact.players[0].alive=true; impact.players[0].propType=props::Find("karton");
+        impact.players[0].ms.pos={25,0,25}; impact.players[0].autoTaunt=1000;
+        Player& gunner=impact.players[remote]; gunner.team=TEAM_HUNTERS; gunner.propType=-1;
+        gunner.ms.pos={0,0,0}; gunner.ms.vel={}; gunner.health=100; gunner.switchTimer=0; gunner.pending.clear();
+        UserCmd gunCmd; gunCmd.builds[0]=WeaponPreset(0,2); gunCmd.builds[1]=WeaponPreset(1,3);
+        guest.makeCmd=[&](){return gunCmd;};
+        for(int i=0;i<60;i++) pump();
+        Check(guest.State().players[remote].builds[0]==gunCmd.builds[0] && guest.State().players[remote].builds[1]==gunCmd.builds[1] &&
+              guest.State().players[remote].ammo[0]==50,"Beide Gast-Builds und Trommelkapazität erreichen Server und Snapshot",fails);
+        impact.phase=Phase::Hunting; impact.phaseTimer=300; gunCmd.buttons=BTN_AIM|BTN_FIRE;
+        int shots=0; bool shotBuild=true;
+        for(int i=0;i<60;i++) { pump(); std::vector<GameEvent> evs; guest.TakeEvents(evs);
+          for(auto& e:evs) if(e.type==EV_SHOT && e.a==remote) { shots++; shotBuild &= e.c==gunCmd.builds[0]; }
+        }
+        Check(shots>3 && shotBuild && guest.State().players[remote].recoilPitch>0 && guest.State().players[remote].aimProgress>.9f,
+              "Netzwerkschüsse übertragen Module, Rückstoß und zeitabhängigen Anschlag",fails);
+        gunCmd.buttons=0; gunCmd.builds[0]=WeaponPreset(0,1); gunCmd.weapon=WPN_SHOTGUN;
+        for(int i=0;i<45;i++) pump();
+        Check(guest.State().players[remote].builds[0]==WeaponPreset(0,2) && gunner.nextBuilds[0]==gunCmd.builds[0],
+              "Gast kann während der Jagd nur den nächsten Build vormerken",fails);
+        gunner.ammo[1]=0; gunCmd.buttons=BTN_RELOAD;
+        for(int i=0;i<12;i++) pump();
+        gunCmd.buttons=0; int shells=0;
+        for(int i=0;i<65;i++) { pump(); std::vector<GameEvent> evs; guest.TakeEvents(evs);
+          for(auto& e:evs) if(e.type==EV_SHELL && e.a==remote) shells++;
+        }
+        Check(shells==1 && guest.State().players[remote].ammo[1]==1 && guest.State().players[remote].reloadDuration>3.7f &&
+              guest.State().players[remote].reloadTimer>0,"Einzelne Schrotpatrone und vollständige Nachlade-Zeitachse kommen beim Gast an",fails);
+        gunCmd.buttons=BTN_FIRE;
+        for(int i=0;i<18;i++) pump();
+        Check(guest.State().players[remote].reloadTimer==0,"Gast kann das Patronen-Nachladen durch Feuern unterbrechen",fails);
+      }
+      server.Stop(impact);
+    }
+  }
   LOG("Netztest beendet: %d Fehler", fails);
   return fails;
 }

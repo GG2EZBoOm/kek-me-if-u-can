@@ -1,4 +1,5 @@
 #include "game/Settings.h"
+#include "game/Weapons.h"
 #include <map>
 
 void Settings::Load(const std::string& path) {
@@ -45,6 +46,10 @@ void Settings::Load(const std::string& path) {
   i("mode", match.mode);
   s("lastServer", lastServer);
   s("serverName", serverName);
+  for (int w = 0; w < 2; w++) {
+    int build = 0; i(w ? "buildShotgun" : "buildSMG", build);
+    builds[w] = ValidateWeaponBuild(w, (u16)build);
+  }
   sensitivity = Clamp(sensitivity, 0.1f, 5.0f);
   fov = Clamp(fov, 60.0f, 120.0f);
   match.bots = ClampI(match.bots, 0, MAX_PLAYERS - 1);
@@ -66,5 +71,6 @@ void Settings::Save(const std::string& path) const {
   t += "lastServer=" + lastServer + "\n";
   t += StrFormat("mode=%d\n", match.mode);
   t += "serverName=" + serverName + "\n";
+  t += StrFormat("buildSMG=%u\nbuildShotgun=%u\n", builds[0], builds[1]);
   WriteFileText(path, t);
 }

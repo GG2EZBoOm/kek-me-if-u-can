@@ -1,5 +1,5 @@
 #pragma once
-// Prozedural synthetisierte Klänge.
+// Prozedurale Taunts und eingebettete, aufbereitete Spielaufnahmen.
 #include "engine/Common.h"
 
 enum SoundId {
@@ -45,10 +45,15 @@ enum SoundId {
   SND_AMB_OUTDOOR,
   SND_AMB_INDOOR,
   SND_MUSIC_MENU,
+  SND_SHELL,
+  SND_SMG_SUPPRESSED,
+  SND_SHOTGUN_SUPPRESSED,
   SND_TAUNT_FIRST,
   SND_COUNT = SND_TAUNT_FIRST + 16
 };
 
 // Erzeugt alle Klänge und registriert sie im Mixer. Gibt die Mixer-IDs zurück.
 void BuildSounds();
-int Snd(int id);
+int Snd(int id, u32 variant = 0);
+// Klangprüfung ohne Audiogerät; optional Original-Taunts als WAV-Vorschau ausgeben.
+int RunSoundTests(const std::string& previewDir = "");

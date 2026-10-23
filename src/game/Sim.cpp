@@ -2,14 +2,6 @@
 #include "game/Taunts.h"
 #include <chrono>
 
-static const WeaponInfo kWeapons[WPN_COUNT] = {
-    {"MP", 30, 1, 13.0f, 0.085f, 1.9f, 0.016f, 0.004f, 4.0f, true},
-    {"Schrotflinte", 6, 8, 10.0f, 0.85f, 2.4f, 0.07f, 0.05f, 1.25f, false},
-    {"Granate", 1, 0, 0.0f, 0.8f, 0.0f, 0.0f, 0.0f, 0.0f, false},
-};
-
-const WeaponInfo& GetWeapon(int w) { return kWeapons[ClampI(w, 0, WPN_COUNT - 1)]; }
-
 int FindDisguiseTarget(const World& w, const MoveState& ms, int propType, Vec3* hitPos) {
   Vec3 pivot = PropPivot(ms, propType);
   Vec3 cam = ThirdPersonCamera(w, pivot, ms.yaw, ms.pitch, PropCamDistance(propType));
@@ -158,8 +150,12 @@ void Sim::SpawnPlayer(int id, Team team, int spawnIndex) {
   }
   p.health = p.maxHealth;
   p.weapon = WPN_SMG;
-  for (int w = 0; w < WPN_COUNT; w++) p.ammo[w] = (u8)GetWeapon(w).magazine;
+  for (int w = 0; w < 2; w++) p.builds[w] = ValidateWeaponBuild(w, p.nextBuilds[w]);
+  for (int w = 0; w < WPN_COUNT; w++) p.ammo[w] = (u8)GetWeaponStats(w, w < 2 ? p.builds[w] : 0).magazine;
   p.fireTimer = p.reloadTimer = p.switchTimer = 0;
+  p.aimProgress = p.recoilPitch = p.recoilYaw = p.sprintRecover = p.reloadDuration = p.reloadNextShell = 0;
+  p.shotsFired = 0;
+  p.ramDistance = 0;
   p.abilityTimer = 8;
   p.decoys = 2;
   if (mode == MODE_CLONES) p.decoys = 3;
@@ -300,11 +296,26 @@ void Sim::Tick() {
     dec(p.tauntCooldown);
     dec(p.disguiseTimer);
     dec(p.hurtTimer);
+    dec(p.sprintRecover);
+    const WeaponStats wi = GetWeaponStats(p.weapon, p.weapon < 2 ? p.builds[p.weapon] : 0);
+    bool aiming = p.alive && p.team == TEAM_HUNTERS && p.weapon < 2 && (p.prevButtons & BTN_AIM) &&
+                  p.reloadTimer <= 0 && p.switchTimer <= 0 && p.sprintRecover <= 0;
+    p.aimProgress = Clamp(p.aimProgress + (aiming ? 1 : -1) * TICK_DT / wi.adsTime, 0.0f, 1.0f);
+    p.recoilPitch *= expf(-7.0f * TICK_DT);
+    p.recoilYaw *= expf(-9.0f * TICK_DT);
     if (p.reloadTimer > 0) {
       p.reloadTimer -= TICK_DT;
+      if (p.weapon == WPN_SHOTGUN) {
+        p.reloadNextShell -= TICK_DT;
+        if (p.reloadNextShell <= 0 && p.ammo[p.weapon] < wi.magazine) {
+          p.ammo[p.weapon]++;
+          p.reloadNextShell += wi.shellTime;
+          GameEvent& e = Emit(EV_SHELL); e.a = (u8)id; e.pos = p.ms.pos;
+        }
+      }
       if (p.reloadTimer <= 0) {
         p.reloadTimer = 0;
-        p.ammo[p.weapon] = (u8)GetWeapon(p.weapon).magazine;
+        if (p.weapon == WPN_SMG) p.ammo[p.weapon] = (u8)wi.magazine;
       }
     }
     if (p.respawnTimer > 0) {
@@ -354,6 +365,14 @@ void Sim::Tick() {
 void Sim::ProcessCmd(int id, const UserCmd& cmd) {
   Player& p = players[id];
   p.lastCmdSeq = cmd.seq;
+  for (int w = 0; w < 2; w++) {
+    p.nextBuilds[w] = ValidateWeaponBuild(w, cmd.builds[w]);
+    if ((phase == Phase::Waiting || phase == Phase::Hiding) && p.builds[w] != p.nextBuilds[w]) {
+      p.builds[w] = p.nextBuilds[w];
+      p.ammo[w] = (u8)GetWeaponStats(w, p.builds[w]).magazine;
+      p.reloadTimer = p.reloadDuration = 0;
+    }
+  }
   if (!p.alive) {
     p.prevButtons = cmd.buttons;
     p.ms.yaw = cmd.yaw;
@@ -367,7 +386,16 @@ void Sim::ProcessCmd(int id, const UserCmd& cmd) {
   MoveEnv env = MakeEnv(id, others);
   int pt = p.team == TEAM_PROPS ? p.propType : -1;
   bool lockBefore = p.ms.rotLock;
-  if (ApplyMovement(env, p.ms, cmd, pt, frozen)) {
+  const MoveState before = p.ms;
+  bool heavy = pt >= 0 && props::Get(pt).ramDamage > 0;
+  std::vector<MoveContact> contacts;
+  std::vector<int> playerIds;
+  if (heavy) {
+    // Gleiche Reihenfolge wie MakeEnv; danach folgen Klone ohne Spieler-ID.
+    for (int i = 0; i < MAX_PLAYERS; i++)
+      if (i != id && players[i].active && players[i].alive) playerIds.push_back(i);
+  }
+  if (ApplyMovement(env, p.ms, cmd, pt, frozen, heavy ? &contacts : nullptr)) {
     GameEvent& e = Emit(EV_JUMP);
     e.a = (u8)id;
     e.pos = p.ms.pos;
@@ -377,10 +405,43 @@ void Sim::ProcessCmd(int id, const UserCmd& cmd) {
     e.a = (u8)id;
     e.b = p.ms.rotLock ? 1 : 0;
   }
+  if (heavy) PropCollisions(id, cmd, before, contacts, playerIds);
   if (frozen) return;
   if (phase != Phase::Hiding && phase != Phase::Hunting) return;
   if (p.team == TEAM_HUNTERS) HunterActions(id, cmd, pressed);
   else if (p.team == TEAM_PROPS) PropActions(id, cmd, pressed);
+}
+
+void Sim::PropCollisions(int id, const UserCmd& cmd, const MoveState& before,
+                         const std::vector<MoveContact>& contacts, const std::vector<int>& playerIds) {
+  Player& p = players[id];
+  if (phase != Phase::Hunting || p.switchTimer > 0 || p.disguiseTimer > 0) { p.ramDistance = 0; return; }
+  bool sprint = (cmd.buttons & BTN_SPRINT) && (cmd.buttons & BTN_FORWARD) && !(cmd.buttons & BTN_BACK) && before.stamina > .02f;
+  if (!sprint || !before.onGround) p.ramDistance = 0;
+  const float runup = p.ramDistance;
+  for (const MoveContact& c : contacts) {
+    if (c.other < 0 || c.other >= (int)playerIds.size()) continue;  // keine Weltobjekte/Klone
+    int victim = playerIds[c.other];
+    Player& q = players[victim];
+    if (!q.alive || q.team != TEAM_HUNTERS) continue;
+    bool crush = c.normal.y > .7f && !before.onGround && c.velocity.y <= -5.5f;
+    bool ram = fabsf(c.normal.y) < .2f && sprint && before.onGround && runup >= PROP_RAM_RUNUP &&
+               Length(Vec3(c.velocity.x, 0, c.velocity.z)) >= 5.0f && -Dot(c.velocity, c.normal) >= 4.0f;
+    if ((!ram && !crush) || !world->LineOfSight(PlayerBox(before, p.propType).c, c.pos)) continue;
+    p.switchTimer = PROP_IMPACT_COOLDOWN;
+    p.ramDistance = 0;
+    float damage = crush ? Clamp(100 + (-c.velocity.y - 5.5f) * 5, 100, 150) : props::Get(p.propType).ramDamage;
+    if (ram) q.ms.vel += -c.normal * 6.0f + Vec3(0, 3.0f, 0);
+    else { p.ms.vel.y = 3.5f; p.ms.onGround = false; }
+    q.ms.onGround = false;
+    Damage(victim, id, damage, crush ? KILL_CRUSH : KILL_RAM, c.pos);
+    return;  // ein Opfer pro Aufprall, auch bei mehreren Kontakten/gebündelten Befehlen
+  }
+  float travel = DistanceXZ(before.pos, p.ms.pos);
+  float speed = Length(Vec3(p.ms.vel.x, 0, p.ms.vel.z));
+  if (sprint && before.onGround && p.ms.onGround && speed >= 4.5f && travel > .01f)
+    p.ramDistance = std::min(PROP_RAM_RUNUP, p.ramDistance + std::min(travel, 7.0f * TICK_DT));
+  else p.ramDistance = 0;  // an Wänden/Spielern drücken lädt keinen Angriff auf
 }
 
 void Sim::HunterActions(int id, const UserCmd& cmd, u16 pressed) {
@@ -393,16 +454,18 @@ void Sim::HunterActions(int id, const UserCmd& cmd, u16 pressed) {
     }
   }
   if (phase != Phase::Hunting) return;
-  const WeaponInfo& wi = GetWeapon(p.weapon);
+  const WeaponStats wi = GetWeaponStats(p.weapon, p.weapon < 2 ? p.builds[p.weapon] : 0);
+  bool sprint = (cmd.buttons & BTN_SPRINT) && (cmd.buttons & BTN_FORWARD) && !(cmd.buttons & (BTN_BACK | BTN_AIM | BTN_FIRE)) &&
+                p.ms.stamina > .02f && !p.ms.crouching;
+  if (sprint) p.sprintRecover = .20f;
   if ((pressed & BTN_RELOAD) && p.weapon != WPN_GRENADE && p.ammo[p.weapon] < wi.magazine && p.reloadTimer <= 0) {
-    p.reloadTimer = wi.reload;
-    GameEvent& e = Emit(EV_RELOAD);
-    e.a = (u8)id;
-    e.b = p.weapon;
-    e.pos = p.ms.pos;
+    BeginReload(id);
   }
   bool fire = p.weapon == WPN_GRENADE ? (pressed & BTN_FIRE) != 0 : (cmd.buttons & BTN_FIRE) != 0;
-  if (fire && p.fireTimer <= 0 && p.reloadTimer <= 0 && p.switchTimer <= 0) {
+  if ((pressed & BTN_FIRE) && p.weapon == WPN_SHOTGUN && p.reloadTimer > 0 && p.ammo[p.weapon] > 0) {
+    p.reloadTimer = 0; p.fireTimer = std::max(p.fireTimer, .2f);
+  }
+  if (fire && p.fireTimer <= 0 && p.reloadTimer <= 0 && p.switchTimer <= 0 && p.sprintRecover <= 0) {
     if (p.weapon == WPN_GRENADE) {
       if (p.ammo[WPN_GRENADE] > 0) ThrowGrenade(id);
     } else if (p.ammo[p.weapon] > 0) {
@@ -411,11 +474,7 @@ void Sim::HunterActions(int id, const UserCmd& cmd, u16 pressed) {
       GameEvent& e = Emit(EV_EMPTY);
       e.a = (u8)id;
       e.pos = p.ms.pos;
-      p.reloadTimer = wi.reload;
-      GameEvent& r = Emit(EV_RELOAD);
-      r.a = (u8)id;
-      r.b = p.weapon;
-      r.pos = p.ms.pos;
+      BeginReload(id);
     }
   }
   if ((pressed & BTN_ABILITY) && p.abilityTimer <= 0) {
@@ -445,25 +504,37 @@ void Sim::PropActions(int id, const UserCmd& cmd, u16 pressed) {
   if ((pressed & BTN_ABILITY) && mode == MODE_CLONES) SwapClone(id);
 }
 
+void Sim::BeginReload(int id) {
+  Player& p = players[id];
+  WeaponStats wi = GetWeaponStats(p.weapon, p.builds[p.weapon]);
+  p.reloadDuration = p.weapon == WPN_SHOTGUN ? .55f + wi.shellTime * (wi.magazine - p.ammo[p.weapon]) : wi.reload;
+  p.reloadTimer = p.reloadDuration;
+  p.reloadNextShell = .35f + wi.shellTime;
+  GameEvent& e = Emit(EV_RELOAD); e.a = (u8)id; e.b = p.weapon; e.f = p.reloadDuration; e.pos = p.ms.pos;
+}
+
 void Sim::FireWeapon(int id) {
   Player& p = players[id];
-  const WeaponInfo& wi = GetWeapon(p.weapon);
+  const WeaponStats wi = GetWeaponStats(p.weapon, p.builds[p.weapon]);
   p.ammo[p.weapon]--;
   p.fireTimer = wi.interval;
   Vec3 eye = EyePos(p.ms, -1);
-  Vec3 fwd = DirFromYawPitch(p.ms.yaw, p.ms.pitch);
+  Vec3 fwd = DirFromYawPitch(p.ms.yaw + p.recoilYaw, p.ms.pitch + p.recoilPitch);
   Vec3 right = RightFromYaw(p.ms.yaw);
   Vec3 up = Cross(right, fwd);
-  bool aiming = (p.prevButtons & BTN_AIM) != 0;
-  float spread = aiming ? wi.spreadAim : wi.spreadHip;
+  float spread = Lerp(wi.spreadHip, wi.spreadAim, p.aimProgress);
   float speed = sqrtf(p.ms.vel.x * p.ms.vel.x + p.ms.vel.z * p.ms.vel.z);
   spread *= 1.0f + speed * 0.12f;
   if (!p.ms.onGround) spread *= 2.0f;
   GameEvent& se = Emit(EV_SHOT);
   se.a = (u8)id;
   se.b = p.weapon;
+  se.c = p.builds[p.weapon];
   se.pos = eye;
   se.dir = fwd;
+  float kick = (p.weapon == WPN_SMG ? .013f : .048f) * wi.recoil * (p.ms.crouching ? .85f : 1.0f);
+  p.recoilPitch = std::min(.13f, p.recoilPitch + kick);
+  p.recoilYaw += sinf(++p.shotsFired * 2.4f) * kick * .35f;
   float penalty = 0;
   Vec3 penPos;
   u8 cause = p.weapon == WPN_SHOTGUN ? KILL_SHOTGUN : KILL_SMG;
@@ -609,6 +680,7 @@ void Sim::Damage(int victim, int attacker, float dmg, u8 cause, Vec3 pos) {
     GameEvent& e = Emit(EV_HIT);
     e.a = (u8)attacker;
     e.b = (u8)victim;
+    e.c = cause;
     e.f = dmg;
     e.pos = pos;
   }
@@ -667,6 +739,8 @@ void Sim::DoTaunt(int id, int which) {
   Player& p = players[id];
   int t = (which >= 0 && which < NUM_TAUNTS) ? which : rng_.Int(0, NUM_TAUNTS - 1);
   float dur = kTaunts[t].duration;
+  p.tauntVariant = p.tauntVariant < 0 ? rng_.Int(0, TAUNT_VARIANTS - 1)
+                                    : (p.tauntVariant + 1 + rng_.Int(0, TAUNT_VARIANTS - 2)) % TAUNT_VARIANTS;
   p.tauntTimer = dur;
   p.tauntCooldown = dur + 1.2f;
   p.autoTaunt = AutoTauntInterval();
@@ -674,12 +748,13 @@ void Sim::DoTaunt(int id, int which) {
   GameEvent& e = Emit(EV_TAUNT);
   e.a = (u8)id;
   e.b = (u8)t;
+  e.c = (u16)p.tauntVariant;
   e.pos = p.ms.pos + Vec3(0, 0.3f, 0);
   if (mode == MODE_CLONES) {
     for (const Decoy& d : decoys) {
       if (!d.active || d.owner != id) continue;
       GameEvent& echo = Emit(EV_TAUNT);
-      echo.a = (u8)id; echo.b = (u8)t; echo.pos = d.pos + Vec3(0, .3f, 0);
+      echo.a = (u8)id; echo.b = (u8)t; echo.c = (u16)p.tauntVariant; echo.pos = d.pos + Vec3(0, .3f, 0);
     }
   }
 }

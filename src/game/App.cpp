@@ -10,6 +10,7 @@
 #include "game/Invite.h"
 #include "game/Maps.h"
 #include "game/Session.h"
+#include "game/Sounds.h"
 #include "game/Settings.h"
 #include "game/Updater.h"
 #include "game/Version.h"
@@ -164,6 +165,7 @@ int AppMain(int argc, char** argv, bool console) {
   for (int i = 1; i < argc; i++) {
     std::string a = argv[i];
     if (a == "--nettest") return RunNetTest();
+    if (a == "--soundcheck") return RunSoundTests(i + 1 < argc ? argv[i + 1] : "");
     if (a == "--test") return RunTests(i + 1 < argc ? atoi(argv[i + 1]) : 2);
     if (a == "--server") return RunServer(argc, argv);
     if (a == "--update") return RunUpdate(argc, argv);

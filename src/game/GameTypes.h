@@ -10,7 +10,7 @@ constexpr int MAX_DECOYS = 48;  // auch bei voller Lobby drei Klone je Prop
 constexpr int MAX_GRENADES = 8;
 constexpr int NAME_LEN = 24;
 constexpr u16 GAME_PORT = 27015;
-constexpr u32 PROTOCOL_VERSION = 4;
+constexpr u32 PROTOCOL_VERSION = 5;
 
 enum GameMode : u8 { MODE_CLASSIC, MODE_ROULETTE, MODE_CLONES, MODE_HOT, MODE_MOON, MODE_SHUFFLE, MODE_COUNT };
 constexpr float ROULETTE_INTERVAL = 25, CLONE_RECHARGE = 12, HOT_LIMIT = 7;
@@ -58,6 +58,7 @@ struct UserCmd {
   u16 buttons = 0;
   u8 weapon = 0;  // gewünschte Waffe
   u8 taunt = 0;   // 0 = zufällig, sonst Taunt-Nummer + 1
+  u16 builds[2] = {};  // gewünschte Werkbank-Konfiguration; Server prüft Teile und Rundenphase
 };
 
 // Bewegungszustand (wird vom Client vorhergesagt)
@@ -77,10 +78,10 @@ enum EventType : u8 {
   EV_NONE = 0,
   EV_SHOT,          // a=Schütze, b=Waffe, pos=Mündung, dir=Richtung
   EV_IMPACT,        // pos, dir=Normale, b=Material, c=1 wenn Prop
-  EV_HIT,           // a=Angreifer, b=Opfer, f=Schaden, pos
+  EV_HIT,           // a=Angreifer, b=Opfer, c=KillCause, f=Schaden, pos
   EV_PENALTY,       // a=Jäger, f=Schaden, pos=getroffenes Objekt
   EV_KILL,          // a=Täter (255 = Welt), b=Opfer, c=Ursache
-  EV_TAUNT,         // a=Spieler, b=Taunt, pos
+  EV_TAUNT,         // a=Spieler, b=Taunt, c=Klangvariante (auch bei Klonen identisch), pos
   EV_DISGUISE,      // a=Spieler, c=Prop-Typ, pos
   EV_DECOY,         // a=Besitzer, pos
   EV_DECOY_BREAK,   // pos, c=Prop-Typ
@@ -103,9 +104,11 @@ enum EventType : u8 {
   EV_MODE_WARNING,  // b=Modus, 5 Sekunden Vorwarnung
   EV_MODE_PULSE,    // b=Modus, periodischer Regelwechsel
   EV_CLONE_SWAP,    // a=Spieler
+  EV_SHELL,        // a=Spieler, einzelne Schrotpatrone eingesetzt
 };
 
-enum KillCause : u8 { KILL_SMG = 0, KILL_SHOTGUN, KILL_GRENADE, KILL_PENALTY, KILL_FALL, KILL_INFECT };
+enum KillCause : u8 { KILL_SMG = 0, KILL_SHOTGUN, KILL_GRENADE, KILL_PENALTY, KILL_FALL, KILL_INFECT, KILL_RAM, KILL_CRUSH };
+constexpr float PROP_RAM_RUNUP = 1.5f, PROP_IMPACT_COOLDOWN = 2.0f;
 
 struct GameEvent {
   u32 id = 0;

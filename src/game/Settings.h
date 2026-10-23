@@ -19,6 +19,7 @@ struct Settings {
   bool autoUpdate = true;  // beim Start nach einer neuen Version auf GitHub suchen
   bool intros = true;      // Intro-Videos vor dem Hauptmenü
   MatchSettings match;
+  u16 builds[2] = {};
   std::string lastServer = "127.0.0.1";
   std::string serverName = "Kek-Server";
 

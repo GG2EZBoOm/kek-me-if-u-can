@@ -20,14 +20,14 @@ target_link_libraries(phcore PUBLIC opengl32 winmm ws2_32 gdi32 user32 ole32 win
 
 # Spiel (Windows-Subsystem, kein Konsolenfenster) – mit Programmsymbol und Versionsinfo aus res/app.rc
 # res/intro.rc bettet die Intro-Videos ein (nur in der Spiel-EXE)
-add_executable(KekMeIfYouCan WIN32 src/main/main_win.cpp res/app.rc res/intro.rc)
+add_executable(KekMeIfYouCan WIN32 src/main/main_win.cpp res/app.rc res/intro.rc res/sounds.rc)
 target_link_libraries(KekMeIfYouCan PRIVATE phcore)
 
 # Ordner-Ausgabe: gleiche Anwendung, Videos als separat prüfbare MP4-Dateien.
-add_executable(KekMeIfYouCanFolder WIN32 src/main/main_win.cpp res/app.rc)
+add_executable(KekMeIfYouCanFolder WIN32 src/main/main_win.cpp res/app.rc res/sounds.rc)
 set_target_properties(KekMeIfYouCanFolder PROPERTIES OUTPUT_NAME "KekMeIfYouCan-Ordner")
 target_link_libraries(KekMeIfYouCanFolder PRIVATE phcore)
 
 # Konsolen-Build: dedizierter Server, automatische Tests, Screenshots
-add_executable(KekMeIfYouCanCLI src/main/main_cli.cpp res/app.rc)
+add_executable(KekMeIfYouCanCLI src/main/main_cli.cpp res/app.rc res/sounds.rc)
 target_link_libraries(KekMeIfYouCanCLI PRIVATE phcore)

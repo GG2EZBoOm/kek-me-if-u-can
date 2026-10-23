@@ -2155,6 +2155,77 @@ void Etikettendrucker(PK& k) {
   for (int i = 0; i < 9; i++) k.b.Box({-.07f + i * .016f, .099f, .18f}, {-.064f + i * .016f, .102f, .26f});
 }
 
+// --- Dresdner Zwinger: eigenständig modellierte Museums- und Gartenobjekte ---------------------
+void ZwingerVase(PK& k) {
+  k.mat(MAT_PLASTIC); k.col(0xf3eee2);
+  k.fr({0, 0, 0}, .19f, .14f, .08f); k.fr({0, .08f, 0}, .14f, .25f, .25f);
+  k.fr({0, .33f, 0}, .25f, .12f, .22f); k.cyl({0, .55f, 0}, .115f, .12f);
+  k.col(0x244d9a); k.torus({0, .68f, 0}, .12f, .022f); k.torus({0, .10f, 0}, .15f, .018f);
+  for (int i = 0; i < 8; i++) {
+    float a = i * TAU / 8;
+    k.ell({sinf(a) * .241f, .34f, cosf(a) * .241f}, {.035f, .09f, .035f}, 8, 6);
+  }
+  k.col(0xf3eee2); k.fr({0, .70f, 0}, .14f, .05f, .07f); k.sph({0, .80f, 0}, .045f);
+}
+
+void ZwingerUrne(PK& k) {
+  k.mat(MAT_SANDSTONE); k.col(0xc9b58f);
+  k.boxc({0, .09f, 0}, {.34f, .09f, .34f}); k.fr({0, .18f, 0}, .23f, .16f, .25f);
+  k.fr({0, .43f, 0}, .16f, .38f, .43f); k.fr({0, .86f, 0}, .38f, .22f, .24f);
+  k.torus({0, 1.1f, 0}, .24f, .045f); k.fr({0, 1.12f, 0}, .26f, .04f, .17f);
+  k.sph({0, 1.34f, 0}, .075f);
+  for (float x : {-.37f, .37f}) k.ell({x, .87f, 0}, {.075f, .15f, .12f});
+}
+
+void ZwingerOrange(PK& k) {
+  k.mat(MAT_SANDSTONE); k.col(0x9d5b3a);
+  k.fr({0, 0, 0}, .48f, .64f, .72f, 16); k.torus({0, .72f, 0}, .62f, .065f);
+  k.col(0x46382b); k.cyl({0, .73f, 0}, .56f, .025f);
+  k.mat(MAT_WOOD); k.col(0x705035); k.cyl({0, .75f, 0}, .075f, 1.0f, 10);
+  k.mat(MAT_LEAVES);
+  for (int i = 0; i < 6; i++) {
+    float a = i * TAU / 6; k.col(i % 2 ? 0x446331 : 0x54783a);
+    k.ell({.28f * sinf(a), 1.92f + .08f * (i % 2), .28f * cosf(a)}, {.48f, .56f, .48f}, 12, 8);
+    k.mat(MAT_PLASTIC); k.col(0xf3a32c);
+    k.sph({.62f * sinf(a), 1.84f + .16f * (i % 3), .62f * cosf(a)}, .085f, 10); k.mat(MAT_LEAVES);
+  }
+  k.collision({0, 1.25f, 0}, {.70f, 1.25f, .70f});
+}
+
+void ZwingerStatue(PK& k) {
+  k.mat(MAT_SANDSTONE); k.col(0xcbb894);
+  k.boxc({0, .12f, 0}, {.43f, .12f, .40f}); k.boxc({0, .36f, 0}, {.31f, .12f, .28f});
+  k.fr({0, .48f, 0}, .30f, .19f, .90f, 14); k.ell({.03f, 1.49f, 0}, {.24f, .32f, .18f});
+  k.ell({.06f, 1.94f, .02f}, {.16f, .21f, .17f});
+  k.col(0xb3a07d); k.ell({.06f, 2.03f, -.05f}, {.18f, .16f, .15f});
+  k.col(0xcbb894);
+  k.push(Translation({-.29f, 1.41f, .02f}) * RotationZ(-.55f)); k.ell({}, {.085f, .32f, .09f}); k.pop();
+  k.push(Translation({.30f, 1.58f, .02f}) * RotationZ(.8f)); k.ell({}, {.085f, .30f, .09f}); k.pop();
+  k.ell({.47f, 1.8f, .05f}, {.18f, .06f, .19f});
+  for (float x : {-.17f, -.06f, .06f, .17f}) k.boxc({x, .91f, .22f}, {.018f, .36f, .018f});
+}
+
+void ZwingerTelescope(PK& k) {
+  k.mat(MAT_WOOD); k.col(0x6e4529);
+  for (float a : {0.0f, TAU / 3, TAU * 2 / 3}) {
+    k.push(RotationY(a) * Translation({0, .55f, .22f}) * RotationX(.35f)); k.boxc({}, {.035f, .57f, .035f}); k.pop();
+  }
+  k.mat(MAT_GOLD); k.col(0xbca052); k.cyl({0, 1.05f, 0}, .09f, .23f);
+  k.push(Translation({0, 1.37f, 0}) * RotationX(-.38f));
+  k.cylz({}, .105f, 1.1f); k.col(0x343c45); k.cylz({0, 0, .58f}, .117f, .12f);
+  k.mat(MAT_GLASS); k.col(0x568ea8); k.cylz({0, 0, .648f}, .094f, .012f);
+  k.mat(MAT_METAL); k.col(0x343c45); k.cylz({0, 0, -.62f}, .05f, .17f); k.pop();
+}
+
+void ZwingerCrate(PK& k) {
+  k.mat(MAT_WOOD); k.col(0xa98653); k.box({-.72f, 0, -.53f}, {.72f, 1.15f, .53f});
+  k.col(0x775d3f);
+  for (float x : {-.59f, .59f}) for (float z : {-.55f, .55f}) k.boxc({x, .575f, z}, {.065f, .575f, .025f});
+  k.mat(MAT_PAPER); k.col(0xe5d9bc); k.box({-.46f, .38f, .557f}, {.46f, .79f, .57f});
+  k.mat(MAT_PLAIN); k.col(0x55412d);
+  k.push(Translation({-PixelTextWidth("KUNST", .035f) * .5f, .47f, .58f})); BuildPixelText(k.b, "KUNST", .035f, .006f); k.pop();
+}
+
 struct Entry {
   const char* id;
   const char* name;
@@ -2321,6 +2392,12 @@ void BuildCatalog() {
       {"sortierkiste", "Sortierkiste", true, Sortierkiste},
       {"rollcontainer", "Paket-Rollcontainer", true, Rollcontainer},
       {"etikettendrucker", "Etikettendrucker", true, Etikettendrucker},
+      {"zwinger_vase", "Porzellanvase", true, ZwingerVase},
+      {"zwinger_urne", "Barockurne", true, ZwingerUrne},
+      {"zwinger_orange", "Orangenkübel", true, ZwingerOrange},
+      {"zwinger_statue", "Sandsteinfigur", true, ZwingerStatue},
+      {"zwinger_fernrohr", "Historisches Fernrohr", true, ZwingerTelescope},
+      {"zwinger_kunstkiste", "Kunsttransportkiste", true, ZwingerCrate},
   };
   g_defs.reserve(COUNTOF(entries));
   for (const Entry& e : entries) {
@@ -2344,6 +2421,12 @@ void BuildCatalog() {
     d.volume = sz.x * sz.y * sz.z;
     d.health = Clamp(20.0f + 110.0f * cbrtf(d.volume), 20.0f, 150.0f);
     d.partCollision = d.id == "detektor" || d.id == "gitter";
+    // Absichtlich ausgewählte massive Formen: ein großer Schirm/Busch ist keine Abrissbirne.
+    for (const char* heavy : {"sofa", "automat", "aktenschrank", "kopierer", "dixi", "mehlpalette",
+                             "kartonpalette", "ibc", "schaltschrank", "rollcontainer", "werkbank",
+                             "zwinger_orange", "zwinger_statue", "zwinger_kunstkiste"})
+      if (d.id == heavy) d.ramDamage = 70;
+    if (d.id == "autoscooter") d.ramDamage = 105;
   }
   LOG("Prop-Katalog: %d Gegenstände", (int)g_defs.size());
 }

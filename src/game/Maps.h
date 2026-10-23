@@ -17,3 +17,4 @@ void BuildBundestag(World& w);
 void BuildOktoberfest(World& w);
 void BuildNudelfabrik(World& w);
 void BuildPaketzentrum(World& w);
+void BuildZwinger(World& w);

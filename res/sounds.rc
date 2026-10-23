@@ -1,0 +1,2 @@
+// Game-specific recordings, embedded in every build so old EXE-only updaters receive them too.
+301 RCDATA "audio/game-sfx.bank"

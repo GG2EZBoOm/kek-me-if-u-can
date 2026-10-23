@@ -13,3 +13,4 @@ inline const TauntInfo kTaunts[] = {
     {"Präsidentenglocke", 2.0f}, {"Applaus", 3.0f},       {"Tusch", 2.2f},        {"Kazoo-Hymne", 4.2f},
 };
 constexpr int NUM_TAUNTS = (int)(sizeof(kTaunts) / sizeof(kTaunts[0]));
+constexpr int TAUNT_VARIANTS = 3;

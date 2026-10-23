@@ -35,12 +35,19 @@ struct MoveEnv {
   const std::vector<OBox>* others = nullptr;  // andere Spieler, Köder
 };
 
+struct MoveContact {
+  int other = -1;           // Index in MoveEnv::others, -1 = statische Welt
+  Vec3 normal, velocity, pos;  // Geschwindigkeit VOR der Kollisionsantwort
+};
+
 bool BoxBlocked(const MoveEnv& env, const OBox& b, float lift = 0.0f);
-void PlayerMove(const MoveEnv& env, MoveState& s, const UserCmd& cmd, int propType, bool frozen, float dt);
+void PlayerMove(const MoveEnv& env, MoveState& s, const UserCmd& cmd, int propType, bool frozen, float dt,
+                std::vector<MoveContact>* contacts = nullptr);
 // Prop-Drehung zur Blickrichtung (wenn nicht gesperrt und nicht blockiert)
 void UpdatePropRotation(const MoveEnv& env, MoveState& s, int propType);
 // Sucht eine freie Position für einen Quader in der Nähe (z. B. nach Verwandlung)
 bool FindFreeSpot(const MoveEnv& env, MoveState& s, int propType);
 // Kompletter Bewegungsschritt für einen Befehl (Rotationssperre, Bewegung, Prop-Drehung).
 // Identisch auf Server und Client, damit die Vorhersage stimmt. Gibt true zurück, wenn gesprungen wurde.
-bool ApplyMovement(const MoveEnv& env, MoveState& s, const UserCmd& cmd, int propType, bool frozen);
+bool ApplyMovement(const MoveEnv& env, MoveState& s, const UserCmd& cmd, int propType, bool frozen,
+                   std::vector<MoveContact>* contacts = nullptr);

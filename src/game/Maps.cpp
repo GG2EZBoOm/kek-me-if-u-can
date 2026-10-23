@@ -18,6 +18,10 @@ const std::vector<MapInfo>& AllMaps() {
        "Gelb-rote Sortierhalle mit laufenden Paketbändern, begehbarer Sortierbrücke, Paketregalen, Retourenschalter, "
        "Leitstelle und drei begehbaren Lkw-Wechselbrücken. Zugestellt? Angeblich.",
        BuildPaketzentrum},
+      {"zwinger", "Dresdner Zwinger",
+       "Barocker Innenhof mit vier Brunnen, goldenem Kronentor, Bogengalerien und begehbaren Terrassen. "
+       "Zwischen Porzellan, Orangenkübeln und Nymphenbad wird aus Kunst plötzlich Gegenwehr.",
+       BuildZwinger},
   };
   return maps;
 }
