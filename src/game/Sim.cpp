@@ -150,8 +150,8 @@ void Sim::SpawnPlayer(int id, Team team, int spawnIndex) {
   }
   p.health = p.maxHealth;
   p.weapon = WPN_SMG;
-  for (int w = 0; w < 2; w++) p.builds[w] = ValidateWeaponBuild(w, p.nextBuilds[w]);
-  for (int w = 0; w < WPN_COUNT; w++) p.ammo[w] = (u8)GetWeaponStats(w, w < 2 ? p.builds[w] : 0).magazine;
+  for (int w = 0; w < FIREARM_COUNT; w++) p.builds[w] = ValidateWeaponBuild(w, p.nextBuilds[w]);
+  for (int w = 0; w < WPN_COUNT; w++) p.ammo[w] = (u8)GetWeaponStats(w, w < FIREARM_COUNT ? p.builds[w] : 0).magazine;
   p.fireTimer = p.reloadTimer = p.switchTimer = 0;
   p.aimProgress = p.recoilPitch = p.recoilYaw = p.sprintRecover = p.reloadDuration = p.reloadNextShell = 0;
   p.shotsFired = 0;
@@ -297,8 +297,8 @@ void Sim::Tick() {
     dec(p.disguiseTimer);
     dec(p.hurtTimer);
     dec(p.sprintRecover);
-    const WeaponStats wi = GetWeaponStats(p.weapon, p.weapon < 2 ? p.builds[p.weapon] : 0);
-    bool aiming = p.alive && p.team == TEAM_HUNTERS && p.weapon < 2 && (p.prevButtons & BTN_AIM) &&
+    const WeaponStats wi = GetWeaponStats(p.weapon, p.weapon < FIREARM_COUNT ? p.builds[p.weapon] : 0);
+    bool aiming = p.alive && p.team == TEAM_HUNTERS && p.weapon < FIREARM_COUNT && (p.prevButtons & BTN_AIM) &&
                   p.reloadTimer <= 0 && p.switchTimer <= 0 && p.sprintRecover <= 0;
     p.aimProgress = Clamp(p.aimProgress + (aiming ? 1 : -1) * TICK_DT / wi.adsTime, 0.0f, 1.0f);
     p.recoilPitch *= expf(-7.0f * TICK_DT);
@@ -315,7 +315,7 @@ void Sim::Tick() {
       }
       if (p.reloadTimer <= 0) {
         p.reloadTimer = 0;
-        if (p.weapon == WPN_SMG) p.ammo[p.weapon] = (u8)wi.magazine;
+        if (p.weapon != WPN_SHOTGUN) p.ammo[p.weapon] = (u8)wi.magazine;
       }
     }
     if (p.respawnTimer > 0) {
@@ -365,7 +365,7 @@ void Sim::Tick() {
 void Sim::ProcessCmd(int id, const UserCmd& cmd) {
   Player& p = players[id];
   p.lastCmdSeq = cmd.seq;
-  for (int w = 0; w < 2; w++) {
+  for (int w = 0; w < FIREARM_COUNT; w++) {
     p.nextBuilds[w] = ValidateWeaponBuild(w, cmd.builds[w]);
     if ((phase == Phase::Waiting || phase == Phase::Hiding) && p.builds[w] != p.nextBuilds[w]) {
       p.builds[w] = p.nextBuilds[w];
@@ -454,14 +454,14 @@ void Sim::HunterActions(int id, const UserCmd& cmd, u16 pressed) {
     }
   }
   if (phase != Phase::Hunting) return;
-  const WeaponStats wi = GetWeaponStats(p.weapon, p.weapon < 2 ? p.builds[p.weapon] : 0);
+  const WeaponStats wi = GetWeaponStats(p.weapon, p.weapon < FIREARM_COUNT ? p.builds[p.weapon] : 0);
   bool sprint = (cmd.buttons & BTN_SPRINT) && (cmd.buttons & BTN_FORWARD) && !(cmd.buttons & (BTN_BACK | BTN_AIM | BTN_FIRE)) &&
                 p.ms.stamina > .02f && !p.ms.crouching;
   if (sprint) p.sprintRecover = .20f;
   if ((pressed & BTN_RELOAD) && p.weapon != WPN_GRENADE && p.ammo[p.weapon] < wi.magazine && p.reloadTimer <= 0) {
     BeginReload(id);
   }
-  bool fire = p.weapon == WPN_GRENADE ? (pressed & BTN_FIRE) != 0 : (cmd.buttons & BTN_FIRE) != 0;
+  bool fire = (p.weapon == WPN_GRENADE || p.weapon == WPN_PISTOL) ? (pressed & BTN_FIRE) != 0 : (cmd.buttons & BTN_FIRE) != 0;
   if ((pressed & BTN_FIRE) && p.weapon == WPN_SHOTGUN && p.reloadTimer > 0 && p.ammo[p.weapon] > 0) {
     p.reloadTimer = 0; p.fireTimer = std::max(p.fireTimer, .2f);
   }
@@ -532,12 +532,12 @@ void Sim::FireWeapon(int id) {
   se.c = p.builds[p.weapon];
   se.pos = eye;
   se.dir = fwd;
-  float kick = (p.weapon == WPN_SMG ? .013f : .048f) * wi.recoil * (p.ms.crouching ? .85f : 1.0f);
+  float kick = (p.weapon == WPN_SMG ? .013f : p.weapon == WPN_PISTOL ? .020f : .048f) * wi.recoil * (p.ms.crouching ? .85f : 1.0f);
   p.recoilPitch = std::min(.13f, p.recoilPitch + kick);
   p.recoilYaw += sinf(++p.shotsFired * 2.4f) * kick * .35f;
   float penalty = 0;
   Vec3 penPos;
-  u8 cause = p.weapon == WPN_SHOTGUN ? KILL_SHOTGUN : KILL_SMG;
+  u8 cause = p.weapon == WPN_SHOTGUN ? KILL_SHOTGUN : p.weapon == WPN_PISTOL ? KILL_PISTOL : KILL_SMG;
   for (int k = 0; k < wi.pellets; k++) {
     float ang = rng_.Float() * TAU, rad = sqrtf(rng_.Float()) * spread;
     Vec3 d = Normalize(fwd + right * (cosf(ang) * rad) + up * (sinf(ang) * rad));

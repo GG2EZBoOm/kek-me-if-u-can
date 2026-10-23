@@ -822,11 +822,13 @@ int RunNetTest() {
         impact.players[0].ms.pos={25,0,25}; impact.players[0].autoTaunt=1000;
         Player& gunner=impact.players[remote]; gunner.team=TEAM_HUNTERS; gunner.propType=-1;
         gunner.ms.pos={0,0,0}; gunner.ms.vel={}; gunner.health=100; gunner.switchTimer=0; gunner.pending.clear();
-        UserCmd gunCmd; gunCmd.builds[0]=WeaponPreset(0,2); gunCmd.builds[1]=WeaponPreset(1,3);
+        UserCmd gunCmd; gunCmd.builds[0]=WeaponPreset(0,2); gunCmd.builds[1]=WeaponPreset(1,3); gunCmd.builds[WPN_PISTOL]=WeaponPreset(WPN_PISTOL,2);
         guest.makeCmd=[&](){return gunCmd;};
         for(int i=0;i<60;i++) pump();
         Check(guest.State().players[remote].builds[0]==gunCmd.builds[0] && guest.State().players[remote].builds[1]==gunCmd.builds[1] &&
-              guest.State().players[remote].ammo[0]==50,"Beide Gast-Builds und Trommelkapazität erreichen Server und Snapshot",fails);
+              guest.State().players[remote].builds[WPN_PISTOL]==gunCmd.builds[WPN_PISTOL] &&
+              guest.State().players[remote].ammo[WPN_PISTOL]==20 && guest.State().players[remote].ammo[0]==50,
+              "Alle drei Gast-Builds und Magazinkapazitäten erreichen Server und Snapshot",fails);
         impact.phase=Phase::Hunting; impact.phaseTimer=300; gunCmd.buttons=BTN_AIM|BTN_FIRE;
         int shots=0; bool shotBuild=true;
         for(int i=0;i<60;i++) { pump(); std::vector<GameEvent> evs; guest.TakeEvents(evs);
@@ -849,6 +851,20 @@ int RunNetTest() {
         gunCmd.buttons=BTN_FIRE;
         for(int i=0;i<18;i++) pump();
         Check(guest.State().players[remote].reloadTimer==0,"Gast kann das Patronen-Nachladen durch Feuern unterbrechen",fails);
+        gunCmd.weapon=WPN_PISTOL; gunCmd.buttons=0;
+        for(int i=0;i<65;i++) pump();
+        std::vector<GameEvent> discarded; guest.TakeEvents(discarded);
+        gunCmd.buttons=BTN_FIRE|BTN_AIM; shots=0; shotBuild=true;
+        for(int i=0;i<90;i++) { pump(); std::vector<GameEvent> evs; guest.TakeEvents(evs);
+          for(auto& e:evs) if(e.type==EV_SHOT && e.a==remote) { shots++; shotBuild &= e.b==WPN_PISTOL && e.c==gunCmd.builds[WPN_PISTOL]; }
+        }
+        Check(shots==1 && shotBuild && guest.State().players[remote].weapon==WPN_PISTOL && guest.State().players[remote].ammo[WPN_PISTOL]==19,
+              "Pistole über UDP: ein Klick, ein Schuss, richtiger Build und korrektes Magazin",fails);
+        gunCmd.buttons=BTN_RELOAD; for(int i=0;i<12;i++) pump();
+        Check(guest.State().players[remote].reloadTimer>0,"Pistolen-Magazinwechsel erreicht den Gast",fails);
+        gunCmd.buttons=0; for(int i=0;i<140;i++) pump();
+        Check(guest.State().players[remote].ammo[WPN_PISTOL]==20 && guest.State().players[remote].reloadTimer==0,
+              "Pistolen-Nachladen füllt auch über UDP exakt das gewählte Magazin",fails);
       }
       server.Stop(impact);
     }

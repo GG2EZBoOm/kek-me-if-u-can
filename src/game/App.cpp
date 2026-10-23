@@ -67,7 +67,7 @@ static int RunViewer(const std::string& shotDir, int width, int height, const st
         for (int i = 0; i < 4; i++) {
           Vec3 p = target + right * ((i - 1.5f) * 1.25f) - Vec3(0, 1.1f, 0);  // Blickpunkt = Brusthöhe
           float sky = w.SkyAt(p + Vec3(0, 1, 0));
-          view.DrawHunterPreview(r, p, yaws[i], i == 3 ? 0.3f : -0.1f, i == 1 ? 1.2f : 0.0f, i == 1 ? 4.0f : 0.0f, i == 3, i == 2 ? 1 : 0, sky);
+          view.DrawHunterPreview(r, p, yaws[i], i == 3 ? 0.3f : -0.1f, i == 1 ? 1.2f : 0.0f, i == 1 ? 4.0f : 0.0f, i == 3, i == 1 ? WPN_PISTOL : i == 2 ? WPN_SHOTGUN : WPN_SMG, sky);
         }
       }
       ScreenFX fx;

@@ -15,7 +15,7 @@ struct ClientPlayer {
   float health = 0, maxHealth = 100;
   u8 weapon = 0;
   u8 ammo[WPN_COUNT] = {};
-  u16 builds[2] = {};
+  u16 builds[FIREARM_COUNT] = {};
   float aimProgress = 0, recoilPitch = 0, recoilYaw = 0, reloadDuration = 0;
   float reloadTimer = 0, switchTimer = 0, fireTimer = 0;
   float tauntTimer = 0, tauntCooldown = 0, autoTaunt = 0;

@@ -10,7 +10,7 @@ constexpr int MAX_DECOYS = 48;  // auch bei voller Lobby drei Klone je Prop
 constexpr int MAX_GRENADES = 8;
 constexpr int NAME_LEN = 24;
 constexpr u16 GAME_PORT = 27015;
-constexpr u32 PROTOCOL_VERSION = 5;
+constexpr u32 PROTOCOL_VERSION = 6;
 
 enum GameMode : u8 { MODE_CLASSIC, MODE_ROULETTE, MODE_CLONES, MODE_HOT, MODE_MOON, MODE_SHUFFLE, MODE_COUNT };
 constexpr float ROULETTE_INTERVAL = 25, CLONE_RECHARGE = 12, HOT_LIMIT = 7;
@@ -50,7 +50,9 @@ enum Buttons : u16 {
   BTN_ALT = 1 << 15,  // Zuschauer: nächstes Ziel / Freiflug
 };
 
-enum Weapon : u8 { WPN_SMG = 0, WPN_SHOTGUN = 1, WPN_GRENADE = 2, WPN_COUNT };
+enum Weapon : u8 { WPN_SMG = 0, WPN_SHOTGUN = 1, WPN_PISTOL = 2, WPN_GRENADE = 3, WPN_COUNT };
+
+constexpr int FIREARM_COUNT = WPN_GRENADE;
 
 struct UserCmd {
   u32 seq = 0;
@@ -58,7 +60,7 @@ struct UserCmd {
   u16 buttons = 0;
   u8 weapon = 0;  // gewünschte Waffe
   u8 taunt = 0;   // 0 = zufällig, sonst Taunt-Nummer + 1
-  u16 builds[2] = {};  // gewünschte Werkbank-Konfiguration; Server prüft Teile und Rundenphase
+  u16 builds[FIREARM_COUNT] = {};  // gewünschte Werkbank-Konfiguration; Server prüft Teile und Rundenphase
 };
 
 // Bewegungszustand (wird vom Client vorhergesagt)
@@ -107,7 +109,7 @@ enum EventType : u8 {
   EV_SHELL,        // a=Spieler, einzelne Schrotpatrone eingesetzt
 };
 
-enum KillCause : u8 { KILL_SMG = 0, KILL_SHOTGUN, KILL_GRENADE, KILL_PENALTY, KILL_FALL, KILL_INFECT, KILL_RAM, KILL_CRUSH };
+enum KillCause : u8 { KILL_SMG = 0, KILL_SHOTGUN, KILL_GRENADE, KILL_PENALTY, KILL_FALL, KILL_INFECT, KILL_RAM, KILL_CRUSH, KILL_PISTOL };
 constexpr float PROP_RAM_RUNUP = 1.5f, PROP_IMPACT_COOLDOWN = 2.0f;
 
 struct GameEvent {

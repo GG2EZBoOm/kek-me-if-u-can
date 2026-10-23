@@ -17,7 +17,7 @@ struct WeaponStats : WeaponInfo {
 const WeaponInfo& GetWeapon(int weapon);
 int WeaponPart(u16 build, int slot);
 int WeaponPartCount(int slot);
-const char* WeaponSlotName(int slot);
+const char* WeaponSlotName(int slot, int weapon = WPN_SMG);
 const char* WeaponPartName(int weapon, int slot, int option);
 const char* WeaponPartDescription(int weapon, int slot, int option);
 const char* WeaponPartBlock(int weapon, u16 build, int slot, int option);

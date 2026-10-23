@@ -688,8 +688,8 @@ void GameView::DrawHunter(Renderer& r, const ClientPlayer& p, int id, float sky)
   it.model = torsoM * Translation({0, 0.56f, 0}) * RotationX(Clamp(p.pitch, -0.8f, 0.8f) * 0.6f - lean * 0.8f);
   r.Draw(it);
   // Waffe vor der Brust, zielt unabhängig von der Rumpfneigung in Blickrichtung
-  u16 build=p.weapon<2?p.builds[p.weapon]:0;
-  WeaponPose pose=MakeWeaponPose(p.weapon,build,p.reloadTimer,p.reloadDuration,p.fireTimer);
+  u16 build=p.weapon<FIREARM_COUNT?p.builds[p.weapon]:0;
+  WeaponPose pose=MakeWeaponPose(p.weapon,build,p.reloadTimer,p.reloadDuration,p.fireTimer,p.ammo[p.weapon]==0);
   Mat4 gunM = Translation({0.12f, 0.44f, -0.14f}) * RotationX(pitch - lean + pose.reload*.15f) * RotationZ(-pose.reload*.35f);
   Vec3 gripR(0, -0.075f, 0.012f), gripL(0, -0.04f, -0.24f);
   bool gun = p.weapon < WPN_GRENADE;
@@ -701,7 +701,7 @@ void GameView::DrawHunter(Renderer& r, const ClientPlayer& p, int id, float sky)
     gripR = Vec3(0.04f, -0.06f, -0.1f);
     gripL = Vec3(-0.2f, -0.12f, -0.02f);
   }
-  if(p.weapon<2) { gripR={0,-.075f,.035f}; gripL=pose.leftHand; }
+  if(p.weapon<FIREARM_COUNT) { gripR={0,-.075f,.035f}; gripL=pose.leftHand; }
   // Arme per IK an Griff und Vorderschaft, Ellbogen nach unten außen
   struct ArmDef {
     Vec3 shoulder, grip, pole;
@@ -743,7 +743,7 @@ void GameView::DrawHunterPreview(Renderer& r, Vec3 pos, float yaw, float pitch, 
 
 void GameView::DrawViewModel(Renderer& r, const ClientPlayer& me, const ViewInput& in, float sky) {
   if(me.weapon != lastWeapon_) { switchAnim_=1; lastWeapon_=me.weapon; lastYaw_=in.yaw; lastPitch_=in.pitch; sway_={}; }
-  int weapon=ClampI(me.weapon,0,2); u16 build=weapon<2?me.builds[weapon]:0;
+  int weapon=ClampI(me.weapon,0,WPN_COUNT-1); u16 build=weapon<FIREARM_COUNT?me.builds[weapon]:0;
   float speed=sqrtf(me.vel.x*me.vel.x+me.vel.z*me.vel.z);
   bool sprint=(me.lastButtons & BTN_SPRINT) && !(me.lastButtons & (BTN_AIM|BTN_FIRE)) && speed>4.5f;
   sprintBlend_=Damp(sprintBlend_,sprint?1.0f:0.0f,10,frameDt_);
@@ -751,17 +751,17 @@ void GameView::DrawViewModel(Renderer& r, const ClientPlayer& me, const ViewInpu
   sway_.y=Damp(sway_.y,Clamp((in.pitch-lastPitch_)/frameDt_,-3.0f,3.0f)*.010f,8,frameDt_);
   lastYaw_=in.yaw; lastPitch_=in.pitch;
   float bobAmt=me.onGround?Saturate(speed/5):.15f;
-  Vec3 base=Lerp(Vec3(.19f,-.18f,-.44f),Vec3(0,-WeaponSightHeight(weapon,build)*.80f,-.33f),aimBlend_);
+  Vec3 base=Lerp(Vec3(weapon==WPN_PISTOL?.13f:.19f,-.18f,weapon==WPN_PISTOL?-.48f:-.44f),Vec3(0,-WeaponSightHeight(weapon,build)*.80f,weapon==WPN_PISTOL?-.40f:-.33f),aimBlend_);
   Vec3 bob(sinf(bobPhase_)*.007f*bobAmt,-fabsf(cosf(bobPhase_))*.009f*bobAmt,0);
   bob*=1-aimBlend_;  // sight axis remains aligned with the authoritative shot during ADS
-  WeaponPose pose=MakeWeaponPose(weapon,build,me.reloadTimer,me.reloadDuration,me.fireTimer);
+  WeaponPose pose=MakeWeaponPose(weapon,build,me.reloadTimer,me.reloadDuration,me.fireTimer,me.ammo[weapon]==0);
   float sw=std::max(switchAnim_,Saturate(me.switchTimer*2.5f));
   Vec3 off=base+bob+Vec3(-sway_.x*(1-aimBlend_),sway_.y*(1-aimBlend_)-.055f*pose.reload-.32f*sw-.09f*sprintBlend_,.045f*recoil_);
   Mat4 camM=Translation(cam_.pos)*RotationY(cam_.yaw)*RotationX(cam_.pitch);
   Mat4 model=camM*Translation(off)*RotationX(.045f*recoil_*(1-aimBlend_*.85f)+.15f*pose.reload-.30f*sprintBlend_)*
              RotationZ(-.45f*pose.reload+.45f*sprintBlend_)*Scaling(Vec3(.80f));
   DrawItem it; it.viewModel=true; it.castShadow=false; it.sky=sky; it.model=model;
-  if(weapon<2) {
+  if(weapon<FIREARM_COUNT) {
     weapons_.Draw(r,weapon,build,model,sky,true,pose);
     it.mesh=&rightHand_; it.model=model*Translation({0,-.025f,.035f}); r.Draw(it);
     it.mesh=&leftHand_; it.model=model*Translation(pose.leftHand); r.Draw(it);
@@ -769,7 +769,7 @@ void GameView::DrawViewModel(Renderer& r, const ClientPlayer& me, const ViewInpu
     if(me.ammo[WPN_GRENADE]) { it.mesh=&vmGrenade_; r.Draw(it); }
     it.mesh=&grenadeHands_; r.Draw(it);
   }
-  if(flashTimer_>0 && weapon<2) {
+  if(flashTimer_>0 && weapon<FIREARM_COUNT) {
     it.mesh=&flash_; float scale=GetWeaponStats(weapon,build).suppressed?.12f:.55f;
     it.model=model*Translation({0,.025f,WeaponMuzzleZ(weapon,build)-.025f})*RotationZ(rng_.Range(0,TAU))*Scaling(Vec3(scale)); r.Draw(it);
   }
@@ -783,8 +783,8 @@ void GameView::RenderWorkbench(Renderer& r,int weapon,u16 build,float angle,floa
   r.Begin(cam,env,width,height,time); r.ShowWorld(false); cam_=r.Cam();
   DrawItem table; table.mesh=&bench_; r.Draw(table);
   // Move the inspection model into the open right side of the panel layout.
-  float scale=weapon==WPN_SHOTGUN?1.00f:1.25f;
-  Mat4 model=Translation({.30f,.46f,0})*RotationY(angle)*RotationZ(elevation)*Scaling(Vec3(scale));
+  float scale=weapon==WPN_PISTOL?2.0f:weapon==WPN_SHOTGUN?1.00f:1.25f;
+  Mat4 model=Translation({.30f,weapon==WPN_PISTOL?.51f:.46f,0})*RotationY(angle)*RotationZ(elevation)*Scaling(Vec3(scale));
   weapons_.Draw(r,weapon,build,model,1,false,WeaponPose(),slot);
   r.SetLights({{{-.7f,1.4f,.7f},3,Vec3(2.8f,2.3f,1.7f)},{{1.1f,.8f,-.8f},3,Vec3(1.4f,2.2f,3.0f)}});
   ScreenFX fx; fx.vignette=.38f; r.Render(fx);
@@ -809,7 +809,7 @@ void GameView::Render(Renderer& r, const ClientState& s, int localId, const Worl
     float target = me->crouching ? 1.0f : 1.62f;
     eyeH_ = Damp(eyeH_, target, 14.0f, dt);
     cam.pos = me->pos + Vec3(0, eyeH_, 0);
-    WeaponStats stats = GetWeaponStats(me->weapon, me->weapon < 2 ? me->builds[me->weapon] : 0);
+    WeaponStats stats = GetWeaponStats(me->weapon, me->weapon < FIREARM_COUNT ? me->builds[me->weapon] : 0);
     aimBlend_ = Damp(aimBlend_, me->aimProgress, 24.0f, dt);
     cam.fovDeg = Lerp(in.fov, in.fov / stats.zoom, aimBlend_);
     cameraRecoil_.x = Damp(cameraRecoil_.x, me->recoilYaw, 35, dt);

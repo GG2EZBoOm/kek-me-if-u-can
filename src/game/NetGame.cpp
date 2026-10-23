@@ -106,7 +106,7 @@ static void ReadPlayer(Reader& r, ClientPlayer& p, bool full) {
   p.health = r.U16() / 10.0f;
   p.maxHealth = r.U16() / 10.0f;
   p.weapon = r.U8();
-  for (int i = 0; i < 2; i++) p.builds[i] = ValidateWeaponBuild(i, r.U16());
+  for (int i = 0; i < FIREARM_COUNT; i++) p.builds[i] = ValidateWeaponBuild(i, r.U16());
   p.aimProgress = r.U8() / 255.0f;
   p.recoilPitch = r.I16() / 10000.0f; p.recoilYaw = r.I16() / 10000.0f;
   p.reloadDuration = r.U8() / 20.0f;

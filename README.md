@@ -89,7 +89,7 @@ Danach `KekMeIfYouCan.exe` starten. Voraussetzung: Visual Studio 2022/2026 mit �
 | Köder | Props stellen zwei Kopien ihrer Tarnung auf. Treffer darauf kosten die Jäger Lebenspunkte. |
 | Sonar | Jäger lösen einen Ping aus, auf den nahe Props hörbar antworten. |
 | Granate | Eine pro Runde, für verdächtige Gruppen. |
-| Waffenwerkbank | MP und Schrotflinte mit sechs Anschlüssen, vier Build-Vorlagen, 3D-Vorschau und wirksamen Handhabungswerten. |
+| Waffenwerkbank | MP, Schrotflinte und Pistole mit passenden Anbauteilen, vier Build-Vorlagen, 3D-Vorschau und wirksamen Handhabungswerten. |
 | 3D-Klang mit Verdeckung | Geräusche hinter Wänden klingen gedämpft. So lassen sich Taunts orten. |
 | Bots für beide Teams | Prop-Bots suchen sich passende Gruppen gleicher Objekte, richten sich aus, verteilen sich über die Karte und fliehen bei Treffern. Jäger-Bots gehen Geräuschen nach, nutzen Sonar und geben Testschüsse ab. |
 | Ausgerüstete Sucher | Geformte Uniformen, Plattenträger mit Taschen und Funkgerät, Schutzbrille, Headset und Stiefel. Arme greifen die Waffe per Zweigelenk-IK; Lauf- und Hockposen werden animiert. |
@@ -100,7 +100,7 @@ Danach `KekMeIfYouCan.exe` starten. Voraussetzung: Visual Studio 2022/2026 mit �
 
 ## Waffenwerkbank
 
-Im **Hauptmenü**, bei der Spielvorbereitung oder über **Esc → Waffenwerkbank** baust du MP und Schrotflinte um.
+Im **Hauptmenü**, bei der Spielvorbereitung oder über **Esc → Waffenwerkbank** baust du MP, Schrotflinte und Pistole um.
 Waffe auswählen, links einen Anschluss anklicken und rechts das gewünschte Teil montieren.
 Die 3D-Vorschau lässt sich mit gedrückter linker Maustaste drehen; Werte und Unterschiede zum Werksbuild stehen darunter.
 
@@ -108,12 +108,12 @@ Die 3D-Vorschau lässt sich mit gedrückter linker Maustaste drehen; Werte und U
 
 | Anschluss | Auswahl |
 |---|---|
-| Visierung | Kimme/Korn, Reflex, Holo und Prisma mit 2,5× Zielansicht |
+| Visierung | Kimme/Korn, Reflex, Holo und Prisma mit 2,5× Zielansicht; Pistole: Kimme/Korn oder Micro-Reflex |
 | Lauf | Standard, Kompakt, Präzision/Sport |
 | Mündung | Offen/Feuerdämpfer, Kompensator bzw. Choke, Schalldämpfer |
-| Schaft | Standard, leicht, stabil/gepolstert |
-| Magazin | MP: 20/30/50 Schuss; Schrotflinte: 4/6/8 Patronen |
-| Vordergriff | Standard, vertikal/taktisch, Winkelgriff/leichte Pumpe |
+| Schaft | Standard, leicht, stabil/gepolstert; kein Schaftanschluss an der Pistole |
+| Magazin | MP: 20/30/50 Schuss; Schrotflinte: 4/6/8 Patronen; Pistole: 10/15/20 Schuss |
+| Griff | Langwaffen: Vordergriff/Pumpe; Pistole: Polymer-, gummierte oder schlanke Griffschalen |
 
 Die vier Vorlagen **Standard, Kompakt, Kontrolle und Gedämpft** sind sofort spielbar. Jeder Build bleibt in
 `prophunt.ini` gespeichert. Gewicht, Anschlagzeit, Rückstoß, Streuung, Kapazität und Nachladezeit ändern sich mit den Teilen;
@@ -123,14 +123,23 @@ Vertikalgriff auf; unter den kurzen Schrotlauf passt keine 8er-Magazinverlänger
 
 Der Gastgeber prüft alle Teile. **Bis zum Ende der Versteckphase** werden Umbauten übernommen;
 während der Jagd gilt eine Änderung **ab der nächsten Runde**. Auch bei einem späten Beitritt während der Jagd
-wird der gespeicherte Build erst zur nächsten Runde angelegt. Alle Teilnehmer müssen **Version 1.0.5** verwenden
-(Netzwerkprotokoll 5). Andere Spieler sehen dieselben montierten Bauteile.
+wird der gespeicherte Build erst zur nächsten Runde angelegt. Alle Teilnehmer müssen **Version 1.0.6** verwenden
+(Netzwerkprotokoll 6). Andere Spieler sehen dieselben montierten Bauteile.
 
 Die Handhabung nutzt zeitabhängigen Anschlag, serverseitigen Rückstoß, Sprint-Erholung und getrennte Bewegungen
 für Hände, Magazin, Verschluss und Pumpgriff. Die Schrotflinte lädt **Patronen einzeln**; mit Feuer lässt sich
 unterbrechen, sobald mindestens eine Patrone geladen ist. Ein Waffenwechsel bricht das Nachladen ab.
 Die Modelle sind eigene prozedurale Spielmodelle. Die Werkbank ist eine erste modulare Ausbaustufe mit sechs
 Anschlüssen; ein Inventar mit hunderten Einzelteilen, Verschleiß und eine ballistische Simulation gehören noch nicht dazu.
+
+Die **9-mm-Pistole auf Taste 3** schießt halbautomatisch: ein Schuss pro Klick, 15 Schuss im Standardmagazin,
+22 Schaden auf kurze Distanz und 1,45 Sekunden für einen Magazinwechsel. Ihr Schlitten bewegt sich beim Schuss,
+bleibt nach dem letzten Schuss offen und schließt beim Nachladen. Sie hat eigene Schuss- und Nachladegeräusche;
+Bots ziehen sie als Ersatzwaffe, wenn die Hauptwaffe leer ist. Die **Granate liegt auf Taste 4**.
+
+![Pistolen-Werkbank mit Micro-Reflex, Matchlauf und Kompensator](docs/screenshots/v1.0.6-pistol.png)
+
+Die Außenatmosphäre enthält seit 1.0.6 nur Wind, **kein wiederkehrendes Vogelgezwitscher**.
 
 ## Spezialmodi
 
@@ -245,7 +254,7 @@ Tomatendose, Parmesanlaib, Trockenwagen, Hubwagen, Schutzhelm, Werkzeugkiste und
 | G | | Sonar | Im Klon-Alarm: mit eigenem Klon tauschen, sonst Köder |
 | F | | | Zufälliger Taunt |
 | T | | | Taunt-Auswahl |
-| 1 / 2 / 3 | | MP / Schrotflinte / Granate | Taunt wählen (bei offener Liste) |
+| 1 / 2 / 3 / 4 | | MP / Schrotflinte / Pistole / Granate | Taunt wählen (bei offener Liste) |
 | W A S D, Leertaste, Umschalt | Laufen, Springen, Sprinten | | |
 | Strg / C | | Ducken | |
 | Tab / Enter / Esc / F1 / F11 | Punkte / Chat / Pause / Hilfe / Vollbild | | |

@@ -18,7 +18,7 @@ struct Player {
   float health = 100, maxHealth = 100;
   u8 weapon = WPN_SMG;
   u8 ammo[WPN_COUNT] = {};
-  u16 builds[2] = {}, nextBuilds[2] = {};
+  u16 builds[FIREARM_COUNT] = {}, nextBuilds[FIREARM_COUNT] = {};
   float aimProgress = 0, recoilPitch = 0, recoilYaw = 0, sprintRecover = 0;
   float reloadDuration = 0, reloadNextShell = 0;
   u32 shotsFired = 0;

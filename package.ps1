@@ -39,11 +39,14 @@ Spezialmodi: Prop-Roulette, Klon-Alarm, Hummeln im Hintern, Mondschicht.
 Wundertuete waehlt pro Runde einen anderen Spezialmodus.
 Der Gastgeber waehlt vor dem Start oder per Esc fuer die naechste Runde.
 
-Waffenwerkbank im Hauptmenue oder per Esc: MP und Schrotflinte mit
+Waffenwerkbank im Hauptmenue oder per Esc: MP, Schrotflinte und Pistole mit
 Visierungen, Laeufen, Muendungen, Schaeften, Magazinen und Griffen umbauen.
 Builds werden gespeichert. Aenderungen waehrend der Jagd gelten ab der
-naechsten Runde. Alle Mitspieler brauchen Version 1.0.5 (Protokoll 5).
+naechsten Runde. Alle Mitspieler brauchen Version $version (Protokoll 6).
 Schrot einzeln nachladen; Feuer unterbricht, sobald eine Patrone bereit ist.
+Tasten: 1 MP, 2 Schrotflinte, 3 Pistole, 4 Granate. Pistole: ein Schuss pro
+Klick, 15 Schuss ab Werk, 10/20-Schuss-Magazine und Micro-Reflex optional.
+Die staendigen Vogelrufe der Aussenatmosphaere wurden entfernt.
 
 Der automatische Updater aktualisiert beide EXEs. Bei neuen Videodateien
 das aktuelle vollstaendige ZIP entpacken. Eigene Einstellungen stehen in

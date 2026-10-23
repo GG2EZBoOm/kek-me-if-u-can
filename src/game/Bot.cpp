@@ -438,7 +438,10 @@ void BotManager::ThinkHunter(Sim& sim, int id, Brain& b, UserCmd& cmd) {
         float ang = acosf(Clamp(Dot(look, toT / std::max(d, 0.01f)), -1.0f, 1.0f));
         if (b.reaction <= 0 && vis && ang < 0.06f + 0.4f / std::max(d, 1.0f)) cmd.buttons |= BTN_FIRE;
         b.weaponWant = (sk >= 2 && d < 5.0f) ? WPN_SHOTGUN : WPN_SMG;
+        // Draw the sidearm when the primary is dry; keep it until this engagement ends.
+        if(p.ammo[b.weaponWant]==0 || (p.weapon==WPN_PISTOL && p.ammo[WPN_PISTOL]>0)) b.weaponWant=WPN_PISTOL;
         cmd.weapon = b.weaponWant;
+        if(b.weaponWant==WPN_PISTOL && (p.fireTimer>0 || (p.prevButtons&BTN_FIRE))) cmd.buttons &= ~BTN_FIRE;
         if (d > 6.0f || !vis) {
           b.repath -= TICK_DT;
           if (b.repath <= 0) {

@@ -440,7 +440,7 @@ void Game::UpdateView(float dt) {
   plat::SetMouseCaptured(look);
   if (look) {
     Vec2 md = plat::MouseDelta();
-    float zoom = lp && lp->weapon<2 ? GetWeaponStats(lp->weapon,lp->builds[lp->weapon]).zoom : 1;
+    float zoom = lp && lp->weapon<FIREARM_COUNT ? GetWeaponStats(lp->weapon,lp->builds[lp->weapon]).zoom : 1;
     float sens = .0022f * cfg_.sensitivity * (lp && lp->team==TEAM_HUNTERS ? Lerp(1.0f,1/zoom,lp->aimProgress) : 1.0f);
     yaw_ = WrapAngle(yaw_ - md.x * sens);
     pitch_ = Clamp(pitch_ - md.y * sens * (cfg_.invertY ? -1.0f : 1.0f), -1.52f, 1.52f);
@@ -477,10 +477,11 @@ void Game::UpdateView(float dt) {
   if (lp && lp->alive && lp->team == TEAM_HUNTERS) {
     if (plat::KeyPressed('1')) weapon_ = WPN_SMG;
     if (plat::KeyPressed('2')) weapon_ = WPN_SHOTGUN;
-    if (plat::KeyPressed('3') && lp->ammo[WPN_GRENADE] > 0) weapon_ = WPN_GRENADE;
+    if (plat::KeyPressed('3')) weapon_ = WPN_PISTOL;
+    if (plat::KeyPressed('4') && lp->ammo[WPN_GRENADE] > 0) weapon_ = WPN_GRENADE;
     int wh = plat::WheelDelta();
     if (wh != 0) {
-      int maxW = lp->ammo[WPN_GRENADE] > 0 ? 3 : 2;
+      int maxW = lp->ammo[WPN_GRENADE] > 0 ? WPN_COUNT : FIREARM_COUNT;
       weapon_ = (u8)(((int)weapon_ - wh % maxW + maxW * 4) % maxW);
     }
     if (lp->weapon == WPN_SMG && weapon_ == WPN_GRENADE && lp->ammo[WPN_GRENADE] == 0) weapon_ = WPN_SMG;
@@ -558,7 +559,8 @@ void Game::HandleEvent(const GameEvent& e) {
   switch (e.type) {
     case EV_SHOT: {
       const WeaponStats stats=GetWeaponStats(e.b,e.c);
-      int snd = stats.suppressed ? (e.b==WPN_SHOTGUN?SND_SHOTGUN_SUPPRESSED:SND_SMG_SUPPRESSED) : (e.b == WPN_SHOTGUN ? SND_SHOTGUN : SND_SMG);
+      int snd = stats.suppressed ? (e.b==WPN_PISTOL?SND_PISTOL_SUPPRESSED:e.b==WPN_SHOTGUN?SND_SHOTGUN_SUPPRESSED:SND_SMG_SUPPRESSED)
+                                 : (e.b==WPN_PISTOL?SND_PISTOL:e.b==WPN_SHOTGUN?SND_SHOTGUN:SND_SMG);
       if (e.a == me) audio::Play(Snd(snd, e.id), P2(0.55f, rp));
       else audio::Play(Snd(snd, e.id), P3(e.pos, 1.0f, 4.0f, stats.soundRadius, rp));
       break;
@@ -609,7 +611,7 @@ void Game::HandleEvent(const GameEvent& e) {
         fe.killer = name(e.a);
         fe.kt = e.c == KILL_RAM || e.c == KILL_CRUSH ? TEAM_PROPS : TEAM_HUNTERS;
       }
-      if (propVictim) fe.extra = "als " + props::Get((int)e.f).name;
+      if (propVictim) fe.extra = std::string(e.c == KILL_PISTOL ? "Pistole · als " : "als ") + props::Get((int)e.f).name;
       else if (e.c == KILL_PENALTY) fe.extra = "zu viele Fehlschüsse";
       else if (e.c == KILL_FALL) fe.extra = "abgestürzt";
       else if (e.c == KILL_RAM) fe.extra = "überrollt";
@@ -707,8 +709,8 @@ void Game::HandleEvent(const GameEvent& e) {
       if (e.a != me) audio::Play(Snd(SND_JUMP), P3(e.pos, 0.4f, 1.5f, 15.0f, rp));
       break;
     case EV_RELOAD: {
-      int snd=e.b==WPN_SHOTGUN?SND_SWITCH:SND_RELOAD_SMG;
-      float pitch=e.b==WPN_SHOTGUN?1:1.9f/std::max(.5f,e.f);
+      int snd=e.b==WPN_SHOTGUN?SND_SWITCH:e.b==WPN_PISTOL?SND_RELOAD_PISTOL:SND_RELOAD_SMG;
+      float pitch=e.b==WPN_SHOTGUN?1:(e.b==WPN_PISTOL?1.45f:1.9f)/std::max(.5f,e.f);
       if(e.a < MAX_PLAYERS) {
         audio::Stop(reloadVoices_[e.a]);
         reloadVoices_[e.a] = audio::Play(Snd(snd,e.id), e.a==me ? P2(.5f,pitch) : P3(e.pos+Vec3(0,1,0),.5f,1.5f,18,pitch));
@@ -1077,7 +1079,7 @@ void Game::DrawMain() {
   DrawMapCard({W - ui_.S(510) + (1 - ac) * ui_.S(40), H - ui_.S(268), ui_.S(460), ui_.S(218)}, true);
   ui_.SetAlpha(Appear(0.2f));
   DrawProfileChip();
-  if(ui_.MenuItem("m_bench",{W-ui_.S(510),H-ui_.S(350),ui_.S(460),ui_.S(68)},"Waffenwerkbank","Deine MP und Schrotflinte umbauen",icon::Settings)) workbenchOpen_=true;
+  if(ui_.MenuItem("m_bench",{W-ui_.S(510),H-ui_.S(350),ui_.S(460),ui_.S(68)},"Waffenwerkbank","MP, Schrotflinte und Pistole umbauen",icon::Settings)) workbenchOpen_=true;
   if (discord_.Connected()) {
     std::string t = "Discord verbunden" + (discord_.UserName().empty() ? std::string() : " · " + discord_.UserName());
     float tw = ui_.Measure(FONT_SMALL, t).x;
@@ -1790,7 +1792,7 @@ void Game::UpdatePresence() {
 void Game::DrawCrosshair(const ClientPlayer& me) {
   float cx = ui_.W() * 0.5f, cy = ui_.H() * 0.5f;
   if (me.team == TEAM_HUNTERS) {
-    const WeaponStats wi = GetWeaponStats(me.weapon,me.weapon<2?me.builds[me.weapon]:0);
+    const WeaponStats wi = GetWeaponStats(me.weapon,me.weapon<FIREARM_COUNT?me.builds[me.weapon]:0);
     float speed = sqrtf(me.vel.x * me.vel.x + me.vel.z * me.vel.z);
     float spread = Lerp(wi.spreadHip,wi.spreadAim,me.aimProgress) * (1.0f + speed * 0.12f) * (me.onGround ? 1.0f : 2.0f);
     float gap = ui_.S(6) + spread * ui_.H() * 1.1f;
@@ -1950,13 +1952,13 @@ void Game::DrawWorkbench() {
   float W=ui_.W()/ui_.Scale(), H=ui_.H()/ui_.Scale();
   ui_.SetAlpha(1);
   ui_.Panel(R(30,30,420,H-60),ui_.S(20),1,Color::Hex(0x0c151d,230));
-  if(PageHeader(ui_.S(54),ui_.S(48),ui_.S(372),"Waffenwerkbank","Zwei Waffen · sechs Anschlüsse")) { workbenchOpen_=false; SaveCfg(); }
-  for(int w=0;w<2;w++) if(ui_.ButtonEx(StrFormat("wb_gun%d",w).c_str(),R(54+w*190,140,182,48),w?"Schrotflinte":"MP",nullptr,
+  if(PageHeader(ui_.S(54),ui_.S(48),ui_.S(372),"Waffenwerkbank","Drei Waffen · dein Umbau")) { workbenchOpen_=false; SaveCfg(); }
+  for(int w=0;w<FIREARM_COUNT;w++) if(ui_.ButtonEx(StrFormat("wb_gun%d",w).c_str(),R(54+w*127,140,118,48),w==WPN_SHOTGUN?"Schrot":GetWeapon(w).name,nullptr,
       benchWeapon_==w?UI::BTN_PRIMARY:UI::BTN_SECONDARY)) benchWeapon_=w;
   u16& build=cfg_.builds[benchWeapon_];
   for(int slot=0;slot<WS_COUNT;slot++) {
     Rect row=R(54,208+slot*75,372,66);
-    if(ui_.MenuItem(StrFormat("wb_slot%d",slot).c_str(),row,WeaponSlotName(slot),WeaponPartName(benchWeapon_,slot,WeaponPart(build,slot)),
+    if(ui_.MenuItem(StrFormat("wb_slot%d",slot).c_str(),row,WeaponSlotName(slot,benchWeapon_),WeaponPartName(benchWeapon_,slot,WeaponPart(build,slot)),
                     slot==WS_OPTIC?icon::Target:icon::Settings,benchSlot_==slot)) benchSlot_=slot;
   }
   ui_.Label(ui_.S(56),ui_.S(678),"Schnell-Builds",theme::Dim);
@@ -1967,7 +1969,7 @@ void Game::DrawWorkbench() {
   ui_.Text(FONT_SMALL,ui_.S(56),ui_.S(H-62),"Builds werden automatisch gespeichert.",theme::Dim);
   float x=490, rw=W-x-40;
   ui_.Label(ui_.S(x),ui_.S(48),"DEIN BUILD",theme::Accent);
-  ui_.Text(FONT_LARGE,ui_.S(x),ui_.S(72),benchWeapon_?"Schrotflinte / 12 Gauge":"MP / 9 mm",kWhite);
+  ui_.Text(FONT_LARGE,ui_.S(x),ui_.S(72),benchWeapon_==WPN_PISTOL?"Pistole / 9 mm":benchWeapon_==WPN_SHOTGUN?"Schrotflinte / 12 Gauge":"MP / 9 mm",kWhite);
   bool queued=session_ && session_->Ready() && session_->State().phase!=Phase::Waiting && session_->State().phase!=Phase::Hiding;
   ui_.Text(FONT_NORMAL,ui_.S(x),ui_.S(118),queued?"Änderungen gelten ab der nächsten Runde.":"Dein Build wird vor Beginn der Jagd angelegt.",queued?theme::Accent:theme::Dim);
   Rect inspect=R(x,155,rw,H-505);
@@ -1979,7 +1981,7 @@ void Game::DrawWorkbench() {
   benchMouse_=mouse;
   ui_.Text(FONT_SMALL,ui_.S(W-44),ui_.S(158),"Zum Drehen mit der Maus ziehen",theme::Dim,ALIGN_RIGHT);
   ui_.Panel(R(x,H-334,rw,184),ui_.S(18),1,Color::Hex(0x0c151d,225));
-  ui_.Label(ui_.S(x+20),ui_.S(H-318),WeaponSlotName(benchSlot_),theme::Accent);
+  ui_.Label(ui_.S(x+20),ui_.S(H-318),WeaponSlotName(benchSlot_,benchWeapon_),theme::Accent);
   int count=WeaponPartCount(benchSlot_), selected=WeaponPart(build,benchSlot_); float bw=(rw-40-(count-1)*8)/count;
   const char* description=WeaponPartDescription(benchWeapon_,benchSlot_,selected);
   Color descColor=theme::Dim;
@@ -2069,7 +2071,7 @@ void Game::DrawHelp() {
   struct K { std::vector<const char*> keys; const char* what; };
   std::vector<K> common = {{{"W", "A", "S", "D"}, "Laufen"}, {{"Umschalt"}, "Sprinten (Ausdauer)"}, {{"Leertaste"}, "Springen"},
                            {{"Tab"}, "Punktetafel"}, {{"Enter"}, "Chat"}, {{"Esc"}, "Pause"}, {{"F11"}, "Vollbild"}};
-  std::vector<K> hunter = {{{"Maus L"}, "Schießen"}, {{"Maus R"}, "Zielen"}, {{"R"}, "Nachladen"}, {{"1", "2", "3"}, "MP · Schrot · Granate"},
+  std::vector<K> hunter = {{{"Maus L"}, "Schießen"}, {{"Maus R"}, "Zielen"}, {{"R"}, "Nachladen"}, {{"1", "2", "3", "4"}, "Waffen / Granate"},
                            {{"Q"}, "Sonar – verrät nahe Props"}, {{"Strg"}, "Ducken"}};
   std::vector<K> prop = {{{"E"}, "In anvisiertes Objekt verwandeln"}, {{"R"}, "Drehung sperren / lösen"}, {{"F"}, "Zufälliger Taunt (+Punkte)"},
                          {{"T"}, "Taunt-Auswahl"}, {{"Q"}, "Köder platzieren (2×)"}, {{"Strg"}, "Ducken"}};
@@ -2350,7 +2352,7 @@ void Game::DrawHUD() {
         ui_.Text(FONT_LABEL, r.x + r.w - ui_.S(14), r.y + (r.h - ui_.LineHeight(FONT_LABEL)) * 0.5f, hpS, theme::Dim, ALIGN_RIGHT);
       }
     } else if (lp->team == TEAM_HUNTERS) {
-      const WeaponStats wi = GetWeaponStats(lp->weapon,lp->weapon<2?lp->builds[lp->weapon]:0);
+      const WeaponStats wi = GetWeaponStats(lp->weapon,lp->weapon<FIREARM_COUNT?lp->builds[lp->weapon]:0);
       Rect a = {W - ui_.S(24) - ui_.S(320), H - ui_.S(112), ui_.S(320), ui_.S(88)};
       ui_.Panel(a, ui_.S(18));
       ui_.Label(a.x + ui_.S(18), a.y + ui_.S(13), wi.name, kHunter);
@@ -2360,16 +2362,16 @@ void Game::DrawHUD() {
       ui_.Text(FONT_MEDIUM, a.x + a.w - ui_.S(18), a.y + ui_.S(44), mag, theme::Dim, ALIGN_RIGHT);
       ui_.Text(FONT_NUM, a.x + a.w - ui_.S(26) - mw, a.y + ui_.S(26), StrFormat("%d", ammo), ammo == 0 ? kRed : kWhite, ALIGN_RIGHT);
       // Waffenplätze
-      const char* slots[3] = {"1", "2", "3"};
+      const char* slots[WPN_COUNT] = {"1", "2", "3", "4"};
       float sx = a.x + ui_.S(18);
-      for (int i = 0; i < 3; i++) {
+      for (int i = 0; i < WPN_COUNT; i++) {
         bool active = lp->weapon == i;
-        bool avail = i < 2 || lp->ammo[WPN_GRENADE] > 0;
+        bool avail = i < FIREARM_COUNT || lp->ammo[WPN_GRENADE] > 0;
         float kw = ui_.KeyCap(sx, a.y + ui_.S(40), slots[i], ui_.S(24), active ? theme::Accent : (avail ? theme::Dim : theme::Faint));
         if (active) ui_.Rect_({sx, a.y + ui_.S(70), kw, ui_.S(3)}, theme::Accent, ui_.S(1.5f));
         sx += kw + ui_.S(6);
       }
-      ui_.Text(FONT_SMALL, sx + ui_.S(4), a.y + ui_.S(43), StrFormat("Granaten %d", lp->ammo[WPN_GRENADE]), theme::Dim);
+      ui_.Text(FONT_SMALL, a.x + a.w - ui_.S(18), a.y - ui_.S(77), "1 MP · 2 Schrot · 3 Pistole · 4 Granate", theme::Dim, ALIGN_RIGHT);
       if (lp->reloadTimer > 0) {
         float f = 1.0f - lp->reloadTimer / std::max(0.01f, lp->reloadDuration);
         Rect rb = {a.x + ui_.S(18), a.y + a.h - ui_.S(10), a.w - ui_.S(36), ui_.S(4)};
@@ -2544,9 +2546,10 @@ void Game::Autopilot() {
   hostSetup_ = false;
   frames(45);
   Shot("setup");
-  u16 savedBuilds[2]; memcpy(savedBuilds,cfg_.builds,sizeof(savedBuilds));
+  u16 savedBuilds[FIREARM_COUNT]; memcpy(savedBuilds,cfg_.builds,sizeof(savedBuilds));
   workbenchOpen_=true; cfg_.builds[0]=WeaponPreset(0,2); frames(3); Shot("workbench_smg");
   benchWeapon_=1; benchSlot_=WS_MAGAZINE; cfg_.builds[1]=WeaponPreset(1,3); frames(3); Shot("workbench_shotgun");
+  benchWeapon_=WPN_PISTOL; benchSlot_=WS_OPTIC; cfg_.builds[WPN_PISTOL]=WeaponPreset(WPN_PISTOL,2); frames(3); Shot("workbench_pistol");
   workbenchOpen_=false; benchWeapon_=0; memcpy(cfg_.builds,savedBuilds,sizeof(savedBuilds));
   screen_ = Screen::Join;
   frames(45);
@@ -2575,7 +2578,7 @@ void Game::Autopilot() {
     Player& player=sampleSim.players[session_->LocalId()]; Player saved=player;
     float oldTimer=sampleSim.phaseTimer, oldYaw=yaw_, oldPitch=pitch_;
     Phase oldPhase=sampleSim.phase; auto oldCmd=session_->makeCmd;
-    u16 oldBuilds[2]; memcpy(oldBuilds,cfg_.builds,sizeof(oldBuilds));
+    u16 oldBuilds[FIREARM_COUNT]; memcpy(oldBuilds,cfg_.builds,sizeof(oldBuilds));
     u16 sampleButtons=0;
     session_->makeCmd=[&](){ UserCmd c; c.yaw=yaw_; c.pitch=pitch_; c.weapon=weapon_; c.buttons=sampleButtons; memcpy(c.builds,cfg_.builds,sizeof(c.builds)); return c; };
     player.alive=true; player.team=TEAM_HUNTERS; player.propType=-1; player.ms.pos={0,0,8}; player.ms.vel={};
@@ -2592,6 +2595,15 @@ void Game::Autopilot() {
     player.ammo[1]=0; sampleButtons=BTN_RELOAD; frames(1); sampleButtons=0; frames(40); Shot("reload_shotgun_shell");
     frames(60); sampleButtons=BTN_FIRE; frames(18); Shot("shotgun_pump");
     sampleButtons=0; frames(4);
+    weapon_=WPN_PISTOL; cfg_.builds[WPN_PISTOL]=0; player.builds[WPN_PISTOL]=0;
+    player.ammo[WPN_PISTOL]=15; frames(45); Shot("pistol_hip");
+    sampleButtons=BTN_AIM; frames(60); Shot("pistol_iron");
+    cfg_.builds[WPN_PISTOL]=WeaponPreset(WPN_PISTOL,3); player.builds[WPN_PISTOL]=cfg_.builds[WPN_PISTOL];
+    frames(30); Shot("pistol_reflex");
+    sampleButtons=0; frames(40); player.ammo[WPN_PISTOL]=1;
+    sampleButtons=BTN_FIRE; frames(1); sampleButtons=0; frames(20); Shot("pistol_empty");
+    sampleButtons=BTN_RELOAD; frames(1); sampleButtons=0; frames(25); Shot("pistol_reload_remove");
+    frames(34); Shot("pistol_reload_insert"); frames(60); Shot("pistol_ready");
     player=saved; sampleSim.phase=oldPhase; sampleSim.phaseTimer=oldTimer; yaw_=oldYaw; pitch_=oldPitch;
     memcpy(cfg_.builds,oldBuilds,sizeof(oldBuilds)); session_->makeCmd=oldCmd;
   }

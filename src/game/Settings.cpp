@@ -46,8 +46,8 @@ void Settings::Load(const std::string& path) {
   i("mode", match.mode);
   s("lastServer", lastServer);
   s("serverName", serverName);
-  for (int w = 0; w < 2; w++) {
-    int build = 0; i(w ? "buildShotgun" : "buildSMG", build);
+  for (int w = 0; w < FIREARM_COUNT; w++) {
+    int build = 0; i(w == WPN_PISTOL ? "buildPistol" : w == WPN_SHOTGUN ? "buildShotgun" : "buildSMG", build);
     builds[w] = ValidateWeaponBuild(w, (u16)build);
   }
   sensitivity = Clamp(sensitivity, 0.1f, 5.0f);
@@ -71,6 +71,6 @@ void Settings::Save(const std::string& path) const {
   t += "lastServer=" + lastServer + "\n";
   t += StrFormat("mode=%d\n", match.mode);
   t += "serverName=" + serverName + "\n";
-  t += StrFormat("buildSMG=%u\nbuildShotgun=%u\n", builds[0], builds[1]);
+  t += StrFormat("buildSMG=%u\nbuildShotgun=%u\nbuildPistol=%u\n", builds[0], builds[1], builds[2]);
   WriteFileText(path, t);
 }

@@ -592,22 +592,6 @@ Buf Ambience(bool outdoor) {
     b[i] = f1.Run(Noise()) * 0.5f * gust + f2.Run(Noise()) * 0.15f * gust;
     if (!outdoor) b[i] += (sinf(TAU * 50.0f * t) * 0.02f + sinf(TAU * 100.0f * t) * 0.012f);
   }
-  if (outdoor) {
-    for (int k = 0; k < 7; k++) {
-      float at = g_rng.Range(0.3f, len - 0.6f);
-      Buf chirp = Make(0.35f);
-      float ph = 0;
-      float base = g_rng.Range(2600.0f, 4200.0f);
-      for (size_t i = 0; i < chirp.size(); i++) {
-        float t = T(i);
-        int syl = (int)(t / 0.07f);
-        float u = fmodf(t, 0.07f) / 0.07f;
-        ph += (base + 900.0f * sinf(u * PI) * (syl % 2 ? -1 : 1)) / SR;
-        chirp[i] = SinC(ph) * sinf(u * PI) * 0.15f;
-      }
-      Mix(b, chirp, at);
-    }
-  }
   // nahtlose Schleife: Ende in den Anfang überblenden
   size_t n = (size_t)(len * SR), x = (size_t)(xf * SR);
   for (size_t i = 0; i < x; i++) {
@@ -664,6 +648,22 @@ static std::vector<Buf> MakeBaseSounds() {
   std::vector<Buf> s(SND_COUNT);
   s[SND_SMG] = Gunshot(false);
   s[SND_SHOTGUN] = Gunshot(true);
+  {
+    Buf pistol=Make(.40f);
+    Mix(pistol,NoiseHit(.12f,4800,48,500),0,.65f);
+    Mix(pistol,Thump(.15f,210,85,32),0,.80f);
+    Mix(pistol,Click(2400,.012f),.045f,.22f);
+    Normalize(pistol,.82f); Fade(pistol,.001f,.045f);
+    s[SND_PISTOL]=pistol;
+    Biquad low; low.LP(1500);
+    for(float& sample:pistol) sample=low.Run(sample)*.50f;
+    s[SND_PISTOL_SUPPRESSED]=pistol;
+    Buf reload=Make(1.45f);
+    Mix(reload,Click(1800,.04f),.09f,.6f);
+    Mix(reload,Click(2700,.04f),.87f,.8f);
+    Mix(reload,Click(3300,.025f),1.26f,.7f);
+    Fade(reload,.002f,.03f); s[SND_RELOAD_PISTOL]=reload;
+  }
   {
     Buf e = Make(0.08f);
     Mix(e, Click(3500, 0.01f), 0);
@@ -869,6 +869,7 @@ static SoundVariations MakeSoundVariations() {
     return sounds;
   }
   for (int id : {SND_SMG, SND_RELOAD_SMG, SND_RELOAD_SHOTGUN, SND_SWITCH, SND_SHELL, SND_SMG_SUPPRESSED,
+                 SND_PISTOL, SND_PISTOL_SUPPRESSED, SND_RELOAD_PISTOL,
                  SND_IMPACT_WALL, SND_IMPACT_WOOD, SND_IMPACT_METAL, SND_IMPACT_GLASS}) sounds[id].clear();
   sounds[SND_EMPTY][0] = recordings.at("empty");
   for (int v = 0; v < 3; v++) {
@@ -884,6 +885,20 @@ static SoundVariations MakeSoundVariations() {
     const Buf& unload = recordings.at(StrFormat("unload_%d", v));
     const Buf& load = recordings.at(StrFormat("load_%d", v));
     const Buf& latch = recordings.at(StrFormat("switch_%d", v % 2));
+    // Short single-shot design, layered from the supplied recordings and a dry low end.
+    Buf pistol=Make(.40f);
+    Mix(pistol,recordings.at("smg_shot"),0,.72f);
+    for(size_t i=0;i<pistol.size();i++) pistol[i]*=expf(-T(i)*(7.0f+v));
+    Mix(pistol,Thump(.14f,220+v*8.0f,90,34),0,.36f);
+    Mix(pistol,latch,.045f,.10f);
+    Normalize(pistol,.82f); Fade(pistol,.001f,.045f);
+    Buf muted=pistol; Biquad pistolLow; pistolLow.LP(1500);
+    for(float& sample:muted) sample=pistolLow.Run(sample)*.50f;
+    sounds[SND_PISTOL].push_back(std::move(pistol));
+    sounds[SND_PISTOL_SUPPRESSED].push_back(std::move(muted));
+    Buf pistolReload=Make(1.45f);
+    Mix(pistolReload,unload,.09f,.7f); Mix(pistolReload,load,.87f,.8f); Mix(pistolReload,latch,1.26f,.7f);
+    Fade(pistolReload,.002f,.03f); sounds[SND_RELOAD_PISTOL].push_back(std::move(pistolReload));
     Buf shell = Make(.22f); Mix(shell, load, 0, .7f); Mix(shell, latch, .10f, .25f);
     Fade(shell,.002f,.025f); sounds[SND_SHELL].push_back(std::move(shell));
     Buf reload = Make(1.9f);
@@ -979,9 +994,22 @@ int RunSoundTests(const std::string& previewDir) {
     montage.resize(montage.size() + (size_t)(.35f * SR), 0);
   }
   bool reloads = true;
-  for (int id : {SND_RELOAD_SMG,SND_RELOAD_SHOTGUN}) for (const Buf& b : sounds[id])
-    reloads &= fabsf((float)b.size()/SR - (id == SND_RELOAD_SMG ? 1.9f : 2.4f)) < .001f;
+  for (int id : {SND_RELOAD_SMG,SND_RELOAD_SHOTGUN,SND_RELOAD_PISTOL}) for (const Buf& b : sounds[id])
+    reloads &= fabsf((float)b.size()/SR - (id == SND_RELOAD_PISTOL ? 1.45f : id == SND_RELOAD_SMG ? 1.9f : 2.4f)) < .001f;
   check(reloads, "Aufgenommene Nachladegeräusche passen zu den Waffen-Timern");
+  bool pistol=sounds[SND_PISTOL].size()==3 && sounds[SND_PISTOL_SUPPRESSED].size()==3;
+  for(int v=0;v<3 && pistol;v++) {
+    double loud=0,quiet=0;
+    for(float s:sounds[SND_PISTOL][v]) loud+=s*s;
+    for(float s:sounds[SND_PISTOL_SUPPRESSED][v]) quiet+=s*s;
+    pistol &= loud>0 && quiet>0 && quiet<loud*.5 && sounds[SND_PISTOL][v]!=sounds[SND_SMG][v];
+  }
+  check(pistol,"Pistole besitzt drei eigene Schussvarianten mit leiseren Schalldämpfer-Versionen");
+  if(!previewDir.empty()) {
+    check(WritePreviewWav(dir/"pistol.wav",sounds[SND_PISTOL][0]) &&
+          WritePreviewWav(dir/"pistol_suppressed.wav",sounds[SND_PISTOL_SUPPRESSED][0]) &&
+          WritePreviewWav(dir/"outdoor.wav",sounds[SND_AMB_OUTDOOR][0]),"Pistolen- und Außenatmosphäre-Hörprobe exportiert");
+  }
   if (!previewDir.empty()) check(WritePreviewWav(dir / "taunts_preview.wav",montage), "Taunt-Hörprobe exportiert");
   LOG("Soundtest beendet: %d Fehler", fails);
   return fails;

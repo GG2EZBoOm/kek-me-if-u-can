@@ -44,7 +44,66 @@ void Grip(MeshBuilder& b,bool wood) {
   b.Box({-.005f,-.069f,-.055f},{.005f,-.02f,-.049f});
   b.Push(RotationX(-.20f)); b.Box({-.003f,-.055f,-.025f},{.003f,-.018f,-.019f}); b.Pop();
 }
+void PistolFrame(MeshBuilder& b) {
+  Paint(b,MAT_PLASTIC,0x30383c);
+  ShapedBody(b,{{-.146f,.018f,-.017f,.014f},{-.130f,.024f,-.020f,.014f},
+    {.043f,.024f,-.020f,.014f},{.065f,.018f,-.013f,.014f}});
+  // Angled grip, with the magazine seated inside it.
+  b.Push(Translation({0,-.018f,.029f})*RotationX(-.22f));
+  ShapedBody(b,{{-.025f,.017f,-.112f,0},{-.018f,.023f,-.114f,0},
+    {.025f,.023f,-.114f,0},{.033f,.015f,-.107f,-.003f}});
+  b.Pop();
+  // Open trigger guard and a separate trigger blade/safety.
+  Paint(b,MAT_PLASTIC,0x20282d);
+  b.Box({-.009f,-.062f,-.072f},{.009f,-.055f,.013f});
+  b.Box({-.009f,-.055f,-.072f},{.009f,-.012f,-.065f});
+  Paint(b,MAT_METAL,0x4a535b);
+  b.Push(RotationX(-.24f)); b.Box({-.004f,-.051f,-.030f},{.004f,-.012f,-.024f}); b.Pop();
+  Paint(b,MAT_PLASTIC,0x13191c); b.Box({-.0015f,-.044f,-.033f},{.0015f,-.025f,-.029f});
+  Paint(b,MAT_METAL,0x68737a);
+  for(float x:{-.025f,.025f}) for(float z:{-.043f,.020f}) b.CylinderX({x,-.005f,z},.003f,.002f,12);
+  Paint(b,MAT_METAL,0x181e23);
+  b.Box({-.029f,-.006f,-.014f},{-.025f,.003f,.021f}); // slide stop
+  b.Box({-.026f,-.038f,.003f},{-.023f,-.027f,.014f}); // magazine release
+  for(int i=0;i<3;i++) b.Box({-.020f,-.023f,-.125f+i*.015f},{.020f,-.017f,-.119f+i*.015f});
+}
+void PistolSlide(MeshBuilder& b) {
+  Paint(b,MAT_METAL,0x555f68);
+  ShapedBody(b,{{-.167f,.017f,.012f,.044f},{-.159f,.023f,.010f,.051f},
+    {.052f,.023f,.010f,.051f},{.061f,.018f,.015f,.043f}});
+  Paint(b,MAT_PLAIN,0x11181e);
+  b.Box({.0228f,.021f,-.047f},{.0234f,.044f,-.004f});
+  b.Box({.005f,.0508f,-.047f},{.022f,.0514f,-.004f});
+  Paint(b,MAT_METAL,0x78858e);
+  b.Box({.0235f,.023f,-.045f},{.024f,.040f,-.007f}); // chamber visible through port
+  Paint(b,MAT_PLAIN,0x222c34);
+  for(float x:{-.0233f,.0233f}) for(int i=0;i<7;i++) {
+    float z=.005f+i*.0065f;
+    b.Box({x-.0005f,.017f,z},{x+.0005f,.043f,z+.0025f});
+  }
+  Paint(b,MAT_METAL,0x171e25);
+  b.Box({-.006f,.050f,-.148f},{.006f,.062f,-.138f});
+  Paint(b,MAT_PLAIN,0xe2e6dc); b.Box({-.0017f,.059f,-.1379f},{.0017f,.062f,-.1374f});
+}
+void PistolOptic(MeshBuilder& b,int n) {
+  Paint(b,MAT_METAL,0x171e25);
+  if(n==0) {
+    b.Box({-.019f,.050f,.037f},{-.0045f,.065f,.049f});
+    b.Box({.0045f,.050f,.037f},{.019f,.065f,.049f});
+    Paint(b,MAT_PLAIN,0xe2e6dc);
+    for(float x:{-.011f,.011f}) b.Box({x-.002f,.059f,.0491f},{x+.002f,.063f,.0496f});
+    return;
+  }
+  b.Box({-.021f,.050f,-.016f},{.021f,.059f,.032f});
+  b.Box({-.022f,.057f,-.008f},{-.018f,.105f,.001f});
+  b.Box({.018f,.057f,-.008f},{.022f,.105f,.001f});
+  b.Box({-.022f,.102f,-.008f},{.022f,.107f,.001f});
+  b.CylinderX({.024f,.064f,.017f},.006f,.005f,12);
+  Paint(b,MAT_PLAIN,0xff463a); b.Emissive(.9f);
+  b.Sphere({0,.084f,.002f},.0015f,10,6); b.Emissive(0);
+}
 void Body(MeshBuilder& b,int w) {
+  if(w==WPN_PISTOL) { PistolFrame(b); return; }
   Paint(b,MAT_METAL,0x41484e);
   ShapedBody(b,{{-.20f,.026f,-.014f,.041f},{-.185f,.031f,-.014f,.050f},{.060f,.031f,-.014f,.050f},{.075f,.025f,-.014f,.040f}});
   Paint(b,MAT_PLASTIC,0x262b2e);
@@ -106,6 +165,12 @@ void Optic(MeshBuilder& b,int n) {
 }
 void Barrel(MeshBuilder& b,int w,int n) {
   float end=WeaponMuzzleZ(w,(u16)(n<<(WS_BARREL*2))), start=-.19f;
+  if(w==WPN_PISTOL) {
+    Paint(b,MAT_METAL,0x707b83);
+    TubeZ(b,{0,.030f,(end-.025f)*.5f},.010f,.0047f,-.025f-end);
+    Paint(b,MAT_METAL,0x20282f); b.CylinderZ({0,.007f,end+.012f},.004f,.012f,16);
+    return;
+  }
   Paint(b,MAT_METAL,0x262f36);
   TubeZ(b,{0,.025f,(start+end)*.5f},w==WPN_SMG?.012f:.018f,w==WPN_SMG?.006f:.010f,start-end);
   if(w==WPN_SMG) {
@@ -125,6 +190,14 @@ void Barrel(MeshBuilder& b,int w,int n) {
 void Muzzle(MeshBuilder& b,int w,int n) {
   // Local origin at the selected barrel tip; no duplicate barrel below attachments.
   Paint(b,MAT_METAL,0x232c32);
+  if(w==WPN_PISTOL) {
+    if(n==0) return;
+    float len=n==2?.15f:.035f, radius=n==2?.019f:.015f;
+    TubeZ(b,{0,.030f,-len*.5f},radius,.0055f,len,32);
+    Paint(b,MAT_METAL,0x4d5960);
+    for(int i=0;i<(n==2?6:2);i++) TubeZ(b,{0,.030f,-.008f-i*len/(n==2?7:3)},radius+.001f,radius,.002f,24);
+    return;
+  }
   float len=n==2?(w==0?.19f:.24f):n==1?.045f:.02f, radius=n==2?(w==0?.026f:.041f):.020f;
   TubeZ(b,{0,.025f,-len*.5f},radius,w==0?.007f:.011f,len,32);
   Paint(b,MAT_METAL,n==2?0x4e5457:0x75808a);
@@ -135,6 +208,7 @@ void Muzzle(MeshBuilder& b,int w,int n) {
   }
 }
 void Stock(MeshBuilder& b,int w,int n) {
+  if(w==WPN_PISTOL) return;
   Paint(b,w==1&&n==0?MAT_WOOD:MAT_PLASTIC,w==1&&n==0?0x785235:n==2?0x626653:0x30383c);
   if(n==1) {
     b.Box({-.012f,.003f,.074f},{.012f,.018f,.292f});
@@ -151,6 +225,16 @@ void Stock(MeshBuilder& b,int w,int n) {
 }
 void Magazine(MeshBuilder& b,int w,int n) {
   Paint(b,MAT_METAL,0x262e35);
+  if(w==WPN_PISTOL) {
+    float len=n==2?.151f:n==1?.106f:.117f;
+    b.Push(Translation({0,-.018f,.029f})*RotationX(-.22f));
+    b.Box({-.015f,-len,-.018f},{.015f,-.005f,.023f});
+    Paint(b,MAT_PLASTIC,0x161e24);
+    b.Box({-.025f,-len-.007f,-.025f},{.025f,-len+.002f,.033f});
+    Paint(b,MAT_PLAIN,0x080c10);
+    for(int i=0;i<6;i++) for(float x:{-.0155f,.0155f}) b.CylinderX({x,-.025f-i*.015f,.005f},.002f,.001f,8);
+    b.Pop(); return;
+  }
   if(w==1) {
     float len=n==1?.26f:n==2?.48f:.37f;
     b.CylinderZ({0,-.019f,-.17f-len*.5f},.013f,len,20);
@@ -173,6 +257,17 @@ void Magazine(MeshBuilder& b,int w,int n) {
   }
 }
 void Foregrip(MeshBuilder& b,int w,int n) {
+  if(w==WPN_PISTOL) {
+    b.Push(Translation({0,-.018f,.029f})*RotationX(-.22f));
+    Paint(b,n==1?MAT_LEATHER:MAT_PLASTIC,n==1?0x3e4843:n==2?0x655a49:0x252e33);
+    float wide=n==2?.0235f:n==1?.026f:.024f;
+    for(float x:{-wide,wide}) {
+      b.Box({x-.001f,-.105f,-.016f},{x+.001f,-.024f,.026f});
+      Paint(b,MAT_PLAIN,0x172025);
+      for(int i=0;i<9;i++) b.Box({x-.0013f,-.096f+i*.008f,-.012f},{x+.0013f,-.094f+i*.008f,.022f});
+    }
+    b.Pop(); return;
+  }
   if(w==1) {
     Paint(b,n==0?MAT_WOOD:MAT_PLASTIC,n==0?0x805735:n==1?0x42494c:0x2d3539);
     TubeZ(b,{0,-.019f,-.345f},.032f,.014f,.14f,20);
@@ -191,27 +286,33 @@ void Foregrip(MeshBuilder& b,int w,int n) {
 }
 }
 
-WeaponPose MakeWeaponPose(int w,u16 build,float remaining,float duration,float fire) {
+WeaponPose MakeWeaponPose(int w,u16 build,float remaining,float duration,float fire,bool empty) {
   WeaponPose p;
   p.leftHand={0,-.05f,w==WPN_SMG?-.25f:-.345f};
   if(WeaponPart(build,WS_GRIP)==1) p.leftHand.y-=.03f;
+  if(w==WPN_PISTOL) p.leftHand={-.037f,-.057f,.017f};
   if(w==WPN_SHOTGUN) {
     float t=GetWeaponStats(w,build).interval-fire;
     p.pump=fire>0 ? std::max(0.0f,sinf(Saturate((t-.10f)/.42f)*PI))*.085f : 0;
     p.leftHand.z+=p.pump;
+  } else if(w==WPN_PISTOL) {
+    float elapsed=GetWeaponStats(w,build).interval-fire;
+    p.bolt=empty?.033f:fire>0?std::max(0.0f,sinf(Saturate(elapsed/.09f)*PI))*.033f:0;
   } else p.bolt=fire>0 ? Saturate(fire/.085f)*.04f : 0;
   if(remaining<=0 || duration<=0) return p;
   float t=Saturate(1-remaining/duration);
   p.reload=std::min(Saturate(t/.12f),Saturate((1-t)/.14f));
-  if(w==WPN_SMG) {
+  if(w==WPN_SMG || w==WPN_PISTOL) {
     // Left hand removes the old magazine, travels to the pouch, then seats the replacement.
     float drop=t<.52f?Saturate((t-.16f)/.18f):1-Saturate((t-.56f)/.20f);
     p.magazineOffset={-.035f*drop,-.30f*drop,.04f*drop}; p.magazineRoll=-.35f*drop;
     p.magazineVisible=!(t>.35f&&t<.52f);
     Vec3 magHand=p.magazineOffset+Vec3(-.025f,-.12f,-.11f);
+    if(w==WPN_PISTOL) magHand=p.magazineOffset+Vec3(-.022f,-.125f,.048f);
     float reach=t<.16f?Saturate(t/.16f):1-Saturate((t-.79f)/.15f);
     p.leftHand=Lerp(p.leftHand,magHand,reach);
-    p.bolt=std::max(p.bolt,sinf(Saturate((t-.79f)/.13f)*PI)*.055f);
+    if(w==WPN_PISTOL) p.bolt=empty?.033f*(1-Saturate((t-.85f)/.07f)):0;
+    else p.bolt=std::max(p.bolt,sinf(Saturate((t-.79f)/.13f)*PI)*.055f);
   } else {
     float elapsed=duration-remaining;
     float cycle=Saturate(elapsed/.35f);
@@ -225,15 +326,18 @@ WeaponPose MakeWeaponPose(int w,u16 build,float remaining,float duration,float f
 }
 void WeaponModels::Init() {
   MeshData d; MeshBuilder b(&d);
-  for(int w=0;w<2;w++) {
+  for(int w=0;w<FIREARM_COUNT;w++) {
     Body(b,w); body_[w].Upload(d); d.Clear();
-    Paint(b,MAT_METAL,0x444c53);
-    b.Box({.0315f,.004f,-.108f},{.0325f,.027f,-.028f});
-    b.CylinderX({.040f,.016f,-.024f},.006f,.018f,12);
+    if(w==WPN_PISTOL) PistolSlide(b);
+    else {
+      Paint(b,MAT_METAL,0x444c53);
+      b.Box({.0315f,.004f,-.108f},{.0325f,.027f,-.028f});
+      b.CylinderX({.040f,.016f,-.024f},.006f,.018f,12);
+    }
     bolt_[w].Upload(d); d.Clear();
     for(int s=0;s<WS_COUNT;s++) for(int n=0;n<WeaponPartCount(s);n++) {
       switch(s) {
-        case WS_OPTIC: Optic(b,n); break;
+        case WS_OPTIC: if(w==WPN_PISTOL) PistolOptic(b,n); else Optic(b,n); break;
         case WS_BARREL: Barrel(b,w,n); break;
         case WS_MUZZLE: Muzzle(b,w,n); break;
         case WS_STOCK: Stock(b,w,n); break;
@@ -247,20 +351,26 @@ void WeaponModels::Init() {
   Paint(b,MAT_GOLD,0xbca66a); b.CylinderZ({0,0,.028f},.011f,.010f,16); shell_.Upload(d);
 }
 void WeaponModels::Draw(Renderer& r,int w,u16 build,const Mat4& model,float sky,bool vm,const WeaponPose& pose,int selected) const {
-  if(w<0 || w>1) return;
+  if(w<0 || w>=FIREARM_COUNT) return;
   build=ValidateWeaponBuild(w,build);
   DrawItem it; it.model=model; it.sky=sky; it.viewModel=vm; it.castShadow=!vm; it.mesh=&body_[w]; r.Draw(it);
   for(int s=0;s<WS_COUNT;s++) {
     if(vm && s==WS_STOCK) continue;  // shoulder/cheek support sits behind the first-person eye
     int n=WeaponPart(build,s); it.mesh=&parts_[w][s][n]; it.model=model; it.highlight=s==selected?.18f:0;
     if(s==WS_MUZZLE) it.model=model*Translation({0,0,WeaponMuzzleZ(w,(u16)(build&~(3<<(WS_MUZZLE*2))))});
-    if(s==WS_MAGAZINE && w==WPN_SMG) {
+    if(s==WS_OPTIC && w==WPN_PISTOL) it.model=model*Translation({0,0,pose.bolt});
+    if(s==WS_MAGAZINE && w!=WPN_SHOTGUN) {
       if(!pose.magazineVisible) continue;
       it.model=model*Translation(pose.magazineOffset)*RotationZ(pose.magazineRoll);
     }
     if(s==WS_GRIP && w==WPN_SHOTGUN) it.model=model*Translation({0,0,pose.pump});
     r.Draw(it);
   }
-  it.highlight=0; it.mesh=&bolt_[w]; it.model=model*Translation({0,0,w==WPN_SMG?pose.bolt:pose.pump*.6f}); r.Draw(it);
+  it.highlight=0; it.mesh=&bolt_[w]; it.model=model*Translation({0,0,w==WPN_SHOTGUN?pose.pump*.6f:pose.bolt});
+  if(w==WPN_PISTOL) {
+    float length=WeaponPart(build,WS_BARREL)==1?.91f:WeaponPart(build,WS_BARREL)==2?1.135f:1;
+    it.model=it.model*Translation({0,0,.061f})*Scaling({1,1,length})*Translation({0,0,-.061f});
+  }
+  r.Draw(it);
   if(pose.shellVisible) { it.mesh=&shell_; it.model=model*Translation(pose.leftHand+Vec3(.015f,.018f,-.010f))*RotationX(-.2f); r.Draw(it); }
 }
