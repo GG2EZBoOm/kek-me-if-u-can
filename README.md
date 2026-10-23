@@ -165,10 +165,23 @@ KekMeIfYouCanCLI.exe --nettest
 KekMeIfYouCan.exe --gameshot build\game
 ```
 
-`--test` prüft Einladungscodes, Bewegung, Türen und Wegfindung auf allen Karten. Danach spielt es auf jeder Karte ein
-komplettes Bot-Match im Zeitraffer (etwa 1000- bis 2000-fache Echtzeit). `--nettest` testet Server und Client über
-Loopback. `--gameshot` klickt sich automatisch durch Menüs und Spiel und speichert Screenshots, auch vom
-Einladungsmenü. Dabei werden weder der Router noch Discord angesprochen.
+`--test` prüft Einladungscodes, Updater, Bewegung, Türen und Wegfindung auf allen Karten. Danach spielt es auf jeder
+Karte ein komplettes Bot-Match im Zeitraffer (etwa 1000- bis 2000-fache Echtzeit). Zwei Prüfungen gelten der Grafik und
+der Fairness:
+
+- **Flackern:** Kein Flächenpaar darf in derselben Ebene liegen (bis 5 mm Abstand) und dabei unterschiedlich aussehen.
+  Solche Flächen flackern, weil der Tiefenpuffer sie nicht trennen kann.
+- **Blattwerk:** An keiner begehbaren Stelle darf man in Büschen oder Hecken stecken, die nur Optik sind.
+
+`--nettest` testet Server und Client über Loopback. `--gameshot` klickt sich automatisch durch Menüs und Spiel und
+speichert Screenshots, auch vom Einladungsmenü. Dabei werden weder der Router noch Discord angesprochen.
+
+Einzelne Stellen einer Karte rendern (Kamera, Blickpunkt). `--hunters` stellt am Blickpunkt vier Jäger in
+verschiedenen Posen auf:
+
+```bash
+KekMeIfYouCanCLI.exe --shots build\cam --map bundestag --cam -50 0.3 1.6 -50 -0.1 0 --hunters
+```
 
 Das Programmsymbol erzeugt `tools/make_icon.py` (benötigt Pillow) als `res/icon.ico` und `res/icon_1024.png`.
 

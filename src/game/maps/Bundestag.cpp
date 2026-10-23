@@ -145,10 +145,11 @@ class Builder {
     k.FloorFinish(38, -35, 46, 50, GY, MAT_ASPHALT, 0x38393b);
     k.FloorFinish(46, -35, 52, 50, GY, MAT_CONCRETE, 0xa9a59d);
     k.Style(MAT_CONCRETE, 0x9a968e);
-    k.Solid(Vec3(37.8f, GY, -35), Vec3(38.0f, GY + 0.12f, 50));
+    k.Solid(Vec3(37.8f, GY, -35), Vec3(38.0f, GY + 0.12f, -3));  // an der Osttreppe unterbrochen
+    k.Solid(Vec3(37.8f, GY, 3), Vec3(38.0f, GY + 0.12f, 50));
     k.Solid(Vec3(46.0f, GY, -35), Vec3(46.2f, GY + 0.12f, 50));
     k.Style(MAT_PLASTIC, 0xf2f2f2);
-    for (float z = -33; z < 48; z += 6) k.Visual(Vec3(41.9f, GY, z), Vec3(42.1f, GY + 0.005f, z + 3));
+    for (float z = -33; z < 48; z += 6) k.Visual(Vec3(41.9f, GY, z), Vec3(42.1f, GY + 0.012f, z + 3));
 
     // Fernboden, Spree, gegenüberliegendes Ufer
     const u32 farCol = 0x7b8a5e;
@@ -267,9 +268,11 @@ class Builder {
     k.Prop("kuebel", Vec3(-41, GY, -11.5f), 0);
     k.Prop("kuebel", Vec3(-41, GY, 11.5f), 0);
     // Grenzen
-    k.Clip(Vec3(-93, GY, -36), Vec3(-92, 40, 51));
+    // West- und Nordgrenze beginnen an der Vorderkante der Randhecke: Die Heckenkugeln sind nur Optik,
+    // sonst könnten sich Props darin verstecken.
+    k.Clip(Vec3(-93, GY, -36), Vec3(-90.25f, 40, 51));
     k.Clip(Vec3(52, GY, -36), Vec3(53, 40, 51));
-    k.Clip(Vec3(-93, GY, 50), Vec3(53, 40, 51));
+    k.Clip(Vec3(-93, GY, 48.25f), Vec3(53, 40, 51));
     k.Style(MAT_LEAVES, 0x3d6b2a);
     for (float x = -91; x < 52; x += 2.2f) k.ob.Ellipsoid(Vec3(x, GY + 1.0f, 49.3f), Vec3(1.5f, 1.3f, 1.0f), 10, 6);
     for (float z = -34; z < 50; z += 2.2f) k.ob.Ellipsoid(Vec3(-91.3f, GY + 1.0f, z), Vec3(1.0f, 1.3f, 1.5f), 10, 6);
@@ -397,9 +400,10 @@ class Builder {
       k.WallZ(-15.5f, 15.5f, -30, -29, 0, RF, h);
       k.Style(MAT_WOOD, 0x4a3020);
       for (float zc : {-5.0f, 0.0f, 5.0f}) {
-        k.Visual(Vec3(-30.05f, 0, zc - 1.42f), Vec3(-28.95f, 4.3f, zc - 1.3f));
-        k.Visual(Vec3(-30.05f, 0, zc + 1.3f), Vec3(-28.95f, 4.3f, zc + 1.42f));
-        k.Visual(Vec3(-30.05f, 4.2f, zc - 1.42f), Vec3(-28.95f, 4.36f, zc + 1.42f));
+        // 2 cm in die Öffnung vorstehend, damit Rahmen und Laibung nicht in einer Ebene liegen
+        k.Visual(Vec3(-30.05f, 0, zc - 1.42f), Vec3(-28.95f, 4.3f, zc - 1.28f));
+        k.Visual(Vec3(-30.05f, 0, zc + 1.28f), Vec3(-28.95f, 4.3f, zc + 1.42f));
+        k.Visual(Vec3(-30.05f, 4.18f, zc - 1.42f), Vec3(-28.95f, 4.36f, zc + 1.42f));
       }
     }
     // Ost mit Ostportal
@@ -464,26 +468,26 @@ class Builder {
     // -lx Wand (zum Gebäude) mit Türen
     {
       float x0 = std::min(WX(-4.5f), WX(-3.7f)), x1 = std::max(WX(-4.5f), WX(-3.7f));
-      k.WallZ(std::min(WZ(-4.5f), WZ(4.5f)), std::max(WZ(-4.5f), WZ(4.5f)), x0, x1, 0, TOP, holesZ({{-3.5f, -2.3f}}, doors));
+      k.WallZ(std::min(WZ(-4.5f), WZ(4.5f)), std::max(WZ(-4.5f), WZ(4.5f)), x0, x1, 0, TOP - 0.4f, holesZ({{-3.5f, -2.3f}}, doors));
     }
     // +lx Wand mit Fenstern
     {
       float x0 = std::min(WX(3.7f), WX(4.5f)), x1 = std::max(WX(3.7f), WX(4.5f));
       auto h = holesZ({{0.9f, 2.3f}}, wins, true);
-      k.WallZ(std::min(WZ(-4.5f), WZ(4.5f)), std::max(WZ(-4.5f), WZ(4.5f)), x0, x1, 0, TOP, h);
+      k.WallZ(std::min(WZ(-4.5f), WZ(4.5f)), std::max(WZ(-4.5f), WZ(4.5f)), x0, x1, 0, TOP - 0.4f, h);
       for (auto& hh : h) k.Glass(Vec3((x0 + x1) * 0.5f - 0.04f, hh.y0, hh.a0), Vec3((x0 + x1) * 0.5f + 0.04f, hh.y1, hh.a1));
       k.Style(MAT_SANDSTONE, SAND);
     }
     // -lz Wand mit Türen
     {
       float z0 = std::min(WZ(-4.5f), WZ(-3.7f)), z1 = std::max(WZ(-4.5f), WZ(-3.7f));
-      k.WallX(std::min(WX(-3.7f), WX(3.7f)), std::max(WX(-3.7f), WX(3.7f)), z0, z1, 0, TOP, holesX({{-3.5f, -2.3f}}, doors));
+      k.WallX(std::min(WX(-3.7f), WX(3.7f)), std::max(WX(-3.7f), WX(3.7f)), z0, z1, 0, TOP - 0.4f, holesX({{-3.5f, -2.3f}}, doors));
     }
     // +lz Wand mit Fenstern
     {
       float z0 = std::min(WZ(3.7f), WZ(4.5f)), z1 = std::max(WZ(3.7f), WZ(4.5f));
       auto h = holesX({{-0.7f, 0.7f}}, wins, true);
-      k.WallX(std::min(WX(-3.7f), WX(3.7f)), std::max(WX(-3.7f), WX(3.7f)), z0, z1, 0, TOP, h);
+      k.WallX(std::min(WX(-3.7f), WX(3.7f)), std::max(WX(-3.7f), WX(3.7f)), z0, z1, 0, TOP - 0.4f, h);
       for (auto& hh : h) k.Glass(Vec3(hh.a0, hh.y0, (z0 + z1) * 0.5f - 0.04f), Vec3(hh.a1, hh.y1, (z0 + z1) * 0.5f + 0.04f));
       k.Style(MAT_SANDSTONE, SAND);
     }
@@ -540,7 +544,7 @@ class Builder {
     // Kantine / Küche
     k.WallX(15.5f, 29, 3, 3.25f, 0, E0C, {door(22), {17, 20, 0.95f, 2.0f}});
     k.Style(MAT_METAL, 0xb9bdc3);
-    k.Solid(Vec3(17, 0.9f, 2.85f), Vec3(20, 0.95f, 3.4f));
+    k.Solid(Vec3(17, 0.9f, 2.85f), Vec3(20, 0.96f, 3.4f));
 
     // Böden
     k.FloorFinish(-29, -15.5f, -15.5f, 15.5f, 0, MAT_MARBLE, 0xe0dacd);
@@ -708,7 +712,12 @@ class Builder {
         float pa = -PI * 0.5f + s * dphi, pb = pa + dphi, pm = (pa + pb) * 0.5f;
         float La = HallL(pa), Lb = HallL(pb), Lm = HallL(pm);
         if (r0 >= std::max(La, Lb)) continue;
-        float ra = std::min(r1, La + 0.5f), rb = std::min(r1, Lb + 0.5f);
+        // Außenkante genau an der Wand enden lassen – sonst liegt der Teppich auf den Türschwellen und flackert.
+        // Nur Segmente über einer Saalecke brauchen Überstand, damit keine Lücke bleibt.
+        Vec3 wa = HallP(La, pa, 0), wb = HallP(Lb, pb, 0);
+        bool sameWall = fabsf(wa.x - wb.x) < 1e-3f || fabsf(wa.z - wb.z) < 1e-3f;
+        float ext = sameWall ? 0.0f : 0.5f;
+        float ra = std::min(r1, La + ext), rb = std::min(r1, Lb + ext);
         k.Style(MAT_CARPET, ring == 9 ? 0x55607a : 0x5d6987);
         Vec3 I0 = HallP(r0, pa, h), I1 = HallP(r0, pb, h), O0 = HallP(ra, pa, h), O1 = HallP(rb, pb, h);
         k.ob.Quad(I0, O0, O1, I1);
@@ -755,7 +764,7 @@ class Builder {
     k.Solid(Vec3(9.2f, WELL, -5), Vec3(12, -0.4f, 5));
     k.Solid(Vec3(9.2f, WELL, -6), Vec3(12, -0.2f, -5));
     k.Solid(Vec3(9.2f, WELL, 5), Vec3(12, -0.2f, 6));
-    k.FloorFinish(9.2f, -6, 12, 6, -0.399f, MAT_CARPET, 0x3f4862);
+    k.FloorFinish(9.2f, -6, 12, 6, -0.39f, MAT_CARPET, 0x3f4862);
     k.Stairs(Vec3(7.24f, WELL, 0), 0, 4, (-0.4f - WELL) / 7.0f, 7, 0.28f, WELL);
     k.Style(MAT_WOOD, 0x5a3d26);
     k.Solid(Vec3(9.6f, -0.4f, -3.6f), Vec3(10.3f, 0.35f, 3.6f));
@@ -795,7 +804,7 @@ class Builder {
       float zs = (float)s;
       k.Style(MAT_WOOD, 0x6b4a2e);
       k.Solid(Vec3(7.5f, WELL, std::min(zs * 6, zs * 12)), Vec3(12, 0, std::max(zs * 6, zs * 12)));
-      k.FloorFinish(7.5f, std::min(zs * 6, zs * 12), 12, std::max(zs * 6, zs * 12), 0.001f, MAT_CARPET, 0x3f4862);
+      k.FloorFinish(7.5f, std::min(zs * 6, zs * 12), 12, std::max(zs * 6, zs * 12), 0.01f, MAT_CARPET, 0x3f4862);
       k.Stairs(Vec3(8.35f, WELL, zs * 3.76f), s < 0 ? 3 : 2, 1.7f, 0.2025f, 8, 0.28f, WELL);
       k.Style(MAT_WOOD, 0x5a3d26);
       for (float zr : {9.2f, 7.2f}) {
@@ -885,10 +894,7 @@ class Builder {
     slab(-12.6f, 12.6f, 12.6f, 19);
     slab(12.6f, -19, 25.5f, 19);
     slab(25.5f, -15.5f, 29, 15.5f);
-    k.FloorFinish(-25.5f, -20, 25.5f, -19, RF, MAT_TILE, 0xb8b4ac);
-    k.FloorFinish(-25.5f, 19, 25.5f, 20, RF, MAT_TILE, 0xb8b4ac);
-    k.FloorFinish(-30, -15.5f, -29, 15.5f, RF, MAT_TILE, 0xb8b4ac);
-    k.FloorFinish(29, -15.5f, 30, 15.5f, RF, MAT_TILE, 0xb8b4ac);
+    // Die Mauerkronen hinter der Brüstung bleiben Sandstein (eine Fliesenauflage darauf würde flackern)
   }
 
   void Dome() {

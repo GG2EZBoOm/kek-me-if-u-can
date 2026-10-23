@@ -7,6 +7,8 @@
 #include "game/Taunts.h"
 #include "game/Updater.h"
 #include <chrono>
+#include <map>
+#include <tuple>
 #include <thread>
 
 static double Now() {
@@ -62,6 +64,224 @@ static void CheckDoors(const World& w, const NavGrid& nav, int& fails) {
     }
   }
   Check(bad == 0, StrFormat("%d Türen passierbar (%d blockiert)", (int)w.doors.size() - bad, bad), fails);
+}
+
+// Z-Fighting: Dreiecke in (fast) derselben Ebene, gleich ausgerichtet, überlappend, aber verschieden aussehend
+// (Farbe oder Material) flackern, weil der Tiefenpuffer sie nicht sicher trennen kann – aus der Entfernung schon
+// bei wenigen Millimetern Abstand.
+static float Cross2(Vec2 a, Vec2 b) { return a.x * b.y - a.y * b.x; }
+
+// Schnittfläche zweier gegen den Uhrzeigersinn orientierter Dreiecke (Sutherland-Hodgman), dazu ihr Schwerpunkt
+static float OverlapArea(const Vec2 a[3], const Vec2 b[3], Vec2* centroid) {
+  std::vector<Vec2> poly(a, a + 3);
+  for (int e = 0; e < 3 && !poly.empty(); e++) {
+    Vec2 p0 = b[e], p1 = b[(e + 1) % 3];
+    std::vector<Vec2> out;
+    for (size_t i = 0; i < poly.size(); i++) {
+      Vec2 p = poly[i], q = poly[(i + 1) % poly.size()];
+      float sp = Cross2(p1 - p0, p - p0), sq = Cross2(p1 - p0, q - p0);
+      if (sp >= 0) out.push_back(p);
+      if ((sp >= 0) != (sq >= 0)) out.push_back(p + (q - p) * (sp / (sp - sq)));
+    }
+    poly.swap(out);
+  }
+  float area = 0;
+  Vec2 c;
+  for (size_t i = 0; i < poly.size(); i++) {
+    float cr = Cross2(poly[i], poly[(i + 1) % poly.size()]);
+    area += cr;
+    c += (poly[i] + poly[(i + 1) % poly.size()]) * cr;
+  }
+  if (centroid && fabsf(area) > 1e-9f) *centroid = c / (3.0f * area);
+  return fabsf(area) * 0.5f;
+}
+
+static void CheckZFighting(const World& w, int& fails) {
+  const int kTolMm = 5;  // so nah beieinander flackern Flächen aus der Entfernung
+  const MeshData& m = w.opaque;
+  struct Tri {
+    Vec2 p[3];
+    float mnU, mxU, mnV, mxV;
+    u32 look;  // Farbe + Material
+    Vec3 u, v, n;
+    float d;
+    int group = 0;
+    Vec3 ps[3];
+  };
+  struct Key {
+    int nx, ny, nz, d;
+    bool operator<(const Key& o) const { return std::tie(nx, ny, nz, d) < std::tie(o.nx, o.ny, o.nz, o.d); }
+  };
+  std::map<Key, std::vector<Tri>> groups;
+  for (size_t i = 0; i + 2 < m.indices.size(); i += 3) {
+    const Vertex& a = m.verts[m.indices[i]];
+    const Vertex& b = m.verts[m.indices[i + 1]];
+    const Vertex& c = m.verts[m.indices[i + 2]];
+    Vec3 cr = Cross(b.pos - a.pos, c.pos - a.pos);
+    if (Length(cr) < 1e-5f) continue;
+    Tri t;
+    t.n = Normalize(cr);
+    t.d = Dot(t.n, a.pos);
+    Key k{(int)lroundf(t.n.x * 200), (int)lroundf(t.n.y * 200), (int)lroundf(t.n.z * 200), (int)lroundf(t.d * 1000)};
+    t.ps[0] = a.pos;
+    t.ps[1] = b.pos;
+    t.ps[2] = c.pos;
+    t.look = (u32)a.color[0] | (u32)a.color[1] << 8 | (u32)a.color[2] << 16 | (u32)a.aux[0] << 24;
+    groups[k].push_back(t);
+  }
+  // Unsichtbar: Stelle steckt in einer festen Wand/im Boden, oder Unterseite knapp über dem Boden (keine Kamera kommt darunter)
+  // Projektion in die gemeinsame Ebene der Gruppe (gerundete Normale)
+  for (auto& g : groups) {
+    Vec3 nq = Normalize(Vec3((float)g.first.nx, (float)g.first.ny, (float)g.first.nz));
+    Vec3 up = fabsf(nq.y) < 0.9f ? Vec3(0, 1, 0) : Vec3(1, 0, 0);
+    Vec3 u = Normalize(Cross(up, nq)), v = Cross(nq, u);
+    for (Tri& t : g.second) {
+      t.u = u;
+      t.v = v;
+      for (int j = 0; j < 3; j++) t.p[j] = Vec2(Dot(t.ps[j], u), Dot(t.ps[j], v));
+      // Projektion kann die Umlaufrichtung nicht umkehren (gleiche Halbebene), sicherheitshalber prüfen
+      if (Cross2(t.p[1] - t.p[0], t.p[2] - t.p[0]) < 0) std::swap(t.p[1], t.p[2]);
+      t.mnU = std::min({t.p[0].x, t.p[1].x, t.p[2].x});
+      t.mxU = std::max({t.p[0].x, t.p[1].x, t.p[2].x});
+      t.mnV = std::min({t.p[0].y, t.p[1].y, t.p[2].y});
+      t.mxV = std::max({t.p[0].y, t.p[1].y, t.p[2].y});
+    }
+  }
+  std::vector<int> ids;
+  bool dump = getenv("KEK_ZF_DUMP") != nullptr;
+  auto hidden = [&](Vec3 p, Vec3 n) {
+    if (n.y < -0.5f && p.y < 0.35f) return true;
+    Vec3 q = p + n * 0.03f;
+    w.Query(q - Vec3(0.01f, 0.01f, 0.01f), q + Vec3(0.01f, 0.01f, 0.01f), ids);
+    for (int id : ids) {
+      const Collider& c = w.cols[id];
+      if (!(c.flags & COL_BULLET) || (c.flags & COL_GLASS) || c.prop >= 0) continue;
+      Vec3 l = c.box.ToLocal(q);
+      if (fabsf(l.x) < c.box.h.x && fabsf(l.y) < c.box.h.y && fabsf(l.z) < c.box.h.z) return true;
+    }
+    return false;
+  };
+  std::vector<Vec3> sites;
+  std::vector<std::string> info;
+  int pairs = 0;
+  // Sweep über die nach mnU sortierten Dreiecke; mixed = nur Paare aus verschiedenen Gruppen (Nachbarebenen)
+  auto sweep = [&](std::vector<const Tri*> list, bool mixed) {
+    std::sort(list.begin(), list.end(), [](const Tri* a, const Tri* b) { return a->mnU < b->mnU; });
+    for (size_t i = 0; i < list.size(); i++)
+      for (size_t j = i + 1; j < list.size() && list[j]->mnU < list[i]->mxU; j++) {
+        const Tri& x = *list[i];
+        const Tri& y = *list[j];
+        if (mixed && x.group == y.group) continue;
+        if (x.look == y.look || x.mxV <= y.mnV || y.mxV <= x.mnV) continue;
+        Vec2 c2;
+        if (OverlapArea(x.p, y.p, &c2) < 0.0004f) continue;  // mindestens 2 × 2 cm
+        Vec3 c = x.u * c2.x + x.v * c2.y + x.n * x.d;
+        if (hidden(c, x.n)) continue;
+        pairs++;
+        bool known = false;
+        for (const Vec3& s : sites) known |= Length(s - c) < 1.5f;
+        if (!known) {
+          if (dump)
+            LOG("      A (%.3f %.3f %.3f) (%.3f %.3f %.3f) (%.3f %.3f %.3f) | B (%.3f %.3f %.3f) (%.3f %.3f %.3f) (%.3f %.3f %.3f)", x.ps[0].x,
+                x.ps[0].y, x.ps[0].z, x.ps[1].x, x.ps[1].y, x.ps[1].z, x.ps[2].x, x.ps[2].y, x.ps[2].z, y.ps[0].x, y.ps[0].y, y.ps[0].z,
+                y.ps[1].x, y.ps[1].y, y.ps[1].z, y.ps[2].x, y.ps[2].y, y.ps[2].z);
+          sites.push_back(c);
+          info.push_back(StrFormat("n=(%.0f,%.0f,%.0f) %06x/m%d vs %06x/m%d, Abstand %.1f mm", x.n.x * 100, x.n.y * 100, x.n.z * 100,
+                                   x.look & 0xffffff, x.look >> 24, y.look & 0xffffff, y.look >> 24, fabsf(x.d - y.d) * 1000));
+        }
+      }
+  };
+  for (auto it = groups.begin(); it != groups.end(); ++it) {
+    std::vector<const Tri*> list;
+    for (Tri& t : it->second) {
+      t.group = 0;
+      list.push_back(&t);
+    }
+    sweep(list, false);
+    for (int dd = 1; dd <= kTolMm; dd++) {
+      Key nk = it->first;
+      nk.d += dd;
+      auto nb = groups.find(nk);
+      if (nb == groups.end()) continue;
+      std::vector<const Tri*> both = list;
+      for (Tri& t : nb->second) {
+        t.group = dd;
+        both.push_back(&t);
+      }
+      sweep(both, true);
+    }
+  }
+  for (size_t i = 0; i < sites.size() && i < 400; i++)
+    LOG("    Z-Fighting bei (%.2f, %.2f, %.2f) %s – %s", sites[i].x, sites[i].y, sites[i].z, info[i].c_str(),
+        w.ZoneAt(sites[i]) ? w.ZoneAt(sites[i])->name.c_str() : "");
+  Check(sites.empty(), StrFormat("Keine flackernden Flächen (%d Stellen, %d Dreieckspaare)", (int)sites.size(), pairs), fails);
+}
+
+// Kein Versteck im Blattwerk: An keiner begehbaren Stelle darf man in Büschen oder Hecken stecken, die nur Optik
+// sind (keine Kollision) – dort wäre ein Prop für Jäger unsichtbar. Innen/außen per senkrechtem Strahl (Parität).
+static void CheckFoliage(const World& w, const NavGrid& nav, int& fails) {
+  const MeshData& m = w.opaque;
+  struct Leaf {
+    Vec3 a, b, c;
+  };
+  std::vector<Leaf> leaves;
+  for (size_t i = 0; i + 2 < m.indices.size(); i += 3) {
+    const Vertex& a = m.verts[m.indices[i]];
+    if (a.aux[0] != MAT_LEAVES) continue;
+    leaves.push_back({a.pos, m.verts[m.indices[i + 1]].pos, m.verts[m.indices[i + 2]].pos});
+  }
+  if (leaves.empty()) {
+    Check(true, "Kein Versteck im Blattwerk (kein Blattwerk)", fails);
+    return;
+  }
+  // Raster 1 m über XZ
+  Vec3 mn(1e9f, 0, 1e9f), mx(-1e9f, 0, -1e9f);
+  for (const Leaf& l : leaves)
+    for (Vec3 p : {l.a, l.b, l.c}) {
+      mn.x = std::min(mn.x, p.x);
+      mn.z = std::min(mn.z, p.z);
+      mx.x = std::max(mx.x, p.x);
+      mx.z = std::max(mx.z, p.z);
+    }
+  int gw = (int)(mx.x - mn.x) + 1, gh = (int)(mx.z - mn.z) + 1;
+  std::vector<std::vector<int>> cells((size_t)gw * gh);
+  for (int i = 0; i < (int)leaves.size(); i++) {
+    const Leaf& l = leaves[i];
+    int x0 = (int)(std::min({l.a.x, l.b.x, l.c.x}) - mn.x), x1 = (int)(std::max({l.a.x, l.b.x, l.c.x}) - mn.x);
+    int z0 = (int)(std::min({l.a.z, l.b.z, l.c.z}) - mn.z), z1 = (int)(std::max({l.a.z, l.b.z, l.c.z}) - mn.z);
+    for (int z = z0; z <= z1; z++)
+      for (int x = x0; x <= x1; x++) cells[(size_t)z * gw + x].push_back(i);
+  }
+  auto inside = [&](Vec3 p) {
+    int cx = (int)(p.x - mn.x), cz = (int)(p.z - mn.z);
+    if (p.x < mn.x || p.z < mn.z || cx >= gw || cz >= gh) return false;
+    int crossings = 0;
+    for (int i : cells[(size_t)cz * gw + cx]) {
+      const Leaf& l = leaves[i];
+      // Liegt (x, z) im Dreieck (XZ-Projektion)? Dann Höhe der Ebene dort mit p.y vergleichen
+      float d = (l.b.z - l.c.z) * (l.a.x - l.c.x) + (l.c.x - l.b.x) * (l.a.z - l.c.z);
+      if (fabsf(d) < 1e-9f) continue;
+      float u = ((l.b.z - l.c.z) * (p.x - l.c.x) + (l.c.x - l.b.x) * (p.z - l.c.z)) / d;
+      float v = ((l.c.z - l.a.z) * (p.x - l.c.x) + (l.a.x - l.c.x) * (p.z - l.c.z)) / d;
+      if (u < 0 || v < 0 || u + v > 1) continue;
+      float y = l.a.y * u + l.b.y * v + l.c.y * (1 - u - v);
+      if (y > p.y) crossings++;
+    }
+    return crossings % 2 == 1;
+  };
+  std::vector<Vec3> sites;
+  for (int n = 0; n < nav.NodeCount(); n++) {
+    if (nav.Component(n) != nav.MainComponent()) continue;
+    Vec3 p = nav.NodePos(n);
+    if (!inside(p + Vec3(0, 0.25f, 0)) && !inside(p + Vec3(0, 0.9f, 0))) continue;
+    bool known = false;
+    for (const Vec3& s : sites) known |= Length(s - p) < 3.0f;
+    if (!known) sites.push_back(p);
+  }
+  for (size_t i = 0; i < sites.size() && i < 20; i++)
+    LOG("    Versteck im Blattwerk bei (%.1f, %.1f, %.1f) – %s", sites[i].x, sites[i].y, sites[i].z,
+        w.ZoneAt(sites[i]) ? w.ZoneAt(sites[i])->name.c_str() : "");
+  Check(sites.empty(), StrFormat("Kein Versteck im Blattwerk (%d Stellen)", (int)sites.size()), fails);
 }
 
 // Jeder benannte Bereich muss erreichbar sein
@@ -272,6 +492,8 @@ int RunTests(int matchRounds) {
     bots.Init(w);
     CheckDoors(w, bots.Nav(), fails);
     CheckZones(w, bots.Nav(), fails);
+    CheckZFighting(w, fails);
+    CheckFoliage(w, bots.Nav(), fails);
     if (w.id == "bundestag") BundestagTests(w, bots.Nav(), fails);
     if (w.id == "oktoberfest") OktoberfestTests(w, bots.Nav(), fails);
     if (matchRounds > 0) BotMatch(w, bots, matchRounds, fails);

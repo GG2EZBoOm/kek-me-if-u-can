@@ -142,23 +142,37 @@ class Builder {
   }
 
   // Holzbrüstung mit Pfosten, Docken und Handlauf
-  void Balustrade(Vec3 a, Vec3 b, float h = 1.0f) {
+  // avoid: Stützen auf der Linie – dort entfallen Pfosten und Docken
+  void Balustrade(Vec3 a, Vec3 b, float h = 1.0f, const std::vector<Vec3>& avoid = {}) {
     Vec3 d = b - a;
     d.y = 0;
     float len = Length(d);
     if (len < 0.05f) return;
     float yaw = atan2f(d.x, d.z);
     Vec3 c = (a + b) * 0.5f;
+    auto dist = [](Vec3 p, Vec3 q) { return Length(Vec3(p.x - q.x, 0, p.z - q.z)); };
+    auto nearAvoid = [&](Vec3 p, float r) {
+      for (const Vec3& q : avoid)
+        if (dist(p, q) < r) return true;
+      return false;
+    };
     k.Style(MAT_WOOD, WOOD_D);
     int n = std::max(1, (int)(len / 1.5f));
+    std::vector<Vec3> posts;
     for (int i = 0; i <= n; i++) {
       Vec3 p = Lerp(a, b, (float)i / n);
+      if (nearAvoid(p, 0.2f)) continue;
+      posts.push_back(p);
       k.Visual(p + Vec3(-0.05f, 0, -0.05f), p + Vec3(0.05f, h, 0.05f));
     }
     k.Style(MAT_WOOD, WOOD_L);
     int m = std::max(1, (int)(len / 0.22f));
     for (int i = 1; i < m; i++) {
       Vec3 p = Lerp(a, b, (float)i / m);
+      // Docken nicht dicht an Pfosten oder Stützen – fast gleiche Flächen flackern
+      bool clash = nearAvoid(p, 0.17f);
+      for (const Vec3& q : posts) clash |= dist(p, q) < 0.085f;
+      if (clash) continue;
       k.Visual(p + Vec3(-0.022f, 0.09f, -0.022f), p + Vec3(0.022f, h - 0.06f, 0.022f));
     }
     k.Style(MAT_WOOD, WOOD_D);
@@ -205,7 +219,9 @@ class Builder {
     k.Style(MAT_METAL, 0x8d9399);
     int m = std::max(1, (int)(len / 0.25f));
     for (int i = 0; i < m; i++) {
-      Vec3 p = Lerp(a, b, (i + 0.5f) / m);
+      float t = (i + 0.5f) / m;
+      if (fabsf(t - roundf(t * n) / n) * len < 0.05f) continue;  // nicht am Pfosten (fast gleiche Flächen flackern)
+      Vec3 p = Lerp(a, b, t);
       k.Visual(p + Vec3(-0.008f, 0.25f, -0.008f), p + Vec3(0.008f, 1.95f, 0.008f));
     }
   }
@@ -269,7 +285,9 @@ class Builder {
     for (int i = 0; i <= n; i++) {
       Vec3 p = Sag(a, b, sag, (float)i / n);
       m.ColorHex(i % 3 ? 0x3f7a2c : 0x86a850);
-      m.Ellipsoid(p, Vec3(0.13f, 0.1f, 0.13f), 6, 4);
+      m.Push(Translation(p) * RotationY(i * 0.9f));  // verdreht: sonst liegen Facetten der Nachbarn in einer Ebene
+      m.Ellipsoid(Vec3(0, 0, 0), Vec3(0.13f, 0.1f, 0.13f), 6, 4);
+      m.Pop();
     }
   }
 
@@ -355,14 +373,15 @@ class Builder {
         float mx = (h.a0 + h.a1) * 0.5f, my = (h.y0 + h.y1) * 0.5f;
         k.Visual(Vec3(mx - 0.03f, h.y0, z0 - 0.02f), Vec3(mx + 0.03f, h.y1, z1 + 0.02f));
         k.Visual(Vec3(h.a0, my - 0.03f, z0 - 0.02f), Vec3(h.a1, my + 0.03f, z1 + 0.02f));
-        k.Visual(Vec3(h.a0 - 0.06f, h.y0 - 0.06f, z0 - 0.03f), Vec3(h.a1 + 0.06f, h.y0, z1 + 0.03f));
+        k.Visual(Vec3(h.a0 - 0.06f, h.y0 - 0.06f, z0 - 0.03f), Vec3(h.a1 + 0.06f, h.y0 + 0.02f, z1 + 0.03f));  // Fensterbank 2 cm über der Wandkrone
       }
       // Zierleiste zwischen Holz und Plane, Abschlussbrett am Wandkopf
       k.Style(MAT_WOOD, WOOD_D);
-      k.Visual(Vec3(-TX, WALL_H - 0.15f, std::min(z0, s * (TZ - WT - 0.06f))), Vec3(TX, WALL_H + 0.18f, std::max(z0 + 2 * WT, s * (TZ - WT - 0.06f))));
+      k.Visual(Vec3(-TX, WALL_H - 0.15f, std::min(z0 - 0.02f, s * (TZ - WT - 0.06f))),
+               Vec3(TX, WALL_H + 0.18f, std::max(z1 + 0.02f, s * (TZ - WT - 0.06f))));  // 2 cm vor der Wandfläche
       if (s > 0) {
-        k.Visual(Vec3(-TX - WT - 0.02f, 2.35f, z0 - 0.03f), Vec3(-3.0f, 2.5f, z1 + 0.03f));
-        k.Visual(Vec3(3.0f, 2.35f, z0 - 0.03f), Vec3(TX + WT + 0.02f, 2.5f, z1 + 0.03f));
+        k.Visual(Vec3(-TX - WT - 0.02f, 2.35f, z0 - 0.03f), Vec3(-2.98f, 2.5f, z1 + 0.03f));
+        k.Visual(Vec3(2.98f, 2.35f, z0 - 0.03f), Vec3(TX + WT + 0.02f, 2.5f, z1 + 0.03f));
       } else {
         k.Visual(Vec3(-TX - WT - 0.02f, 2.35f, z0 - 0.03f), Vec3(TX + WT + 0.02f, 2.5f, z1 + 0.03f));
       }
@@ -467,7 +486,7 @@ class Builder {
       for (float x : pillars) {
         if (s > 0 && fabsf(x) < 1) continue;
         float zc = s * GAL_Z;
-        k.Solid(Vec3(x - 0.14f, 0, zc - 0.14f), Vec3(x + 0.14f, GAL - 0.25f, zc + 0.14f));
+        k.Solid(Vec3(x - 0.14f, 0, zc - 0.14f), Vec3(x + 0.14f, GAL - 0.45f, zc + 0.14f));  // Kappe sitzt obenauf
         k.Solid(Vec3(x - 0.12f, GAL, zc - 0.12f), Vec3(x + 0.12f, RoofY(zc), zc + 0.12f));
         k.Style(MAT_WOOD, WOOD_D);
         k.Visual(Vec3(x - 0.2f, GAL - 0.45f, zc - 0.2f), Vec3(x + 0.2f, GAL - 0.25f, zc + 0.2f));
@@ -478,12 +497,14 @@ class Builder {
       for (int sx = -1; sx <= 1; sx += 2) k.Stairs(Vec3(sx * 26.9f, 0, s * 6.5f), s > 0 ? 2 : 3, 1.8f, 0.2f, 15, 0.3f, 0);
       // Brüstung
       float zr = s * GAL_Z;
+      std::vector<Vec3> pil;
+      for (float x : pillars) pil.push_back(Vec3(x, GAL, zr));
       if (s > 0) {
-        Balustrade(Vec3(-26.0f, GAL, zr), Vec3(-3.5f, GAL, zr));
-        Balustrade(Vec3(3.5f, GAL, zr), Vec3(26.0f, GAL, zr));
+        Balustrade(Vec3(-26.0f, GAL, zr), Vec3(-3.5f, GAL, zr), 1.0f, pil);
+        Balustrade(Vec3(3.5f, GAL, zr), Vec3(26.0f, GAL, zr), 1.0f, pil);
         for (float x : {-3.5f, 3.5f}) Balustrade(Vec3(x, GAL, GAL_Z), Vec3(x, GAL, TZ - WT));
       } else {
-        Balustrade(Vec3(-26.0f, GAL, zr), Vec3(26.0f, GAL, zr));
+        Balustrade(Vec3(-26.0f, GAL, zr), Vec3(26.0f, GAL, zr), 1.0f, pil);
       }
       // Hopfengirlanden unter der Brüstung
       for (int i = 0; i + 1 < (int)(sizeof(pillars) / sizeof(pillars[0])); i++) {
@@ -507,21 +528,22 @@ class Builder {
     // Holzsockel und Türrahmen
     k.Style(MAT_WOOD, WOOD_D);
     k.Visual(Vec3(-8.6f, 0, z1), Vec3(8.6f, 0.9f, z1 + 0.04f));
-    k.Visual(Vec3(-3.25f, 0, z0 - 0.05f), Vec3(-3.0f, 4.7f, z1 + 0.06f));
-    k.Visual(Vec3(3.0f, 0, z0 - 0.05f), Vec3(3.25f, 4.7f, z1 + 0.06f));
-    k.Visual(Vec3(-3.25f, 4.5f, z0 - 0.05f), Vec3(3.25f, 4.75f, z1 + 0.06f));
+    k.Visual(Vec3(-3.25f, 0, z0 - 0.05f), Vec3(-2.98f, 4.7f, z1 + 0.06f));  // 2 cm in die Öffnung (sonst flackert die Laibung)
+    k.Visual(Vec3(2.98f, 0, z0 - 0.05f), Vec3(3.25f, 4.7f, z1 + 0.06f));
+    k.Visual(Vec3(-3.25f, 4.48f, z0 - 0.05f), Vec3(3.25f, 4.75f, z1 + 0.06f));
     // Rauten im Giebel
     for (int r = 0; r < 3; r++)
       for (int c = -3 + r; c <= 3 - r; c++) {
         Vec3 p(c * 1.2f, 8.2f + r * 1.0f, z1 + 0.02f);
         k.ob.Push(Translation(p) * RotationZ(PI * 0.25f));
         k.Style(MAT_FABRIC, (r + c) % 2 ? WHITE : BLUE);
-        k.ob.Box(Vec3(-0.38f, -0.38f, 0), Vec3(0.38f, 0.38f, 0.03f));
+        k.ob.Box(Vec3(-0.34f, -0.34f, 0), Vec3(0.34f, 0.34f, 0.03f));  // Diagonale < 1 m Reihenabstand
         k.ob.Pop();
       }
-    k.Sign("FESTZELT", Vec3(0, 6.0f, z1 + 0.01f), 0, 0.11f, 0xf2c230, 0.8f);
-    k.Sign("ZUR WIESN", Vec3(-4.6f, 6.0f, z1 + 0.01f), 0, 0.045f, 0xffffff, 0.4f, false);
-    k.Sign("O ZAPFT IS!", Vec3(4.6f, 6.0f, z1 + 0.01f), 0, 0.04f, 0xffffff, 0.4f, false);
+    // oberhalb des Traufbretts (bis 5,95 m)
+    k.Sign("FESTZELT", Vec3(0, 6.45f, z1 + 0.01f), 0, 0.11f, 0xf2c230, 0.8f);
+    k.Sign("ZUR WIESN", Vec3(-4.6f, 6.3f, z1 + 0.01f), 0, 0.045f, 0xffffff, 0.4f, false);
+    k.Sign("O ZAPFT IS!", Vec3(4.6f, 6.3f, z1 + 0.01f), 0, 0.04f, 0xffffff, 0.4f, false);
     // Fahnen auf der Fassade
     for (float x : {-8.3f, 0.0f, 8.3f}) {
       float y0 = x == 0 ? 12.6f : 7.5f;
@@ -1246,7 +1268,7 @@ class Builder {
     const float x0 = -14, x1 = 10, z0 = 57, z1 = 71, fy = 0.25f, RH = 4.8f;
     k.Style(MAT_METAL, 0x34373c);
     k.Solid(Vec3(x0, 0, z0), Vec3(x1, fy, z1));
-    k.FloorFinish(x0 + 0.3f, z0 + 0.3f, x1 - 0.3f, z1 - 0.3f, fy + 0.004f, MAT_TILE, 0x2e3136);
+    k.FloorFinish(x0 + 0.3f, z0 + 0.3f, x1 - 0.3f, z1 - 0.3f, fy + 0.012f, MAT_TILE, 0x2e3136);
     // Bande mit Durchgängen
     auto bande = [&](Vec3 mn, Vec3 mx) {
       k.Style(MAT_PLASTIC, 0x1d1d20);
@@ -1461,7 +1483,7 @@ class Builder {
     // Statue (Bronze)
     Vec3 st(bv.x + 4, H0, bv.z);
     k.Style(MAT_SANDSTONE, 0xcab890);
-    k.Visual(st + Vec3(-4, 0, -4), st + Vec3(4, 9, 4));
+    k.Visual(st + Vec3(-4, 0.6f, -4), st + Vec3(4, 9, 4));  // auf der Plattform
     k.Style(MAT_METAL, 0x5f4e34);
     Vec3 base = st + Vec3(0, 9, 0);
     b.Frustum(base, 2.6f, 1.4f, 10, 16);

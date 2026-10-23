@@ -30,6 +30,9 @@ class GameView {
   bool Project(Vec3 p, int width, int height, Vec2& out) const;
   void Shake(float amount) { shake_ = std::max(shake_, amount); }
   WorldRender& Worlds() { return wr_; }
+  // Für Vorschaubilder (Kamera-Viewer): Jäger in einer Pose zeichnen
+  void DrawHunterPreview(Renderer& r, Vec3 pos, float yaw, float pitch, float walkPhase, float speed, bool crouch, int weapon,
+                         float sky);
 
  private:
   struct Fx {
@@ -59,7 +62,7 @@ class GameView {
   std::vector<Fx> fx_;
   std::vector<FxLight> lights_;
   std::vector<PointLight> lightBuf_;
-  Mesh torso_, head_, arm_, leg_, gun3p_, grenade_;
+  Mesh torso_, head_, thigh_, shin_, upperArm_, foreArm_, smg3p_, shotgun3p_, grenade_;
   Mesh vmSmg_, vmShotgun_, vmGrenade_, vmHands_[3], flash_;
   float walkPhase_[MAX_PLAYERS] = {};
   float eyeH_ = 1.62f;

@@ -6,6 +6,7 @@
 #include "engine/Renderer.h"
 #include "engine/UI.h"
 #include "engine/Upnp.h"
+#include "game/GameView.h"
 #include "game/Invite.h"
 #include "game/Maps.h"
 #include "game/Session.h"
@@ -27,7 +28,8 @@ static void LookAtAngles(Vec3 from, Vec3 to, float& yaw, float& pitch) {
 }
 
 // Rendert Kamerafahrt-Ansichten der Karte als PNG (Entwicklungswerkzeug)
-static int RunViewer(const std::string& shotDir, int width, int height, const std::vector<Vec3>& extraCams, int map) {
+// hunters: am Blickpunkt (Brusthöhe) vier Jäger aufstellen (von vorn, gehend, von hinten, geduckt) – Vorschau des Modells
+static int RunViewer(const std::string& shotDir, int width, int height, const std::vector<Vec3>& extraCams, int map, bool hunters) {
   if (!plat::Init("Kek Me If You Can – Kamera", width, height, true)) return 1;
   Renderer r;
   RenderSettings rs;
@@ -40,6 +42,8 @@ static int RunViewer(const std::string& shotDir, int width, int height, const st
   WorldRender wr;
   wr.Init(r);
   wr.Load(r, w);
+  GameView view;
+  if (hunters) view.Init(r);
   std::vector<Vec3> path = extraCams.empty() ? w.cameraPath : extraCams;
   int shots = (int)path.size() / 2;
   for (int s = 0; s < shots; s++) {
@@ -53,6 +57,18 @@ static int RunViewer(const std::string& shotDir, int width, int height, const st
       fr.FromMatrix(r.Cam().viewProj);
       r.SetLights(w.lights);
       wr.Submit(r, w, fr, cam.pos);
+      if (hunters) {
+        Vec3 target = path[s * 2 + 1];
+        Vec3 fwd = Normalize(Vec3(target.x - cam.pos.x, 0, target.z - cam.pos.z));
+        Vec3 right(-fwd.z, 0, fwd.x);
+        float face = atan2f(fwd.x, fwd.z);  // Blick zur Kamera (Vorwärts = -Z)
+        const float yaws[4] = {face, face + PI * 0.5f, face + PI, face + 0.4f};
+        for (int i = 0; i < 4; i++) {
+          Vec3 p = target + right * ((i - 1.5f) * 1.25f) - Vec3(0, 1.1f, 0);  // Blickpunkt = Brusthöhe
+          float sky = w.SkyAt(p + Vec3(0, 1, 0));
+          view.DrawHunterPreview(r, p, yaws[i], i == 3 ? 0.3f : -0.1f, i == 1 ? 1.2f : 0.0f, i == 1 ? 4.0f : 0.0f, i == 3, i == 2 ? 1 : 0, sky);
+        }
+      }
       ScreenFX fx;
       r.Render(fx);
       ui.Begin(width, height, false);
@@ -144,6 +160,7 @@ int AppMain(int argc, char** argv, bool console) {
   int width = 1600, height = 900;
   std::vector<Vec3> extraCams;
   int map = 0;
+  bool hunters = false;
   for (int i = 1; i < argc; i++) {
     std::string a = argv[i];
     if (a == "--nettest") return RunNetTest();
@@ -152,6 +169,7 @@ int AppMain(int argc, char** argv, bool console) {
     if (a == "--update") return RunUpdate(argc, argv);
     if (a == "--shots" && i + 1 < argc) shotDir = argv[++i];
     else if (a == "--map" && i + 1 < argc) map = std::max(0, FindMap(argv[++i]));
+    else if (a == "--hunters") hunters = true;
     else if (a == "--size" && i + 2 < argc) { width = atoi(argv[++i]); height = atoi(argv[++i]); }
     else if (a == "--cam" && i + 6 < argc) {
       extraCams.push_back(Vec3((float)atof(argv[i + 1]), (float)atof(argv[i + 2]), (float)atof(argv[i + 3])));
@@ -159,6 +177,6 @@ int AppMain(int argc, char** argv, bool console) {
       i += 6;
     }
   }
-  if (!shotDir.empty()) return RunViewer(shotDir, width, height, extraCams, map);
+  if (!shotDir.empty()) return RunViewer(shotDir, width, height, extraCams, map, hunters);
   return RunGame(argc, argv);
 }

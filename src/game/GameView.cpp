@@ -1,61 +1,232 @@
 #include "game/GameView.h"
 #include "game/Movement.h"
+#include "game/Shapes.h"
 #include "game/Sim.h"
 
 namespace {
 
-void BuildMeshes(Mesh& torso, Mesh& head, Mesh& arm, Mesh& leg, Mesh& gun3p, Mesh& grenade) {
+// Maße des Jäger-Skeletts (Meter)
+const float kThigh = 0.43f;     // Hüfte -> Knie
+const float kUpperArm = 0.30f;  // Schulter -> Ellbogen
+const float kForeArm = 0.27f;   // Ellbogen -> Handmitte
+
+// Basis für ein Glied: lokal -Y zeigt von "from" nach "to", lokal +Z in Richtung "pole"
+Mat4 BoneBasis(Vec3 from, Vec3 to, Vec3 pole) {
+  Vec3 y = Normalize(from - to);
+  Vec3 z = pole - y * Dot(pole, y);
+  z = Length(z) < 1e-4f ? Vec3(0, 0, 1) : Normalize(z);
+  Vec3 x = Cross(y, z);
+  Mat4 m = Mat4::Identity();
+  m.m[0] = x.x; m.m[1] = x.y; m.m[2] = x.z;
+  m.m[4] = y.x; m.m[5] = y.y; m.m[6] = y.z;
+  m.m[8] = z.x; m.m[9] = z.y; m.m[10] = z.z;
+  m.m[12] = from.x; m.m[13] = from.y; m.m[14] = from.z;
+  return m;
+}
+
+// Runder, leicht verjüngter Abschnitt zwischen zwei Punkten
+void Limb(MeshBuilder& b, Vec3 a, Vec3 c, float ra, float rc, int segs = 12) {
+  float len = Length(c - a);
+  if (len < 1e-4f) return;
+  b.Push(BoneBasis(a, a * 2.0f - c, Vec3(0, 0, 1)));  // Ursprung in a, +Y zeigt nach c
+  b.Frustum(Vec3(0, 0, 0), ra, rc, len, segs);
+  b.Pop();
+}
+
+// Elliptischer Kegelstumpf (Querschnitt in z gestaucht) – Rumpf, Gürtel, Weste
+void OvalFrustum(MeshBuilder& b, Vec3 base, float r0, float r1, float h, float zScale, int segs = 16) {
+  b.Push(Translation(base) * Scaling(Vec3(1, 1, zScale)));
+  b.Frustum(Vec3(0, 0, 0), r0, r1, h, segs);
+  b.Pop();
+}
+
+void BuildMeshes(Mesh& torso, Mesh& head, Mesh& thigh, Mesh& shin, Mesh& upperArm, Mesh& foreArm, Mesh& smg3p, Mesh& shotgun3p,
+                 Mesh& grenade) {
+  const u32 uniform = 0x1f2a44, uniformD = 0x18213a, vest = 0x2a3142, vestL = 0x353d50, black = 0x141518, skin = 0xd9a684;
+  const u32 hiVis = 0xd8e030;
   MeshData d;
   MeshBuilder b(&d);
-  // Bein (Hüfte im Ursprung, nach unten)
-  b.Mat(MAT_FABRIC); b.ColorHex(0x1f2a44);
-  b.Box({-0.08f, -0.78f, -0.09f}, {0.08f, 0.0f, 0.09f});
-  b.Mat(MAT_LEATHER); b.ColorHex(0x141416);
-  b.Box({-0.085f, -0.88f, -0.14f}, {0.085f, -0.76f, 0.09f});
-  leg.Upload(d);
+
+  // --- Oberschenkel (Hüfte im Ursprung, nach unten) ---
+  b.Mat(MAT_FABRIC); b.ColorHex(uniform);
+  b.Ellipsoid({0, -0.02f, 0}, {0.09f, 0.08f, 0.095f}, 12, 6);
+  b.Frustum({0, -kThigh, 0}, 0.07f, 0.088f, kThigh, 12);
+  b.ColorHex(uniformD);  // Beintasche außen
+  b.Box({-0.095f, -0.3f, -0.05f}, {0.095f, -0.17f, 0.04f});
+  b.Mat(MAT_PLASTIC); b.ColorHex(black);  // Knieschoner
+  b.Ellipsoid({0, -kThigh + 0.005f, -0.05f}, {0.062f, 0.07f, 0.035f}, 10, 6);
+  thigh.Upload(d);
   d.Clear();
-  // Rumpf (Hüfte im Ursprung)
-  b.Mat(MAT_FABRIC); b.ColorHex(0x23304d);
-  b.Box({-0.22f, 0.0f, -0.12f}, {0.22f, 0.56f, 0.12f});
-  b.Mat(MAT_PLASTIC); b.ColorHex(0xd8e030); b.Emissive(0.08f);
-  b.Box({-0.226f, 0.2f, -0.126f}, {0.226f, 0.26f, 0.126f});
+
+  // --- Unterschenkel mit Stiefel (Knie im Ursprung, Sohle bei -0.47) ---
+  b.Mat(MAT_FABRIC); b.ColorHex(uniform);
+  b.Ellipsoid({0, 0, 0}, {0.07f, 0.05f, 0.07f}, 10, 5);
+  b.Frustum({0, -0.36f, 0}, 0.058f, 0.07f, 0.36f, 12);
+  b.Mat(MAT_LEATHER); b.ColorHex(black);
+  b.Frustum({0, -0.44f, 0}, 0.066f, 0.062f, 0.13f, 12);              // Schaft
+  b.Ellipsoid({0, -0.43f, -0.06f}, {0.066f, 0.045f, 0.125f}, 12, 6);  // Fuß
+  b.ColorHex(0x0b0b0c);
+  b.Box({-0.068f, -0.47f, -0.19f}, {0.068f, -0.44f, 0.075f});        // Sohle
+  shin.Upload(d);
+  d.Clear();
+
+  // --- Rumpf (Hüfte im Ursprung, Hals bei 0.56) ---
+  b.Mat(MAT_FABRIC); b.ColorHex(uniform);
+  OvalFrustum(b, {0, 0, 0}, 0.165f, 0.16f, 0.16f, 0.72f);         // Becken
+  OvalFrustum(b, {0, 0.15f, 0}, 0.16f, 0.215f, 0.33f, 0.62f);     // Brustkorb
+  b.Ellipsoid({0, 0.48f, 0}, {0.235f, 0.08f, 0.13f}, 16, 7);      // Schultern
+  b.Mat(MAT_LEATHER); b.ColorHex(black);
+  OvalFrustum(b, {0, 0.12f, 0}, 0.172f, 0.172f, 0.055f, 0.74f);   // Gürtel
+  b.Mat(MAT_GOLD); b.ColorHex(0xb0b4b8);
+  b.Box({-0.028f, 0.128f, -0.135f}, {0.028f, 0.168f, -0.122f});   // Schnalle
+  b.Mat(MAT_LEATHER); b.ColorHex(0x1d1e22);
+  b.Box({0.15f, 0.02f, -0.06f}, {0.2f, 0.17f, 0.05f});            // Holster
+  b.Box({-0.19f, 0.06f, -0.03f}, {-0.155f, 0.15f, 0.06f});        // Gürteltasche
+  // Plattenträger: Bauchband, Front- und Rückenplatte, Schultergurte
+  b.Mat(MAT_FABRIC); b.ColorHex(vest);
+  OvalFrustum(b, {0, 0.19f, 0}, 0.2f, 0.208f, 0.17f, 0.66f);
+  b.Box({-0.17f, 0.19f, -0.165f}, {0.17f, 0.47f, -0.1f});
+  b.Box({-0.17f, 0.19f, 0.1f}, {0.17f, 0.47f, 0.16f});
+  for (float sx : {-1.0f, 1.0f}) b.Box({sx > 0 ? 0.08f : -0.15f, 0.45f, -0.14f}, {sx > 0 ? 0.15f : -0.08f, 0.545f, 0.14f});
+  // Magazintaschen vorn, Funkgerät links
+  b.ColorHex(vestL);
+  for (int i = 0; i < 3; i++) {
+    float x0 = -0.13f + i * 0.09f;
+    b.Box({x0, 0.2f, -0.205f}, {x0 + 0.075f, 0.32f, -0.16f});
+    b.ColorHex(0x2f3646);
+    b.Box({x0 - 0.002f, 0.29f, -0.209f}, {x0 + 0.077f, 0.325f, -0.2f});  // Klappe
+    b.ColorHex(vestL);
+  }
+  b.Box({-0.15f, 0.34f, -0.2f}, {-0.07f, 0.44f, -0.16f});
+  b.Mat(MAT_PLASTIC); b.ColorHex(black);
+  b.Box({-0.14f, 0.35f, -0.215f}, {-0.08f, 0.43f, -0.2f});
+  b.Cylinder({-0.09f, 0.43f, -0.19f}, 0.006f, 0.12f, 6);           // Antenne
+  // Reflexstreifen rundum und Schriftzug auf dem Rücken
+  b.Mat(MAT_PLASTIC); b.ColorHex(hiVis); b.Emissive(0.12f);
+  OvalFrustum(b, {0, 0.255f, 0}, 0.212f, 0.212f, 0.03f, 0.67f);
+  b.Box({-0.17f, 0.44f, -0.169f}, {0.17f, 0.455f, -0.164f});
+  b.Push(Translation({-PixelTextWidth("SUCHER", 0.0095f) * 0.5f, 0.33f, 0.161f}));
+  BuildPixelText(b, "SUCHER", 0.0095f, 0.004f);
+  b.Pop();
   b.Emissive(0);
-  b.Mat(MAT_LEATHER); b.ColorHex(0x111111);
-  b.Box({-0.226f, 0.0f, -0.126f}, {0.226f, 0.06f, 0.126f});
-  b.Mat(MAT_GOLD); b.ColorHex(0xc9a24a);
-  b.Box({0.07f, 0.38f, -0.13f}, {0.13f, 0.45f, -0.12f});
-  b.Mat(MAT_FABRIC); b.ColorHex(0x1a2438);
-  b.Box({-0.18f, 0.3f, 0.12f}, {0.18f, 0.5f, 0.17f});
+  b.Mat(MAT_PLASTIC); b.ColorHex(skin);
+  b.Cylinder({0, 0.5f, 0}, 0.052f, 0.09f, 10);                    // Hals
   torso.Upload(d);
   d.Clear();
-  // Kopf (Halsansatz im Ursprung)
-  b.Mat(MAT_PLASTIC); b.ColorHex(0xd9a684);
-  b.Box({-0.05f, 0.0f, -0.05f}, {0.05f, 0.06f, 0.05f});
-  b.Box({-0.11f, 0.05f, -0.11f}, {0.11f, 0.29f, 0.11f});
-  b.ColorHex(0x1b1b1b);
-  b.Box({-0.07f, 0.17f, -0.112f}, {-0.03f, 0.2f, -0.105f});
-  b.Box({0.03f, 0.17f, -0.112f}, {0.07f, 0.2f, -0.105f});
-  b.Mat(MAT_FABRIC); b.ColorHex(0x1d2740);
-  b.Box({-0.12f, 0.25f, -0.12f}, {0.12f, 0.34f, 0.12f});
-  b.Box({-0.12f, 0.25f, -0.21f}, {0.12f, 0.27f, -0.11f});
-  b.Mat(MAT_GOLD); b.ColorHex(0xc9a24a);
-  b.Box({-0.03f, 0.28f, -0.125f}, {0.03f, 0.32f, -0.118f});
+
+  // --- Kopf (Halsansatz im Ursprung) ---
+  b.Mat(MAT_PLASTIC); b.ColorHex(skin);
+  b.Cylinder({0, 0, 0.005f}, 0.05f, 0.08f, 10);
+  b.Ellipsoid({0, 0.165f, 0}, {0.094f, 0.118f, 0.104f}, 16, 10);
+  b.Ellipsoid({0, 0.1f, -0.03f}, {0.074f, 0.058f, 0.074f}, 12, 6);   // Kiefer
+  b.Ellipsoid({0, 0.152f, -0.102f}, {0.016f, 0.027f, 0.02f}, 8, 5);  // Nase
+  for (float sx : {-1.0f, 1.0f}) b.Ellipsoid({sx * 0.093f, 0.158f, 0.0f}, {0.014f, 0.03f, 0.022f}, 8, 5);  // Ohren
+  b.ColorHex(0xf2f0ea);
+  for (float sx : {-1.0f, 1.0f}) b.Ellipsoid({sx * 0.034f, 0.178f, -0.086f}, {0.017f, 0.011f, 0.01f}, 8, 5);
+  b.ColorHex(0x26201c);
+  for (float sx : {-1.0f, 1.0f}) b.Sphere({sx * 0.034f, 0.178f, -0.095f}, 0.0072f, 8, 5);
+  b.ColorHex(0x3a2a20);
+  for (float sx : {-1.0f, 1.0f}) b.Box({sx * 0.034f - 0.017f, 0.196f, -0.1f}, {sx * 0.034f + 0.017f, 0.204f, -0.09f});  // Brauen
+  b.ColorHex(0x9a5a48);
+  b.Box({-0.018f, 0.112f, -0.1f}, {0.018f, 0.117f, -0.094f});  // Mund
+  // Haare an Hinterkopf und Seiten (hintere Hälfte einer etwas größeren Ellipse)
+  b.Mat(MAT_FABRIC); b.ColorHex(0x2e2118);
+  b.Push(Translation({0, 0.168f, 0.012f}) * RotationX(PI * 0.5f));
+  b.Ellipsoid({0, 0, 0}, {0.099f, 0.104f, 0.118f}, 14, 7, -0.2f);
+  b.Pop();
+  // Helm mit Rand, Brillenband, Schutzbrille, Halterung
+  b.Mat(MAT_PLASTIC); b.ColorHex(0x1a2235);
+  b.Ellipsoid({0, 0.19f, 0.006f}, {0.124f, 0.122f, 0.134f}, 18, 9, 0.0f);
+  b.Push(Translation({0, 0.188f, 0.006f}) * Scaling(Vec3(1, 1, 1.08f)));
+  b.Torus({0, 0, 0}, 0.124f, 0.009f, 24, 6);
+  b.Pop();
+  b.ColorHex(0x101114);
+  b.Push(Translation({0, 0.235f, 0.006f}) * Scaling(Vec3(1, 1, 1.08f)));
+  b.Torus({0, 0, 0}, 0.118f, 0.007f, 24, 5);
+  b.Pop();
+  b.Box({-0.018f, 0.27f, -0.142f}, {0.018f, 0.3f, -0.118f});
+  b.Mat(MAT_PLASTIC); b.ColorHex(0xff9a30); b.Emissive(0.15f);
+  for (float sx : {-1.0f, 1.0f}) b.Ellipsoid({sx * 0.042f, 0.245f, -0.124f}, {0.032f, 0.021f, 0.016f}, 10, 6);
+  b.Emissive(0);
+  // Headset mit Mikrofon
+  b.ColorHex(0x16171a);
+  for (float sx : {-1.0f, 1.0f}) b.CylinderX({sx * 0.112f, 0.155f, 0.0f}, 0.04f, 0.03f, 12);
+  Limb(b, {-0.11f, 0.13f, -0.025f}, {-0.045f, 0.105f, -0.098f}, 0.005f, 0.005f, 6);
+  b.Sphere({-0.042f, 0.104f, -0.1f}, 0.011f, 8, 5);
   head.Upload(d);
   d.Clear();
-  // Arm (Schulter im Ursprung)
-  b.Mat(MAT_FABRIC); b.ColorHex(0x23304d);
-  b.Box({-0.06f, -0.55f, -0.06f}, {0.06f, 0.04f, 0.06f});
-  b.Mat(MAT_PLASTIC); b.ColorHex(0xd9a684);
-  b.Box({-0.05f, -0.66f, -0.05f}, {0.05f, -0.55f, 0.05f});
-  arm.Upload(d);
+
+  // --- Oberarm (Schulter im Ursprung, Ellbogen bei -kUpperArm, +Z = Ellbogen-Außenseite) ---
+  b.Mat(MAT_FABRIC); b.ColorHex(uniform);
+  b.Ellipsoid({0, -0.01f, 0}, {0.07f, 0.075f, 0.07f}, 12, 6);
+  b.Frustum({0, -kUpperArm, 0}, 0.052f, 0.062f, kUpperArm, 12);
+  b.ColorHex(uniformD);
+  b.Box({-0.064f, -0.12f, -0.035f}, {0.064f, -0.06f, 0.035f});  // Ärmeltasche/Abzeichen
+  b.Mat(MAT_PLASTIC); b.ColorHex(hiVis); b.Emissive(0.1f);
+  b.Box({-0.066f, -0.105f, -0.02f}, {0.066f, -0.075f, 0.02f});
+  b.Emissive(0);
+  upperArm.Upload(d);
   d.Clear();
-  // Waffe in dritter Person
+
+  // --- Unterarm mit Handschuh (Ellbogen im Ursprung, Handmitte bei -kForeArm) ---
+  b.Mat(MAT_FABRIC); b.ColorHex(uniform);
+  b.Ellipsoid({0, 0, 0}, {0.055f, 0.05f, 0.055f}, 10, 5);
+  b.Frustum({0, -0.21f, 0}, 0.043f, 0.052f, 0.21f, 12);
+  b.Mat(MAT_PLASTIC); b.ColorHex(black);
+  b.Ellipsoid({0, -0.005f, 0.035f}, {0.048f, 0.055f, 0.03f}, 10, 5);  // Ellbogenschoner
+  b.Mat(MAT_LEATHER); b.ColorHex(black);
+  b.Frustum({0, -0.235f, 0}, 0.046f, 0.046f, 0.03f, 12);              // Stulpe
+  b.Ellipsoid({0, -kForeArm, 0}, {0.038f, 0.05f, 0.03f}, 10, 6);     // Hand
+  b.Ellipsoid({0.03f, -kForeArm + 0.015f, -0.012f}, {0.014f, 0.032f, 0.014f}, 8, 5);  // Daumen
+  foreArm.Upload(d);
+  d.Clear();
+
+  // --- MP in dritter Person (Ursprung = Drehpunkt, vorne = -Z) ---
   b.Mat(MAT_METAL); b.ColorHex(0x2a2c30);
-  b.Box({-0.03f, -0.05f, -0.4f}, {0.03f, 0.05f, 0.08f});
-  b.Box({-0.02f, -0.18f, -0.22f}, {0.02f, -0.05f, -0.14f});
-  b.CylinderZ({0, 0.02f, -0.48f}, 0.013f, 0.16f, 8);
-  gun3p.Upload(d);
+  b.Box({-0.026f, -0.03f, -0.3f}, {0.026f, 0.035f, 0.06f});
+  b.ColorHex(0x1f2124);
+  b.Box({-0.01f, 0.035f, -0.25f}, {0.01f, 0.047f, 0.03f});
+  b.Mat(MAT_PLASTIC); b.ColorHex(0x161719);
+  b.Box({-0.03f, -0.05f, -0.3f}, {-0.0f + 0.03f, 0.018f, -0.15f});
+  b.Mat(MAT_METAL); b.ColorHex(0x2a2c30);
+  b.CylinderZ({0, 0.002f, -0.37f}, 0.01f, 0.14f, 10);
+  b.CylinderZ({0, 0.002f, -0.45f}, 0.016f, 0.06f, 10);
+  b.ColorHex(0x1b1c1f);
+  b.Push(Translation({0, -0.03f, -0.1f}) * RotationX(0.2f));
+  b.Box({-0.015f, -0.15f, -0.024f}, {0.015f, 0.0f, 0.024f});  // Magazin
+  b.Pop();
+  b.Push(Translation({0, -0.03f, 0.02f}) * RotationX(-0.25f));
+  b.Box({-0.018f, -0.1f, -0.024f}, {0.018f, 0.0f, 0.022f});   // Griff
+  b.Pop();
+  b.ColorHex(0x2a2c30);
+  b.Box({-0.012f, -0.02f, 0.06f}, {0.012f, 0.0f, 0.24f});     // Schulterstütze
+  b.Box({-0.02f, -0.06f, 0.21f}, {0.02f, 0.02f, 0.25f});
+  b.ColorHex(0x111214);
+  b.Box({-0.016f, 0.047f, -0.08f}, {0.016f, 0.085f, -0.02f});  // Rotpunktvisier
+  b.Mat(MAT_PLASTIC); b.ColorHex(0xff3020); b.Emissive(1.0f);
+  b.Box({-0.004f, 0.062f, -0.083f}, {0.004f, 0.07f, -0.079f});
+  b.Emissive(0);
+  smg3p.Upload(d);
   d.Clear();
+
+  // --- Schrotflinte in dritter Person ---
+  b.Mat(MAT_METAL); b.ColorHex(0x26282b);
+  b.Box({-0.028f, -0.035f, -0.2f}, {0.028f, 0.035f, 0.07f});
+  b.CylinderZ({0, 0.015f, -0.44f}, 0.016f, 0.5f, 10);
+  b.CylinderZ({0, -0.016f, -0.4f}, 0.014f, 0.4f, 10);
+  b.Mat(MAT_WOOD); b.ColorHex(0x6b4a2e);
+  b.CylinderZ({0, -0.016f, -0.38f}, 0.026f, 0.15f, 12);      // Pumpe
+  b.Push(Translation({0, -0.03f, 0.05f}) * RotationX(-0.3f));
+  b.Box({-0.02f, -0.1f, -0.026f}, {0.02f, 0.0f, 0.024f});
+  b.Pop();
+  b.Push(Translation({0, -0.02f, 0.07f}) * RotationX(-0.12f));
+  b.Box({-0.022f, -0.045f, 0.0f}, {0.022f, 0.025f, 0.26f});   // Schaft
+  b.Pop();
+  b.Mat(MAT_LEATHER); b.ColorHex(black);
+  b.Box({-0.024f, -0.08f, 0.31f}, {0.024f, 0.01f, 0.33f});
+  shotgun3p.Upload(d);
+  d.Clear();
+
   b.Mat(MAT_METAL); b.ColorHex(0x3d4a2e);
   b.Sphere({0, 0, 0}, 0.06f, 10, 7);
   b.ColorHex(0x8d9299);
@@ -77,10 +248,11 @@ void Tube(MeshBuilder& b, Vec3 a, Vec3 c, float ra, float rc) {
   m.m[8] = z.x; m.m[9] = z.y; m.m[10] = z.z;
   m.m[12] = a.x; m.m[13] = a.y; m.m[14] = a.z;
   b.Push(m);
-  // leicht verjüngter Ärmel aus zwei Abschnitten
-  b.Box({-ra, 0, -ra}, {ra, len * 0.5f, ra});
+  // runder, leicht verjüngter Ärmel mit Falte in der Mitte
   float rm = (ra + rc) * 0.5f;
-  b.Box({-rm, len * 0.5f - 0.005f, -rm}, {rm, len, rm});
+  b.Frustum(Vec3(0, 0, 0), ra, rm, len * 0.5f, 14);
+  b.Frustum(Vec3(0, len * 0.47f, 0), rm * 1.06f, rm * 1.06f, len * 0.06f, 14);
+  b.Frustum(Vec3(0, len * 0.5f, 0), rm, rc, len * 0.5f, 14);
   b.Pop();
 }
 
@@ -89,9 +261,9 @@ void BuildArms(MeshBuilder& b, Vec3 rightHand, Vec3 leftHand, bool leftVisible) 
   const u32 glove = 0x1c1d20, sleeve = 0x23304d, cuff = 0x2c3a5c;
   b.Mat(MAT_LEATHER); b.ColorHex(glove);
   b.Push(Translation(rightHand) * RotationX(-0.25f));
-  b.Box({-0.032f, -0.1f, -0.032f}, {0.035f, -0.005f, 0.04f});
-  b.Box({-0.03f, -0.095f, -0.052f}, {0.03f, -0.035f, -0.03f});
-  b.Box({0.028f, -0.04f, -0.03f}, {0.042f, 0.012f, 0.02f});
+  b.Ellipsoid({0.002f, -0.052f, 0.006f}, {0.036f, 0.052f, 0.04f}, 12, 7);  // Handrücken/Ballen
+  b.Ellipsoid({-0.002f, -0.06f, -0.04f}, {0.034f, 0.05f, 0.021f}, 12, 7);  // Finger um den Griff
+  Limb(b, {0.03f, -0.035f, 0.0f}, {0.036f, 0.01f, -0.022f}, 0.013f, 0.011f, 8);  // Daumen
   b.Pop();
   b.Mat(MAT_FABRIC); b.ColorHex(cuff);
   Vec3 rw = rightHand + Vec3(0.008f, -0.1f, 0.05f);
@@ -100,9 +272,10 @@ void BuildArms(MeshBuilder& b, Vec3 rightHand, Vec3 leftHand, bool leftVisible) 
   Tube(b, rw + Vec3(0.015f, -0.02f, 0.04f), rw + Vec3(0.13f, -0.24f, 0.38f), 0.038f, 0.046f);
   if (!leftVisible) return;
   b.Mat(MAT_LEATHER); b.ColorHex(glove);
-  b.Box(leftHand + Vec3(-0.04f, -0.045f, -0.05f), leftHand + Vec3(0.035f, -0.008f, 0.045f));
-  b.Box(leftHand + Vec3(-0.048f, -0.02f, -0.04f), leftHand + Vec3(-0.032f, 0.03f, 0.03f));
-  b.Box(leftHand + Vec3(0.03f, -0.03f, -0.045f), leftHand + Vec3(0.042f, 0.018f, 0.02f));
+  b.Ellipsoid(leftHand + Vec3(-0.003f, -0.027f, 0.0f), {0.04f, 0.022f, 0.05f}, 12, 6);  // Handfläche unter dem Vorderschaft
+  for (int i = 0; i < 4; i++)
+    Limb(b, leftHand + Vec3(-0.04f, -0.02f, -0.035f + i * 0.022f), leftHand + Vec3(-0.042f, 0.026f, -0.033f + i * 0.022f), 0.0105f, 0.0095f, 8);
+  Limb(b, leftHand + Vec3(0.03f, -0.025f, 0.02f), leftHand + Vec3(0.04f, 0.016f, -0.01f), 0.012f, 0.0105f, 8);  // Daumen
   b.Mat(MAT_FABRIC); b.ColorHex(cuff);
   Vec3 lw = leftHand + Vec3(-0.01f, -0.04f, 0.05f);
   Tube(b, lw, lw + Vec3(-0.03f, -0.03f, 0.05f), 0.035f, 0.037f);
@@ -114,54 +287,86 @@ void BuildViewModels(Mesh& smg, Mesh& shotgun, Mesh& gren, Mesh* hands, Mesh& fl
   MeshData d;
   MeshBuilder b(&d);
   // --- MP (vorne = -Z, Ursprung über dem Griff) ---
-  b.Mat(MAT_METAL); b.ColorHex(0x2a2c30);
-  b.Box({-0.027f, -0.034f, -0.3f}, {0.027f, 0.04f, 0.08f});
+  const u32 steel = 0x16181b, poly = 0x1b1c1f, polyD = 0x121315;
+  // Oberbau (Stahl, oben gerundet) und Unterbau (Kunststoff)
+  b.Mat(MAT_METAL); b.ColorHex(steel);
+  b.Box({-0.025f, -0.006f, -0.2f}, {0.025f, 0.034f, 0.075f});
+  b.CylinderZ({0, 0.03f, -0.0625f}, 0.022f, 0.275f, 14);
+  b.Mat(MAT_PLASTIC); b.ColorHex(poly);
+  b.Box({-0.028f, -0.046f, -0.17f}, {0.028f, -0.004f, 0.07f});
+  b.ColorHex(polyD);
+  b.Box({-0.029f, -0.03f, -0.13f}, {0.029f, -0.024f, -0.02f});  // Trennfuge
+  // Handschutz achteckig mit Schlitzen
+  b.ColorHex(poly);
+  b.CylinderZ({0, -0.006f, -0.265f}, 0.031f, 0.13f, 8);
+  b.ColorHex(polyD);
+  for (int i = 0; i < 4; i++)
+    for (float sx : {-1.0f, 1.0f}) b.Box({sx * 0.03f - 0.002f, -0.002f, -0.31f + i * 0.026f}, {sx * 0.03f + 0.002f, 0.008f, -0.296f + i * 0.026f});
+  // Lauf und Mündungsaufsatz
+  b.Mat(MAT_METAL); b.ColorHex(steel);
+  b.CylinderZ({0, 0.004f, -0.36f}, 0.0105f, 0.08f, 12);
+  b.CylinderZ({0, 0.004f, -0.42f}, 0.016f, 0.07f, 12);
+  b.ColorHex(0x060708);
+  for (int i = 0; i < 3; i++) b.Box({-0.0165f, 0.0f, -0.445f + i * 0.018f}, {0.0165f, 0.008f, -0.437f + i * 0.018f});
+  // Schiene mit Zähnen
   b.ColorHex(0x1f2124);
-  b.Box({-0.011f, 0.04f, -0.24f}, {0.011f, 0.051f, 0.03f});
-  for (int i = 0; i < 9; i++) b.Box({-0.0115f, 0.051f, -0.23f + i * 0.028f}, {0.0115f, 0.055f, -0.218f + i * 0.028f});
-  b.ColorHex(0x2a2c30);
-  b.Box({-0.017f, 0.051f, -0.01f}, {-0.006f, 0.08f, 0.012f});
-  b.Box({0.006f, 0.051f, -0.01f}, {0.017f, 0.08f, 0.012f});
-  b.Box({-0.004f, 0.04f, -0.278f}, {0.004f, 0.076f, -0.268f});
-  b.Box({-0.014f, 0.04f, -0.285f}, {0.014f, 0.08f, -0.282f});
-  b.Mat(MAT_PLASTIC); b.ColorHex(0x161719);
-  b.Box({-0.033f, -0.06f, -0.3f}, {0.033f, 0.02f, -0.14f});
-  b.ColorHex(0x0e0f10);
-  for (int i = 0; i < 4; i++) b.Box({-0.0335f, -0.045f, -0.285f + i * 0.035f}, {0.0335f, -0.04f, -0.27f + i * 0.035f});
-  b.Mat(MAT_METAL); b.ColorHex(0x2a2c30);
-  b.CylinderZ({0, 0.004f, -0.36f}, 0.011f, 0.13f, 10);
-  b.CylinderZ({0, 0.004f, -0.44f}, 0.015f, 0.04f, 10);
-  b.ColorHex(0x1b1c1f);
-  b.Push(Translation({0, -0.034f, -0.1f}) * RotationX(0.2f));
-  b.Box({-0.016f, -0.16f, -0.025f}, {0.016f, 0.0f, 0.025f});
-  b.Pop();
-  b.Push(Translation({0, -0.034f, 0.035f}) * RotationX(-0.25f));
-  b.Box({-0.02f, -0.11f, -0.025f}, {0.02f, 0.0f, 0.022f});
-  b.Pop();
-  b.Box({-0.005f, -0.065f, -0.05f}, {0.005f, -0.058f, 0.02f});
-  b.Mat(MAT_PLASTIC); b.ColorHex(0xff3a2a); b.Emissive(1.0f);
-  b.Box({-0.003f, 0.062f, -0.005f}, {0.003f, 0.068f, 0.0f});
+  b.Box({-0.011f, 0.046f, -0.2f}, {0.011f, 0.055f, 0.06f});
+  for (int i = 0; i < 9; i++) b.Box({-0.0115f, 0.055f, -0.19f + i * 0.028f}, {0.0115f, 0.059f, -0.178f + i * 0.028f});
+  // Rotpunktvisier: Gehäuse, Tubus, Linse, Punkt
+  b.ColorHex(0x111214);
+  b.Box({-0.016f, 0.055f, -0.05f}, {0.016f, 0.066f, 0.012f});
+  b.CylinderZ({0, 0.08f, -0.02f}, 0.018f, 0.064f, 14);
+  b.Mat(MAT_PLASTIC); b.ColorHex(0x24384a);
+  b.CylinderZ({0, 0.08f, 0.0125f}, 0.0145f, 0.002f, 14);
+  b.ColorHex(0xff3a2a); b.Emissive(1.0f);
+  b.Box({-0.0025f, 0.0775f, 0.0135f}, {0.0025f, 0.0825f, 0.0145f});
   b.Emissive(0);
+  // Magazin (leicht gebogen) und Griff mit Fingermulden
+  b.Mat(MAT_PLASTIC); b.ColorHex(polyD);
+  b.Push(Translation({0, -0.04f, -0.1f}) * RotationX(0.18f));
+  b.Box({-0.016f, -0.09f, -0.024f}, {0.016f, 0.0f, 0.024f});
+  b.Pop();
+  b.Push(Translation({0, -0.125f, -0.112f}) * RotationX(0.32f));
+  b.Box({-0.0165f, -0.07f, -0.025f}, {0.0165f, 0.004f, 0.025f});
+  b.Pop();
+  b.ColorHex(poly);
+  b.Push(Translation({0, -0.034f, 0.035f}) * RotationX(-0.25f));
+  b.Box({-0.019f, -0.11f, -0.022f}, {0.019f, 0.0f, 0.024f});
+  b.ColorHex(polyD);
+  for (int i = 0; i < 3; i++) b.Box({-0.0195f, -0.03f - i * 0.026f, -0.0235f}, {0.0195f, -0.022f - i * 0.026f, -0.02f});
+  b.Pop();
+  b.Mat(MAT_METAL); b.ColorHex(0x2a2c30);
+  b.Box({-0.004f, -0.062f, -0.048f}, {0.004f, -0.056f, 0.02f});  // Abzugsbügel
+  b.Box({0.025f, 0.012f, -0.03f}, {0.034f, 0.02f, 0.0f});        // Spannhebel
+  // Schulterstütze ganz eingeschoben: Gummikappe direkt hinter dem Gehäuse (ragt sonst ins Bild)
+  b.Mat(MAT_LEATHER); b.ColorHex(0x0d0d0e);
+  b.Box({-0.018f, -0.05f, 0.075f}, {0.018f, 0.022f, 0.088f});
   smg.Upload(d);
   d.Clear();
-  // --- Schrotflinte ---
-  b.Mat(MAT_METAL); b.ColorHex(0x2e3034);
-  b.Box({-0.03f, -0.04f, -0.17f}, {0.03f, 0.045f, 0.06f});
-  b.CylinderZ({0, 0.022f, -0.48f}, 0.016f, 0.62f, 12);
-  b.CylinderZ({0, -0.016f, -0.43f}, 0.013f, 0.5f, 10);
+  // --- Schrotflinte (brünierter Stahl, Walnuss) ---
+  b.Mat(MAT_METAL); b.ColorHex(steel);
+  b.Box({-0.03f, -0.04f, -0.17f}, {0.03f, 0.04f, 0.06f});
+  b.CylinderZ({0, 0.03f, -0.055f}, 0.03f, 0.23f, 14);   // gerundeter Rücken
+  b.CylinderZ({0, 0.022f, -0.48f}, 0.016f, 0.62f, 14);
+  b.CylinderZ({0, -0.016f, -0.43f}, 0.013f, 0.5f, 12);
+  b.CylinderZ({0, 0.003f, -0.77f}, 0.02f, 0.02f, 12);    // Laufschelle
   b.Mat(MAT_GOLD); b.ColorHex(0xc9a24a);
   b.Sphere({0, 0.042f, -0.78f}, 0.005f, 6, 4);
-  b.Mat(MAT_WOOD); b.ColorHex(0x6b4528);
-  b.Box({-0.031f, -0.045f, -0.53f}, {0.031f, 0.006f, -0.36f});
-  b.ColorHex(0x4e321c);
-  for (int i = 0; i < 6; i++) b.Box({-0.0315f, -0.035f, -0.52f + i * 0.028f}, {0.0315f, -0.003f, -0.512f + i * 0.028f});
-  b.ColorHex(0x6b4528);
+  b.Mat(MAT_WOOD); b.ColorHex(0x7a4a26);
+  b.CylinderZ({0, -0.02f, -0.445f}, 0.031f, 0.17f, 14);  // Pumpe
+  b.ColorHex(0x4e2e16);
+  for (int i = 0; i < 6; i++) b.CylinderZ({0, -0.02f, -0.515f + i * 0.028f}, 0.0322f, 0.008f, 14);
+  b.ColorHex(0x7a4a26);
   b.Push(Translation({0, -0.034f, 0.03f}) * RotationX(-0.25f));
   b.Box({-0.021f, -0.11f, -0.025f}, {0.021f, 0.0f, 0.03f});
   b.Pop();
   b.Push(Translation({0, -0.01f, 0.05f}) * RotationX(0.14f));
   b.Box({-0.023f, -0.06f, 0.0f}, {0.023f, 0.035f, 0.26f});
+  b.Mat(MAT_LEATHER); b.ColorHex(0x0d0d0e);
+  b.Box({-0.024f, -0.062f, 0.26f}, {0.024f, 0.037f, 0.28f});
   b.Pop();
+  b.Mat(MAT_METAL); b.ColorHex(0x2a2c30);
+  b.Box({-0.004f, -0.062f, -0.05f}, {0.004f, -0.056f, 0.02f});
   shotgun.Upload(d);
   d.Clear();
   // --- Granate ---
@@ -210,7 +415,7 @@ Vec4 V4(u32 hex, float a) {
 void GameView::Init(Renderer& r) {
   renderer_ = &r;
   wr_.Init(r);
-  BuildMeshes(torso_, head_, arm_, leg_, gun3p_, grenade_);
+  BuildMeshes(torso_, head_, thigh_, shin_, upperArm_, foreArm_, smg3p_, shotgun3p_, grenade_);
   BuildViewModels(vmSmg_, vmShotgun_, vmGrenade_, vmHands_, flash_);
 }
 
@@ -395,37 +600,110 @@ bool GameView::Project(Vec3 p, int width, int height, Vec2& out) const {
   return true;
 }
 
+// Zweigelenk-IK: Ellbogen e so, dass Schulter s -> e -> Hand h die Längen la, lb hat; pole gibt die Beugerichtung vor
+static void SolveArm(Vec3 s, Vec3& h, Vec3 pole, float la, float lb, Vec3& e) {
+  Vec3 d = h - s;
+  float dist = Clamp(Length(d), fabsf(la - lb) + 1e-3f, la + lb - 1e-3f);
+  Vec3 dir = Normalize(d);
+  h = s + dir * dist;
+  float cosA = Clamp((la * la + dist * dist - lb * lb) / (2 * la * dist), -1.0f, 1.0f);
+  float sinA = sqrtf(std::max(0.0f, 1 - cosA * cosA));
+  Vec3 pp = pole - dir * Dot(pole, dir);
+  pp = Length(pp) < 1e-4f ? Vec3(0, -1, 0) : Normalize(pp);
+  e = s + dir * (cosA * la) + pp * (sinA * la);
+}
+
 void GameView::DrawHunter(Renderer& r, const ClientPlayer& p, int id, float sky) {
   float speed = sqrtf(p.vel.x * p.vel.x + p.vel.z * p.vel.z);
   float amt = Saturate(speed / 4.0f);
   float ph = walkPhase_[id];
-  float crouch = p.crouching ? 0.3f : 0.0f;
-  float hipY = 0.9f - crouch;
-  float swing = sinf(ph) * 0.6f * amt;
+  bool crouch = p.crouching;
+  float hipY = crouch ? 0.52f : 0.9f - 0.035f * amt * fabsf(sinf(ph));
   Mat4 base = Translation(p.pos) * RotationY(p.yaw);
   DrawItem it;
   it.sky = sky;
-  it.mesh = &leg_;
-  it.model = base * Translation({-0.1f, hipY, 0}) * RotationX(swing + (p.crouching ? -0.8f : 0));
-  r.Draw(it);
-  it.model = base * Translation({0.1f, hipY, 0}) * RotationX(-swing + (p.crouching ? -0.8f : 0));
-  r.Draw(it);
-  Mat4 torsoM = base * Translation({0, hipY, 0}) * RotationX(p.crouching ? -0.25f : -0.05f * amt);
+  // Beine: Oberschenkel schwingt, das Knie beugt sich beim Vorschwingen; geduckt in der Hocke
+  for (int side = 0; side < 2; side++) {
+    float phase = ph + (side ? PI : 0.0f);
+    float thighA, knee;
+    if (crouch) {
+      thighA = 1.05f + (side ? 0.12f : -0.08f) + 0.25f * sinf(phase) * amt;
+      knee = 1.95f + (side ? 0.08f : -0.04f);
+    } else {
+      thighA = sinf(phase) * 0.55f * amt;
+      knee = amt * (0.12f + 0.85f * std::max(0.0f, cosf(phase)));
+    }
+    Mat4 hip = base * Translation({side ? 0.1f : -0.1f, hipY, 0}) * RotationX(thighA);
+    it.mesh = &thigh_;
+    it.model = hip;
+    r.Draw(it);
+    it.mesh = &shin_;
+    it.model = hip * Translation({0, -kThigh, 0}) * RotationX(-knee);
+    r.Draw(it);
+  }
+  float lean = crouch ? -0.38f : -0.06f * amt;
+  Mat4 torsoM = base * Translation({0, hipY, 0}) * RotationX(lean) * RotationY(0.06f * sinf(ph) * amt);
   it.mesh = &torso_;
   it.model = torsoM;
   r.Draw(it);
+  float pitch = Clamp(p.pitch, -1.0f, 1.0f);
   it.mesh = &head_;
-  it.model = torsoM * Translation({0, 0.56f, 0}) * RotationX(Clamp(p.pitch, -0.8f, 0.8f) * 0.6f);
+  it.model = torsoM * Translation({0, 0.56f, 0}) * RotationX(Clamp(p.pitch, -0.8f, 0.8f) * 0.6f - lean * 0.8f);
   r.Draw(it);
-  float aim = 1.45f + Clamp(p.pitch, -1.0f, 1.0f);
-  it.mesh = &arm_;
-  it.model = torsoM * Translation({0.27f, 0.5f, 0}) * RotationX(aim) * RotationZ(0.15f);
-  r.Draw(it);
-  it.model = torsoM * Translation({-0.27f, 0.5f, 0}) * RotationY(-0.5f) * RotationX(aim - 0.1f) * RotationZ(-0.25f);
-  r.Draw(it);
-  it.mesh = &gun3p_;
-  it.model = torsoM * Translation({0.1f, 0.42f, -0.12f}) * RotationX(Clamp(p.pitch, -1.0f, 1.0f));
-  r.Draw(it);
+  // Waffe vor der Brust, zielt unabhängig von der Rumpfneigung in Blickrichtung
+  Mat4 gunM = Translation({0.12f, 0.44f, -0.14f}) * RotationX(pitch - lean);
+  Vec3 gripR(0, -0.075f, 0.012f), gripL(0, -0.04f, -0.24f);
+  const Mesh* gun = &smg3p_;
+  if (p.weapon == WPN_SHOTGUN) {
+    gun = &shotgun3p_;
+    gripR = Vec3(0, -0.07f, 0.06f);
+    gripL = Vec3(0, -0.03f, -0.34f);
+  } else if (p.weapon == WPN_GRENADE) {
+    gun = nullptr;
+    gripR = Vec3(0.04f, -0.06f, -0.1f);
+    gripL = Vec3(-0.2f, -0.12f, -0.02f);
+  }
+  // Arme per IK an Griff und Vorderschaft, Ellbogen nach unten außen
+  struct ArmDef {
+    Vec3 shoulder, grip, pole;
+  };
+  const ArmDef arms[2] = {{Vec3(0.205f, 0.5f, 0), gripR, Vec3(0.9f, -1, 0.35f)}, {Vec3(-0.205f, 0.5f, 0), gripL, Vec3(-0.9f, -1, 0.2f)}};
+  for (const ArmDef& a : arms) {
+    Vec3 hand = TransformPoint(gunM, a.grip), elbow;
+    SolveArm(a.shoulder, hand, a.pole, kUpperArm, kForeArm, elbow);
+    Vec3 out = Normalize(elbow - (a.shoulder + hand) * 0.5f);
+    it.mesh = &upperArm_;
+    it.model = torsoM * BoneBasis(a.shoulder, elbow, out);
+    r.Draw(it);
+    it.mesh = &foreArm_;
+    it.model = torsoM * BoneBasis(elbow, hand, out);
+    r.Draw(it);
+    if (!gun && &a == &arms[0]) {
+      it.mesh = &grenade_;
+      it.model = torsoM * Translation(hand + Vec3(0, 0.02f, -0.03f));
+      r.Draw(it);
+    }
+  }
+  if (gun) {
+    it.mesh = gun;
+    it.model = torsoM * gunM;
+    r.Draw(it);
+  }
+}
+
+void GameView::DrawHunterPreview(Renderer& r, Vec3 pos, float yaw, float pitch, float walkPhase, float speed, bool crouch,
+                                 int weapon, float sky) {
+  ClientPlayer p;
+  p.pos = pos;
+  p.yaw = yaw;
+  p.pitch = pitch;
+  p.vel = Vec3(-sinf(yaw), 0, -cosf(yaw)) * speed;
+  p.crouching = crouch;
+  p.weapon = (u8)weapon;
+  p.team = TEAM_HUNTERS;
+  p.alive = true;
+  walkPhase_[0] = walkPhase;
+  DrawHunter(r, p, 0, sky);
 }
 
 void GameView::DrawViewModel(Renderer& r, const ClientPlayer& me, const ViewInput& in, float sky) {

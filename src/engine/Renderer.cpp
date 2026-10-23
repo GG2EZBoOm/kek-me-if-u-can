@@ -189,6 +189,8 @@ void main() {
     alb *= 0.85 + 0.18 * vnoise(P * 28.0); spec = 0.35; shin = 36.0;
   }
   emit += alb * vAux.z * 6.0;
+  // Metalle spiegeln in ihrer eigenen Farbe: dunkler Stahl glänzt dezent, helles Metall bleibt hell
+  vec3 metalTint = mat == 6 ? mix(vec3(0.18), vec3(1.0), clamp(alb * 2.2, 0.0, 1.0)) : vec3(1.0);
 
   float sky = vAux.y * vInst.x;
   if (uGlass == 1 && dot(N, V) < 0.0) N = -N;
@@ -202,7 +204,7 @@ void main() {
   if (ndl > 0.0) {
     sh = shadowAt(vWorld, N);
     vec3 H = normalize(V + uSunDir);
-    col += uSunColor * sh * ndl * (alb + spec * pow(max(dot(N, H), 0.0), shin));
+    col += uSunColor * sh * ndl * (alb + spec * metalTint * pow(max(dot(N, H), 0.0), shin));
   }
   for (int i = 0; i < uLightCount; i++) {
     vec3 L = uLightPos[i].xyz - vWorld;
@@ -216,13 +218,13 @@ void main() {
     float att = win * win / (d2 + 1.0);
     float nl = max(dot(N, L), 0.0);
     vec3 H = normalize(V + L);
-    col += uLightCol[i].rgb * att * nl * (alb + spec * pow(max(dot(N, H), 0.0), shin));
+    col += uLightCol[i].rgb * att * nl * (alb + spec * metalTint * pow(max(dot(N, H), 0.0), shin));
   }
   float fres = pow(1.0 - max(dot(N, V), 0.0), 5.0);
   if (refl > 0.0) {
     vec3 R = reflect(-V, N);
     vec3 env = mix(uIndoorAmb * 2.5, skyColor(R, false), sky);
-    col += env * (refl + (1.0 - refl) * fres * 0.5) * mix(vec3(1.0), alb * 2.0, mat == 20 ? 1.0 : 0.0);
+    col += env * (refl + (1.0 - refl) * fres * 0.5) * (mat == 20 ? alb * 2.0 : metalTint);
   }
   col += emit;
   if (vInst.y > 0.0) {
