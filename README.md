@@ -6,8 +6,17 @@ Intro-Videos. Das Symbol ist eine Dose mit verschmitztem Blick: Das „can“ im
 
 ## Herunterladen
 
-Die fertigen EXEs gibt es unter [Releases](https://github.com/GG2EZBoOm/kek-me-if-u-can/releases/latest):
-`KekMeIfYouCan.exe` laden und starten, eine Installation ist nicht nötig. Windows SmartScreen kann beim ersten Start
+**[Spiel für Windows herunterladen – KekMeIfYouCan.exe](https://github.com/GG2EZBoOm/kek-me-if-u-can/releases/latest/download/KekMeIfYouCan.exe)**
+
+Die EXE enthält das komplette Spiel, alle Karten und die drei Intros. Herunterladen und starten; eine Installation ist nicht nötig.
+Für dedizierte Server und Tests gibt es zusätzlich die
+[Konsolen-Version](https://github.com/GG2EZBoOm/kek-me-if-u-can/releases/latest/download/KekMeIfYouCanCLI.exe).
+Alle Versionen stehen unter [Releases](https://github.com/GG2EZBoOm/kek-me-if-u-can/releases/latest).
+
+**„Code → Download ZIP“ und „Source code“ enthalten nur die Projektdateien zum Selbstbauen, keine EXE.**
+Zum Spielen bitte den direkten Download oben verwenden.
+
+Windows SmartScreen kann beim ersten Start
 warnen, weil die Datei nicht signiert ist („Weitere Informationen“ → „Trotzdem ausführen“).
 
 ### Intros
