@@ -31,8 +31,15 @@ jobs:
           KekMeIfYouCanCLI.exe --test 1 || exit /b 1
           KekMeIfYouCanCLI.exe --nettest || exit /b 1
 
+      - name: Vollstaendigen Spielordner packen
+        shell: pwsh
+        run: ./package.ps1
+
       - name: Release erstellen
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$env:GITHUB_REF_NAME" KekMeIfYouCan.exe KekMeIfYouCanCLI.exe --title "Kek Me If You Can $env:GITHUB_REF_NAME" --generate-notes
+        run: |
+          $notes = "docs/releases/$env:GITHUB_REF_NAME.md"
+          $noteArgs = if (Test-Path -LiteralPath $notes) { @('--notes-file', $notes) } else { @('--generate-notes') }
+          gh release create "$env:GITHUB_REF_NAME" KekMeIfYouCan.exe KekMeIfYouCan-Ordner.exe KekMeIfYouCanCLI.exe build/package/KekMeIfYouCan-Windows.zip build/package/SHA256SUMS.txt --title "Kek Me If You Can $env:GITHUB_REF_NAME" @noteArgs

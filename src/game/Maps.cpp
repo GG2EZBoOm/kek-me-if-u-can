@@ -14,6 +14,10 @@ const std::vector<MapInfo>& AllMaps() {
        "Alte Backsteinfabrik: Produktionshalle mit Rührwerken, Nudelpresse und Spaghetti-Straße, Laufstege, Trockenraum, "
        "Mehllager, Verpackung mit Lkw an der Rampe – draußen Mehlsilos, Werkshof und Parkplatz.",
        BuildNudelfabrik},
+      {"paketzentrum", "KEK-Paketzentrum",
+       "Gelb-rote Sortierhalle mit laufenden Paketbändern, begehbarer Sortierbrücke, Paketregalen, Retourenschalter, "
+       "Leitstelle und drei begehbaren Lkw-Wechselbrücken. Zugestellt? Angeblich.",
+       BuildPaketzentrum},
   };
   return maps;
 }

@@ -26,6 +26,8 @@ struct Player {
   float respawnTimer = -1;
   int score = 0, kills = 0, deaths = 0;
   float aliveAcc = 0;
+  float modeMeter = 0;
+  Vec3 modeAnchor;
   u32 lastCmdSeq = 0;
   u16 prevButtons = 0;
   float hurtTimer = 0;
@@ -41,6 +43,8 @@ struct Decoy {
   Vec3 pos;
   float yaw = 0;
   float health = 40;
+  float life = 0, pingTimer = -1;
+  u32 bornTick = 0;
 };
 
 struct Grenade {
@@ -75,6 +79,8 @@ class Sim {
   int round = 0;
   Team winner = TEAM_SPECTATOR;
   u32 tick = 0;
+  GameMode mode = MODE_CLASSIC;
+  float modeTimer = 0;
   Player players[MAX_PLAYERS];
   Decoy decoys[MAX_DECOYS];
   Grenade grenades[MAX_GRENADES];
@@ -109,6 +115,10 @@ class Sim {
   void TryDisguise(int id);
   void DoTaunt(int id, int which);
   void PlaceDecoy(int id);
+  void UpdateMode();
+  void RandomDisguise(int id);
+  void SwapClone(int id);
+  void SetDisguise(int id, int type, const MoveState& state);
   void UpdateGrenades();
   void Explode(Grenade& g);
   void CheckRoundEnd();

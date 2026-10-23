@@ -26,6 +26,9 @@ int FindDisguiseTarget(const World& w, const MoveState& ms, int propType, Vec3* 
 void Sim::Init(World* w, const MatchSettings& s) {
   world = w;
   settings = s;
+  settings.mode = ClampI(settings.mode, 0, MODE_COUNT - 1);
+  mode = MODE_CLASSIC;
+  modeTimer = 0;
   for (auto& p : players) p = Player();
   for (auto& d : decoys) d = Decoy();
   for (auto& g : grenades) g = Grenade();
@@ -113,6 +116,7 @@ MoveEnv Sim::MakeEnv(int ignore, std::vector<OBox>& storage) const {
     storage.push_back(PlayerBox(t, d.propType));
   }
   MoveEnv env;
+  env.mode = mode;
   env.world = world;
   env.others = &storage;
   return env;
@@ -158,6 +162,9 @@ void Sim::SpawnPlayer(int id, Team team, int spawnIndex) {
   p.fireTimer = p.reloadTimer = p.switchTimer = 0;
   p.abilityTimer = 8;
   p.decoys = 2;
+  if (mode == MODE_CLONES) p.decoys = 3;
+  p.modeMeter = 0;
+  p.modeAnchor = p.ms.pos;
   p.tauntTimer = p.tauntCooldown = 0;
   p.autoTaunt = AutoTauntInterval();
   p.disguiseTimer = 0;
@@ -171,6 +178,7 @@ void Sim::SpawnPlayer(int id, Team team, int spawnIndex) {
   MoveEnv env = MakeEnv(id, others);
   FindFreeSpot(env, p.ms, team == TEAM_PROPS ? p.propType : -1);
   p.prevPos = p.ms.pos;
+  p.modeAnchor = p.ms.pos;
   p.prevColYaw = p.ms.colYaw;
 }
 
@@ -185,6 +193,12 @@ void Sim::StartRound() {
     return;
   }
   round++;
+  GameMode previousMode = mode;
+  mode = (GameMode)ClampI(settings.mode, 0, MODE_COUNT - 1);
+  if (mode == MODE_SHUFFLE) {
+    do { mode = (GameMode)rng_.Int(MODE_ROULETTE, MODE_MOON); } while (mode == previousMode);
+  }
+  modeTimer = mode == MODE_ROULETTE ? ROULETTE_INTERVAL : 0;
   int hunters = std::max(1, (n * 2 + 2) / 5);
   std::vector<bool> isHunter(MAX_PLAYERS, false);
   if (settings.teamSwap) {
@@ -196,13 +210,14 @@ void Sim::StartRound() {
     for (int k = 0; k < hunters; k++) isHunter[sh[k]] = true;
   }
   int hs = rng_.Int(0, 15), ps = rng_.Int(0, 15);
+  for (auto& d : decoys) d.active = false;
+  for (auto& g : grenades) g.active = false;
+  for (int id : ids) players[id].alive = false;
   for (int id : ids) {
     players[id].wasHunterThisRound = false;
     if (isHunter[id]) SpawnPlayer(id, TEAM_HUNTERS, hs++);
     else SpawnPlayer(id, TEAM_PROPS, ps++);
   }
-  for (auto& d : decoys) d.active = false;
-  for (auto& g : grenades) g.active = false;
   phase = Phase::Hiding;
   phaseTimer = settings.hideTime;
   lastCountdown_ = settings.hideTime;
@@ -332,6 +347,7 @@ void Sim::Tick() {
     }
   }
   UpdateGrenades();
+  UpdateMode();
   CheckRoundEnd();
 }
 
@@ -362,6 +378,7 @@ void Sim::ProcessCmd(int id, const UserCmd& cmd) {
     e.b = p.ms.rotLock ? 1 : 0;
   }
   if (frozen) return;
+  if (phase != Phase::Hiding && phase != Phase::Hunting) return;
   if (p.team == TEAM_HUNTERS) HunterActions(id, cmd, pressed);
   else if (p.team == TEAM_PROPS) PropActions(id, cmd, pressed);
 }
@@ -411,6 +428,10 @@ void Sim::HunterActions(int id, const UserCmd& cmd, u16 pressed) {
       float d = Distance(q.ms.pos, p.ms.pos);
       if (d < 16.0f) q.pingTimer = 0.5f + d * 0.04f;
     }
+    if (mode == MODE_CLONES) {
+      for (Decoy& d : decoys)
+        if (d.active && Distance(d.pos, p.ms.pos) < 16.0f) d.pingTimer = 0.5f + Distance(d.pos, p.ms.pos) * 0.04f;
+    }
   }
 }
 
@@ -421,6 +442,7 @@ void Sim::PropActions(int id, const UserCmd& cmd, u16 pressed) {
     if (p.tauntTimer <= 0 && p.tauntCooldown <= 0) DoTaunt(id, cmd.taunt > 0 ? cmd.taunt - 1 : -1);
   }
   if (pressed & BTN_DECOY) PlaceDecoy(id);
+  if ((pressed & BTN_ABILITY) && mode == MODE_CLONES) SwapClone(id);
 }
 
 void Sim::FireWeapon(int id) {
@@ -538,7 +560,7 @@ void Sim::ThrowGrenade(int id) {
 void Sim::UpdateGrenades() {
   for (Grenade& g : grenades) {
     if (!g.active) continue;
-    g.vel.y -= 20.0f * TICK_DT;
+    g.vel.y -= (mode == MODE_MOON ? 8.0f : 20.0f) * TICK_DT;
     Vec3 move = g.vel * TICK_DT;
     float len = Length(move);
     if (len > 1e-5f) {
@@ -620,12 +642,15 @@ void Sim::Kill(int victim, int attacker, u8 cause) {
 
 void Sim::TryDisguise(int id) {
   Player& p = players[id];
+  if (mode == MODE_ROULETTE && phase == Phase::Hunting) {
+    GameEvent& e = Emit(EV_NOFIT); e.a = (u8)id; e.b = 2;
+    return;
+  }
   if (p.disguiseTimer > 0) return;
   int target = FindDisguiseTarget(*world, p.ms, p.propType);
   if (target < 0) return;
   const WorldProp& wp = world->props[target];
   if (wp.type == p.propType) return;
-  const PropDef& def = props::Get(wp.type);
   MoveState t = p.ms;
   t.colYaw = wp.yaw;
   t.rotLock = true;
@@ -635,16 +660,7 @@ void Sim::TryDisguise(int id) {
     Emit(EV_NOFIT).a = (u8)id;
     return;
   }
-  float frac = p.maxHealth > 0 ? p.health / p.maxHealth : 1.0f;
-  p.propType = wp.type;
-  p.maxHealth = def.health;
-  p.health = std::max(1.0f, frac * def.health);
-  p.ms = t;
-  p.disguiseTimer = 0.8f;
-  GameEvent& e = Emit(EV_DISGUISE);
-  e.a = (u8)id;
-  e.c = (u16)wp.type;
-  e.pos = p.ms.pos;
+  SetDisguise(id, wp.type, t);
 }
 
 void Sim::DoTaunt(int id, int which) {
@@ -659,11 +675,23 @@ void Sim::DoTaunt(int id, int which) {
   e.a = (u8)id;
   e.b = (u8)t;
   e.pos = p.ms.pos + Vec3(0, 0.3f, 0);
+  if (mode == MODE_CLONES) {
+    for (const Decoy& d : decoys) {
+      if (!d.active || d.owner != id) continue;
+      GameEvent& echo = Emit(EV_TAUNT);
+      echo.a = (u8)id; echo.b = (u8)t; echo.pos = d.pos + Vec3(0, .3f, 0);
+    }
+  }
 }
 
 void Sim::PlaceDecoy(int id) {
   Player& p = players[id];
   if (p.decoys == 0) return;
+  if (mode == MODE_CLONES) {
+    int owned = 0;
+    for (const Decoy& d : decoys) if (d.active && d.owner == id) owned++;
+    if (owned >= 3) { GameEvent& e = Emit(EV_NOFIT); e.a = (u8)id; e.b = 3; return; }
+  }
   Vec3 pivot = PropPivot(p.ms, p.propType);
   Vec3 cam = ThirdPersonCamera(*world, pivot, p.ms.yaw, p.ms.pitch, PropCamDistance(p.propType));
   Vec3 dir = DirFromYawPitch(p.ms.yaw, p.ms.pitch);
@@ -691,6 +719,9 @@ void Sim::PlaceDecoy(int id) {
     d.pos = t.pos;
     d.yaw = t.colYaw;
     d.health = 40;
+    d.life = mode == MODE_CLONES ? 45.0f : 0;
+    d.pingTimer = -1;
+    d.bornTick = tick;
     p.decoys--;
     GameEvent& e = Emit(EV_DECOY);
     e.a = (u8)id;

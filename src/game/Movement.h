@@ -30,6 +30,7 @@ float PropCamDistance(int propType);
 Vec3 ThirdPersonCamera(const World& w, Vec3 pivot, float yaw, float pitch, float dist);
 
 struct MoveEnv {
+  GameMode mode = MODE_CLASSIC;
   const World* world = nullptr;
   const std::vector<OBox>* others = nullptr;  // andere Spieler, Köder
 };

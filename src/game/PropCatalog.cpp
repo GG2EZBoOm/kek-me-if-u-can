@@ -2086,6 +2086,75 @@ void IbcTank(PK& k) {
   k.part({-0.6f, 0.144f, -0.39f}, {0.6f, 1.15f, 0.39f});
 }
 
+// --- KEK-Paketzentrum -----------------------------------------------------------------------
+void Versandpaket(PK& k, Vec3 size, bool fragile) {
+  k.mat(MAT_PAPER); k.col(fragile ? 0xb48148 : 0xc99d61);
+  k.box({-size.x / 2, 0, -size.z / 2}, {size.x / 2, size.y, size.z / 2});
+  k.col(0xd6b789);
+  k.box({-.035f, size.y + .009f, -size.z / 2}, {.035f, size.y + .012f, size.z / 2});
+  k.col(0xf5efe2);
+  k.box({size.x * .02f, size.y + .01f, -size.z * .28f}, {size.x * .36f, size.y + .014f, size.z * .08f});
+  k.col(0x25252a);
+  for (int i = 0; i < 7; i++) {
+    float x = size.x * (.05f + i * .04f);
+    k.b.Box({x, size.y + .024f, -size.z * .22f}, {x + .005f, size.y + .026f, size.z * .02f});
+  }
+  k.col(0xd21b12); k.mat(MAT_PLAIN);
+  k.push(Translation({0, size.y * .47f, size.z * .5f + .011f}) * Scaling(Vec3(size.x * .13f)));
+  BuildKekLogo(k.b); k.pop();
+  if (fragile) {
+    k.col(0xb91912);
+    k.b.Box({-size.x * .46f, size.y * .15f, size.z * .5f + .012f}, {-size.x * .4f, size.y * .8f, size.z * .5f + .025f});
+  }
+}
+void Versandrolle(PK& k) {
+  k.mat(MAT_PAPER); k.col(0xb98d57); k.cyl({0, 0, 0}, .1f, .72f, 18);
+  k.col(0xf0e8d7); k.cyl({0, 0, 0}, .103f, .04f, 18); k.cyl({0, .68f, 0}, .103f, .04f, 18);
+  k.col(0xffce24); k.cyl({0, .3f, 0}, .105f, .12f, 18);
+}
+void Handscanner(PK& k) {
+  k.mat(MAT_PLASTIC); k.col(0x242b32); k.box({-.045f, 0, -.035f}, {.045f, .14f, .04f});
+  k.col(0xffcc19); k.box({-.075f, .12f, -.055f}, {.075f, .23f, .065f});
+  k.col(0x143543); k.box({-.055f, .15f, .066f}, {.055f, .213f, .077f});
+  k.col(0xf04425); k.box({-.04f, .155f, -.066f}, {.04f, .195f, -.055f});
+}
+void Klebeband(PK& k) {
+  k.mat(MAT_PAPER); k.col(0xbc9561); k.torus({0, .047f, 0}, .065f, .026f, 20, 10);
+  k.col(0xf1e9d6); k.b.Torus({0, .048f, 0}, .041f, .008f, 20, 8);
+}
+void Postsack(PK& k) {
+  k.mat(MAT_FABRIC); k.col(0xd5ba7c); k.ell({0, .38f, 0}, {.3f, .38f, .25f}, 16, 10);
+  k.col(0x8d734b); k.cyl({0, .68f, 0}, .105f, .1f, 12);
+  k.col(0xc21c12); k.push(Translation({0, .38f, .249f}) * Scaling(Vec3(.075f))); BuildKekLogo(k.b); k.pop();
+}
+void Sortierkiste(PK& k) {
+  k.mat(MAT_PLASTIC); k.col(0xffc91a);
+  k.box({-.3f, .025f, -.21f}, {.3f, .07f, .21f});
+  for (float x : {-.28f, .28f}) k.box({x - .02f, .07f, -.21f}, {x + .02f, .32f, .21f});
+  for (float z : {-.19f, .19f}) k.box({-.26f, .07f, z - .02f}, {.26f, .32f, z + .02f});
+  k.col(0xcc2015); k.b.Box({-.13f, .15f, .222f}, {.13f, .25f, .228f});
+}
+void Rollcontainer(PK& k) {
+  k.mat(MAT_METAL); k.col(0x6f7980); k.box({-.45f, .14f, -.34f}, {.45f, .21f, .34f});
+  for (float x : {-.41f, .41f}) for (float z : {-.29f, .29f}) {
+    k.col(0x252a30); k.cylz({x, .09f, z}, .09f, .055f, 12);
+    k.col(0x9ba2a5); k.box({x - .018f, .21f, z - .018f}, {x + .018f, 1.7f, z + .018f});
+  }
+  for (float y : {.5f, .9f, 1.3f, 1.68f}) {
+    k.box({-.43f, y, -.31f}, {.43f, y + .018f, -.29f});
+    for (float x : {-.42f, .42f}) k.box({x - .01f, y, -.28f}, {x + .01f, y + .018f, .31f});
+  }
+  k.push(Translation({0, .22f, 0})); Versandpaket(k, {.68f, .48f, .49f}, false); k.pop();
+  k.push(Translation({-.08f, .71f, -.03f})); Versandpaket(k, {.46f, .35f, .36f}, true); k.pop();
+}
+void Etikettendrucker(PK& k) {
+  k.mat(MAT_PLASTIC); k.col(0x343c43); k.box({-.14f, 0, -.14f}, {.14f, .19f, .14f});
+  k.col(0xf6c923); k.box({-.145f, .14f, -.145f}, {.145f, .22f, .15f});
+  k.col(0xeceee8); k.box({-.09f, .08f, .15f}, {.09f, .089f, .32f});
+  k.col(0x232a30);
+  for (int i = 0; i < 9; i++) k.b.Box({-.07f + i * .016f, .099f, .18f}, {-.064f + i * .016f, .102f, .26f});
+}
+
 struct Entry {
   const char* id;
   const char* name;
@@ -2242,6 +2311,16 @@ void BuildCatalog() {
       {"schaltschrank", "Schaltschrank", true, Schaltschrank},
       {"fass_blau", "Kunststofffass", true, Kunststofffass},
       {"ibc", "IBC-Tank", true, IbcTank},
+      {"paket_s", "KEK-Päckchen", true, [](PK& k) { Versandpaket(k, {.36f, .28f, .3f}, false); }},
+      {"paket_m", "KEK-Paket", true, [](PK& k) { Versandpaket(k, {.66f, .52f, .48f}, false); }},
+      {"paket_fragil", "Vorsicht, zerbrechlich!", true, [](PK& k) { Versandpaket(k, {.48f, .64f, .44f}, true); }},
+      {"versandrolle", "Versandrolle", true, Versandrolle},
+      {"handscanner", "Handscanner", true, Handscanner},
+      {"klebeband", "Klebebandrolle", true, Klebeband},
+      {"postsack", "Postsack", true, Postsack},
+      {"sortierkiste", "Sortierkiste", true, Sortierkiste},
+      {"rollcontainer", "Paket-Rollcontainer", true, Rollcontainer},
+      {"etikettendrucker", "Etikettendrucker", true, Etikettendrucker},
   };
   g_defs.reserve(COUNTOF(entries));
   for (const Entry& e : entries) {

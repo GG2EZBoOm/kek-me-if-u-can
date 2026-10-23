@@ -172,6 +172,14 @@ void BotManager::ThinkProp(Sim& sim, int id, Brain& b, UserCmd& cmd) {
     }
   };
   if (damaged && b.state != 6 && sim.phase == Phase::Hunting) startFlee();
+  if (sim.phase == Phase::Hunting && sim.mode == MODE_HOT && b.state != 6) startFlee();
+  if (sim.phase == Phase::Hunting && sim.mode == MODE_ROULETTE && b.state < 3) { b.state = 3; b.stateTimer = 0; }
+  if (sim.phase == Phase::Hunting && sim.mode == MODE_CLONES) {
+    int clones = 0;
+    for (const Decoy& d : sim.decoys) if (d.active && d.owner == id) clones++;
+    if (clones < 3 && p.decoys && rng_.Chance(.3f * TICK_DT)) press(BTN_DECOY);
+    if (clones && nearH < 5 && p.abilityTimer <= 0) press(BTN_ABILITY);
+  }
 
   switch (b.state) {
     case 0: {  // Tarnung auswählen
@@ -545,6 +553,10 @@ void BotManager::ThinkHunter(Sim& sim, int id, Brain& b, UserCmd& cmd) {
 
 void BotManager::OnEvents(const Sim& sim, const std::vector<GameEvent>& evs) {
   for (const GameEvent& e : evs) {
+    if (e.a < MAX_PLAYERS && sim.players[e.a].bot &&
+        ((e.type == EV_DISGUISE && sim.mode == MODE_ROULETTE) || e.type == EV_CLONE_SWAP)) {
+      brains_[e.a].state = 3; brains_[e.a].stateTimer = 0; brains_[e.a].path.clear();
+    }
     if (e.type == EV_TAUNT || e.type == EV_PING) {
       sounds_.push_back({e.pos, time_});
       for (int j = 0; j < MAX_PLAYERS; j++) {

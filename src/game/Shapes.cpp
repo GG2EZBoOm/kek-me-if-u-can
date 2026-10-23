@@ -1,5 +1,24 @@
 #include "game/Shapes.h"
 
+void BuildKekLogo(MeshBuilder& b) {
+  Mat4 slant = Mat4::Identity(); slant.m[4] = .28f;
+  b.Push(slant);
+  auto polygon = [&](std::initializer_list<Vec2> points) { ExtrudeConvex(b, std::vector<Vec2>(points), 0, .025f); };
+  for (float x : {-1.65f, .65f}) {
+    b.Box({x, -.7f, 0}, {x + .28f, .7f, .025f});
+    polygon({{x + .25f, -.13f}, {x + 1.05f, .7f}, {x + .66f, .7f}, {x + .25f, .25f}});
+    polygon({{x + .25f, .16f}, {x + .25f, -.24f}, {x + .65f, -.7f}, {x + 1.06f, -.7f}});
+  }
+  b.Box({-.5f, -.7f, 0}, {-.22f, .7f, .025f});
+  for (float y : {-.7f, -.12f, .44f}) b.Box({-.22f, y, 0}, {.5f, y + .26f, .025f});
+  for (int i = 0; i < 3; i++) {
+    float y = -.69f + i * .19f;
+    b.Box({-3, y, 0}, {-1.85f, y + .1f, .025f});
+    b.Box({1.88f, y, 0}, {3, y + .1f, .025f});
+  }
+  b.Pop();
+}
+
 void ExtrudeConvex(MeshBuilder& b, const std::vector<Vec2>& pts, float z0, float z1) {
   int n = (int)pts.size();
   if (n < 3) return;

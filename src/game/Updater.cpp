@@ -464,6 +464,8 @@ void Updater::Work(std::string current, bool install) {
   std::wstring self = ExePath(), dir = DirOf(self);
   std::wstring selfName = self.substr(dir.size());
   bool selfIsCli = SameName(selfName, L"KekMeIfYouCanCLI.exe");
+  // Die Ordner-Ausgabe bleibt auch nach einem Update klein. Marker liegt im ZIP.
+  bool folder = FileExists(dir + L"folder-install.txt");
   struct Job {
     const Release::Asset* asset;
     std::wstring target;
@@ -471,9 +473,10 @@ void Updater::Work(std::string current, bool install) {
   std::vector<Job> jobs;
   for (const Release::Asset& a : rel.assets) {
     std::wstring name = Utf8ToWide(a.name);
-    bool gui = SameName(name, L"KekMeIfYouCan.exe"), cli = SameName(name, L"KekMeIfYouCanCLI.exe");
+    bool gui = SameName(name, folder ? L"KekMeIfYouCan-Ordner.exe" : L"KekMeIfYouCan.exe");
+    bool cli = SameName(name, L"KekMeIfYouCanCLI.exe");
     if (!gui && !cli) continue;
-    std::wstring target = dir + name;
+    std::wstring target = dir + (gui ? L"KekMeIfYouCan.exe" : L"KekMeIfYouCanCLI.exe");
     if ((gui && !selfIsCli) || (cli && selfIsCli)) target = self;  // auch eine umbenannte EXE wird ersetzt
     else if (!FileExists(target)) continue;
     jobs.push_back({&a, target});

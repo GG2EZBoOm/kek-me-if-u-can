@@ -10,3 +10,6 @@ void BuildEagle(MeshBuilder& b);
 // Gibt die Breite zurück.
 float BuildPixelText(MeshBuilder& b, const char* text, float pixel, float depth);
 float PixelTextWidth(const char* text, float pixel);
+// Roter, schräger KEK-Schriftzug mit Geschwindigkeitsstreifen; 6 x 1.4, Front +Z.
+// Reine Geometrie, ohne Profilbild oder weißen Kreis aus der Referenz.
+void BuildKekLogo(MeshBuilder& b);

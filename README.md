@@ -1,29 +1,37 @@
 # Kek Me If You Can
 
 Ein Prop-Hunt-Spiel mit **eigener C++-Engine**, ohne externe Bibliotheken: Geometrie, Materialien, Klänge und Musik
-werden beim Start prozedural erzeugt. Am Ende steht eine einzelne EXE, einschließlich Programmsymbol und drei
-Intro-Videos. Das Symbol ist eine Dose mit verschmitztem Blick: Das „can“ im Namen ist wörtlich gemeint.
+werden beim Start prozedural erzeugt. Es gibt einen vollständigen Spielordner als ZIP und eine Einzel-EXE mit
+eingebetteten Intros. Das Symbol ist eine Dose mit verschmitztem Blick: Das „can“ im Namen ist wörtlich gemeint.
 
 ## Herunterladen
 
-**[Spiel für Windows herunterladen – KekMeIfYouCan.exe](https://github.com/GG2EZBoOm/kek-me-if-u-can/releases/latest/download/KekMeIfYouCan.exe)**
+**[Vollständigen Spielordner für Windows herunterladen – ZIP](https://github.com/GG2EZBoOm/kek-me-if-u-can/releases/latest/download/KekMeIfYouCan-Windows.zip)**
 
-Die EXE enthält das komplette Spiel, alle Karten und die drei Intros. Herunterladen und starten; eine Installation ist nicht nötig.
-Für dedizierte Server und Tests gibt es zusätzlich die
-[Konsolen-Version](https://github.com/GG2EZBoOm/kek-me-if-u-can/releases/latest/download/KekMeIfYouCanCLI.exe).
+Das ZIP vollständig entpacken, dann **KekMeIfYouCan.exe** im entpackten Ordner starten. Es enthält die kleine
+Spiel-EXE (rund 1,8 MB), das Konsolen-/Serverprogramm, alle drei Intro-Videos in `data/video`, eine Anleitung und
+SHA-256-Prüfsummen. Eine Installation ist nicht nötig. Den Ordner zusammenlassen.
+
+Alternativ: [Einzel-EXE mit eingebetteten Videos](https://github.com/GG2EZBoOm/kek-me-if-u-can/releases/latest/download/KekMeIfYouCan.exe)
+oder [Konsolen-Version](https://github.com/GG2EZBoOm/kek-me-if-u-can/releases/latest/download/KekMeIfYouCanCLI.exe).
+`KekMeIfYouCan-Ordner.exe` in den Release-Dateien ist die Update-Datei für die Ordner-Ausgabe; für einen neuen Download das ZIP nehmen.
 Alle Versionen stehen unter [Releases](https://github.com/GG2EZBoOm/kek-me-if-u-can/releases/latest).
 
 **„Code → Download ZIP“ und „Source code“ enthalten nur die Projektdateien zum Selbstbauen, keine EXE.**
 Zum Spielen bitte den direkten Download oben verwenden.
 
-Windows SmartScreen kann beim ersten Start
-warnen, weil die Datei nicht signiert ist („Weitere Informationen“ → „Trotzdem ausführen“).
+Die Programme sind derzeit **nicht digital signiert**. Windows kann sie daher weiterhin warnen oder blockieren;
+die Aufteilung in einen Spielordner garantiert keine Freigabe. Fehlt „Trotzdem ausführen“, bitte den vollständigen
+Meldungstext prüfen: SmartScreen-Richtlinien, Smart App Control und ein konkreter Virenfund sind unterschiedliche Ursachen.
+Die Prüfsummen dienen dem Dateivergleich und ersetzen keine Sicherheitsprüfung.
+[Microsoft erklärt SmartScreen und Signaturen.](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation)
 
 ### Intros
 
 Beim Start laufen drei Intro-Videos: Kekish Games, die Engine und das Spiel. Mit **Leertaste**, Enter oder einem
 Klick geht es zum nächsten, **Esc** überspringt alle. In den Einstellungen lassen sie sich abschalten, `--no-intro`
-überspringt sie für einen Start. Die Videos stecken in der EXE und werden über Windows Media Foundation abgespielt.
+überspringt sie für einen Start. In der Ordner-Ausgabe liegen sie unter `data/video`, in der Einzel-EXE sind sie
+eingebettet. Beide Ausgaben verwenden Windows Media Foundation.
 
 ### Automatische Updates
 
@@ -32,6 +40,8 @@ EXEs, prüft Größe und SHA-256-Prüfsumme und tauscht die Dateien aus. Kommt d
 startet das Spiel sofort neu, sonst zeigt das Hauptmenü „Update ist bereit“ mit einem Neustart-Knopf. Während eines
 Spiels wird nichts unterbrochen. In den Einstellungen lässt sich das abschalten oder von Hand prüfen.
 `--no-update` überspringt die Prüfung für einen Start.
+Die Ordner-Ausgabe bleibt bei EXE-Updates klein; dafür `folder-install.txt` behalten. Wenn sich die Videos ändern,
+das neue vollständige ZIP herunterladen. Beide Ausgaben enthalten dieselben Spielregeln und Karten.
 
 ## Selbst bauen
 
@@ -41,6 +51,7 @@ build.bat
 
 Danach `KekMeIfYouCan.exe` starten. Voraussetzung: Visual Studio 2022/2026 mit „Desktopentwicklung mit C++“
 (liefert Compiler, CMake und Ninja mit).
+`./package.ps1` in PowerShell erstellt danach `build/package/KekMeIfYouCan-Windows.zip`.
 
 ## Spielprinzip
 
@@ -68,6 +79,23 @@ Danach `KekMeIfYouCan.exe` starten. Voraussetzung: Visual Studio 2022/2026 mit �
 | Lebendige Karten | Fahnen wehen im Wind, Riesenrad und Kettenflieger drehen sich. |
 | Freie Durchgänge | Gegenstände, die eine Tür versperren würden, werden beim Kartenbau automatisch weggelassen. Ein Test prüft jede Tür. |
 | Mehrspieler übers Internet | Bis zu 16 Spieler. Einladungscode, automatische Portfreigabe am Router (UPnP) und Discord-Einladungen (siehe unten). |
+
+## Spezialmodi
+
+Der **Lobbyleiter** wählt im Startmenü den Modus. Im **Esc-Menü** kann er einen Modus für die nächste Runde
+vormerken; die laufende Runde behält ihre Regeln. Gäste sehen die Auswahl, können sie aber nicht ändern.
+Alle Modi funktionieren mit Bots und Freunden auf allen vier Karten. Infektion ist zusätzlich einschaltbar.
+
+| Modus | So spielt er sich |
+|---|---|
+| **Prop-Roulette** | Alle 25 Sekunden eine neue Zufallsform aus der Karte, mit fünf Sekunden Vorwarnung. Die Form muss am aktuellen Ort passen; der Lebensanteil bleibt erhalten. Während der Jagd ist E gesperrt. |
+| **Klon-Alarm** | Q stellt bis zu drei eigene Klone auf. G tauscht dich mit dem nächsten eigenen Klon innerhalb von 20 m, mit zehn Sekunden Abklingzeit. Klone imitieren Taunts und Sonarantworten, verschwinden nach 45 Jagdsekunden; alle zwölf Sekunden kommt eine Ladung zurück. |
+| **Hummeln im Hintern** | Wer als Prop sieben Sekunden am selben Platz bleibt, hupt und verrät seine Position. Ein Meter Ortswechsel setzt den Alarm zurück. |
+| **Mondschicht** | 40 Prozent Schwerkraft für beide Teams und Granaten: hohe Sprünge und lange Flugbahnen. |
+| **Wundertüte** | Jede Runde einer der vier Spezialmodi, ohne direkte Wiederholung. |
+
+**Klassisch** bleibt ebenfalls wählbar. Für Mehrspieler müssen alle dieselbe aktuelle Version verwenden;
+das Netzwerkprotokoll wurde für die neuen Regeln erweitert.
 
 ## Karten
 
@@ -115,9 +143,22 @@ Eine Backsteinfabrik mit Werkshof und zwei Produktionslinien:
 
 Für einen dedizierten Server: `KekMeIfYouCanCLI.exe --server --map nudelfabrik --bots 8`.
 
+### KEK-Paketzentrum
+
+Gelb-rote Logistikhalle mit dem schrägen **KEK-Schriftzug und Streifen**, ohne das Avatar-Motiv im weißen Kreis:
+
+- Zwei laufende Paketbänder mit Scanportalen und große Paketregale
+- Eine begehbare Sortierbrücke mit zwei Treppen und Rundwegen
+- Retourenschalter, Packplätze und Leitstelle
+- Drei begehbare Lkw-Laderäume mit Ladetreppen und ein Betriebshof
+- Zehn neue Tarnungen: Päckchen, Paket, zerbrechliches Paket, Versandrolle, Handscanner, Klebeband,
+  Postsack, Sortierkiste, Rollcontainer und Etikettendrucker
+
+Für einen dedizierten Server: `KekMeIfYouCanCLI.exe --server --map paketzentrum --bots 8`.
+
 ### Gegenstände
 
-139 verschiedene Gegenstände. Im Bundestag gibt es unter anderem Aktenordner, Wasserglas, Laptop, Mate-Flasche,
+149 verschiedene Gegenstände. Im Bundestag gibt es unter anderem Aktenordner, Wasserglas, Laptop, Mate-Flasche,
 Currywurst, Wahlurne, Präsidentenglocke, Büste und Ficus. Auf dem Oktoberfest kommen Maßkrug, Wiesnbrezn,
 Lebkuchenherz, Bierfass, Hendl, Radi, Trachtenhut, Tuba, Teddybär, Gartenzwerg, Karussellpferd, Autoscooter und
 viele mehr dazu. Die Nudelfabrik ergänzt 32 Gegenstände, darunter Mehlsack, Europalette, Spaghetti-Packung,
@@ -132,6 +173,7 @@ Tomatendose, Parmesanlaib, Trockenwagen, Hubwagen, Schutzhelm, Werkzeugkiste und
 | E | | | In anvisiertes Objekt verwandeln |
 | R | | Nachladen | Drehung sperren/lösen |
 | Q | | Sonar | Köder platzieren |
+| G | | Sonar | Im Klon-Alarm: mit eigenem Klon tauschen, sonst Köder |
 | F | | | Zufälliger Taunt |
 | T | | | Taunt-Auswahl |
 | 1 / 2 / 3 | | MP / Schrotflinte / Granate | Taunt wählen (bei offener Liste) |
@@ -145,8 +187,8 @@ Tomatendose, Parmesanlaib, Trockenwagen, Hubwagen, Schutzhelm, Werkzeugkiste und
 ### Freunde einladen
 
 1. Wähle **Server erstellen**. Die Windows-Firewall fragt beim ersten Mal nach einer Freigabe, die du erlauben musst.
-2. Das Spiel gibt den **UDP-Port 27015** automatisch am Router frei (UPnP). Im **Esc-Menü** steht rechts die Karte
-   **„Freunde einladen“** mit
+2. Das Spiel gibt den **UDP-Port 27015** automatisch am Router frei (UPnP). Im **Esc-Menü** öffnet rechts der Knopf
+   **„Freunde einladen“** die Karte mit
    - einem **Einladungscode** wie `KEK-TE294-3VBJZ`. Er enthält deine IPv4-Adresse und den Port.
    - **Einladung kopieren**: Das kopiert eine fertige Nachricht für Discord oder einen anderen Chat.
    - **Öffentliche IP**: Diese Schaltfläche erscheint, wenn der Router die Adresse nicht verrät. Die Adresse wird
@@ -205,7 +247,9 @@ der Fairness:
   Solche Flächen flackern, weil der Tiefenpuffer sie nicht trennen kann.
 - **Blattwerk:** An keiner begehbaren Stelle darf man in Büschen oder Hecken stecken, die nur Optik sind.
 
-`--nettest` testet Server und Client über Loopback. `--gameshot` klickt sich automatisch durch Menüs und Spiel und
+Die Spezialregeln werden zusätzlich in einer kontrollierten Arena und mit Bot-Matches im Paketzentrum geprüft.
+`--nettest` testet Server und Client über Loopback, einschließlich Moduswechseln und voller Lobby mit vielen Klonen.
+`--gameshot` klickt sich automatisch durch Menüs und Spiel und
 speichert Screenshots, auch vom Einladungsmenü. Dabei werden weder der Router noch Discord angesprochen.
 
 Einzelne Stellen einer Karte rendern (Kamera, Blickpunkt). `--hunters` stellt am Blickpunkt vier Jäger in
@@ -222,7 +266,8 @@ Das Programmsymbol erzeugt `tools/make_icon.py` (benötigt Pillow) als `res/icon
 1. Version in `src/game/Version.h` erhöhen (z. B. `1.0.1`) und alles committen.
 2. `release.bat` ausführen. Es pusht den Stand und das Tag `v1.0.1`.
 3. GitHub Actions (`.github/workflows/release.yml`) baut, führt `--test` und `--nettest` aus und erstellt das
-   Release mit beiden EXEs. Ab dann bekommen alle Spieler die neue Version beim nächsten Start.
+   Release mit vollständigem Spielordner-ZIP, beiden GUI-Ausgaben, CLI und Prüfsummen. Ab dann bekommen Spieler
+   die neue EXE beim nächsten Start, sofern automatische Updates aktiviert sind.
 
 Das Update testen, ohne eine neue Version zu bauen: Die EXEs in einen leeren Ordner kopieren und dort Folgendes
 ausführen. Der Befehl gibt eine ältere eigene Version vor und installiert dann das aktuelle Release.

@@ -20,5 +20,6 @@ cmake -S "%~dp0." -B "%~dp0build\%CFG%" -G Ninja -DCMAKE_BUILD_TYPE=%CFG% || exi
 cmake --build "%~dp0build\%CFG%" || exit /b 1
 copy /y "%~dp0build\%CFG%\KekMeIfYouCan.exe" "%~dp0KekMeIfYouCan.exe" >nul
 copy /y "%~dp0build\%CFG%\KekMeIfYouCanCLI.exe" "%~dp0KekMeIfYouCanCLI.exe" >nul
+copy /y "%~dp0build\%CFG%\KekMeIfYouCan-Ordner.exe" "%~dp0KekMeIfYouCan-Ordner.exe" >nul
 echo.
 echo Fertig: %~dp0KekMeIfYouCan.exe

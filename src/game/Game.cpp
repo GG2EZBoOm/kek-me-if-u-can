@@ -83,6 +83,7 @@ class Game {
   bool PageHeader(float x, float y, float w, const std::string& title, const std::string& sub);
   void DrawMain();
   void DrawPlaySetup();
+  void DrawModePanel(const Rect& rect, bool inGame);
   void DrawJoin();
   void DrawSettings(bool overlay);
   void DrawConnecting();
@@ -127,6 +128,7 @@ class Game {
   float hideTotal_ = 0;    // Länge der aktuellen Versteckphase (für den Ring)
   double flybyStart_ = 0;
   bool settingsOverlay_ = false;
+  bool inviteOpen_ = false;
   bool paused_ = false, chatOpen_ = false, tauntMenu_ = false, help_ = false;
   std::string chatInput_;
   std::string error_;
@@ -348,6 +350,7 @@ void Game::LeaveGame(const std::string& reason) {
   loadedWorld_ = &menuWorld_;
   screen_ = Screen::Main;
   paused_ = chatOpen_ = tauntMenu_ = settingsOverlay_ = false;
+  inviteOpen_ = false;
   if (!reason.empty()) {
     error_ = reason;
     errorTime_ = 7;
@@ -402,7 +405,7 @@ UserCmd Game::MakeCmd() {
   if (tap('E')) c.buttons |= BTN_USE;
   if (tap('R')) c.buttons |= team == TEAM_PROPS ? BTN_LOCK : BTN_RELOAD;
   if (tap('Q')) c.buttons |= team == TEAM_PROPS ? BTN_DECOY : BTN_ABILITY;
-  if (tap('G')) c.buttons |= team == TEAM_PROPS ? BTN_DECOY : BTN_ABILITY;
+  if (tap('G')) c.buttons |= team == TEAM_PROPS && session_->State().mode != MODE_CLONES ? BTN_DECOY : BTN_ABILITY;
   if (tauntTap_) {
     c.buttons |= BTN_TAUNT;
     c.taunt = (u8)(tauntChoice_ + 1);
@@ -623,6 +626,19 @@ void Game::HandleEvent(const GameEvent& e) {
     case EV_PING:
       audio::Play(Snd(SND_PING), P3(e.pos, 1.0f, 3.0f, 45.0f));
       break;
+    case EV_MODE_WARNING:
+      Center("Formwechsel in 5 Sekunden!", Color::Hex(GetMode(e.b).color), 2.5f);
+      centerSub_ = "Prop-Roulette: Such dir etwas Platz für deine nächste Tarnung.";
+      audio::Play(Snd(SND_COUNTDOWN), P2(.45f));
+      break;
+    case EV_MODE_PULSE:
+      Center("Neue Form, neues Glück!", Color::Hex(GetMode(e.b).color), 2.2f);
+      centerSub_ = "Die Props wurden neu gemischt.";
+      break;
+    case EV_CLONE_SWAP:
+      audio::Play(Snd(SND_DISGUISE), P3(e.pos, .6f, 2, 22));
+      if (e.a == me) { Center("Ich war nie hier!", Color::Hex(GetMode(MODE_CLONES).color), 1.8f); centerSub_ = "Dein Klon übernimmt deinen alten Platz."; }
+      break;
     case EV_PHASE:
       if (e.b == (u8)Phase::Hiding) {
         audio::Play(Snd(SND_ROUND_START), P2(0.6f));
@@ -630,6 +646,7 @@ void Game::HandleEvent(const GameEvent& e) {
         else Center(StrFormat("Runde %d – versteck dich!", st.round), kProp, 4.0f);
         centerSub_ = lp && lp->team == TEAM_PROPS ? "E: in ein Objekt verwandeln · R: Drehung sperren · F/T: Taunt · Q: Köder"
                                                   : "Gleich darfst du suchen. Falsche Treffer kosten Lebenspunkte!";
+        if (st.mode != MODE_CLASSIC) centerSub_ = std::string(GetMode(st.mode).name) + " · " + GetMode(st.mode).tagline;
       } else if (e.b == (u8)Phase::Hunting) {
         audio::Play(Snd(SND_GO), P2(0.5f));
         audio::Play(Snd(SND_HUNT_START), P2(0.45f));
@@ -697,7 +714,8 @@ void Game::HandleEvent(const GameEvent& e) {
       if (e.a == me) {
         audio::Play(Snd(SND_NOFIT), P2(0.5f));
         Popup p;
-        p.text = "Hier ist kein Platz dafür";
+        p.text = e.b == 1 ? "Kein eigener Klon in 20 m Reichweite" : e.b == 2 ? "Prop-Roulette: Die nächste Form bestimmt das Los" :
+                 e.b == 3 ? "Schon 3 Klone aktiv – G tauscht deinen Platz" : "Hier ist kein Platz dafür";
         p.color = kRed;
         p.life = p.time = 1.5f;
         popups_.push_back(p);
@@ -1034,6 +1052,37 @@ bool Game::PageHeader(float x, float y, float w, const std::string& title, const
   return back;
 }
 
+void Game::DrawModePanel(const Rect& panel, bool inGame) {
+  ui_.Panel(panel, ui_.S(20));
+  float x = panel.x + ui_.S(24), y = panel.y + ui_.S(20), w = panel.w - ui_.S(48);
+  int mode = inGame ? session_->State().nextMode : cfg_.match.mode;
+  bool canEdit = !inGame || session_->IsHost();
+  ui_.Label(x, y, inGame ? "Nächste Runde" : "Spezialmodus", theme::Accent);
+  y += ui_.S(29);
+  std::vector<std::string> options;
+  for (int i = 0; i < MODE_COUNT; i++) options.push_back(GetMode(i).name);
+  if (canEdit) {
+    if (ui_.Selector(inGame ? "mode_next" : "mode_setup", {x, y, w, ui_.S(50)}, "Modus", &mode, options)) {
+      cfg_.match.mode = mode;
+      if (inGame) session_->SetNextMode(mode);
+      SaveCfg();
+    }
+  } else ui_.Text(FONT_MEDIUM, x, y + ui_.S(8), GetMode(mode).name, kWhite);
+  y += ui_.S(68);
+  const ModeInfo& info = GetMode(mode);
+  Color accent = Color::Hex(info.color);
+  ui_.Rect_({x, y, ui_.S(4), ui_.S(40)}, accent, ui_.S(2));
+  for (const auto& line : ui_.Wrap(FONT_MEDIUM, info.tagline, w - ui_.S(20))) {
+    ui_.Text(FONT_MEDIUM, x + ui_.S(16), y, line, accent); y += ui_.LineHeight(FONT_MEDIUM);
+  }
+  y += ui_.S(18);
+  for (const auto& line : ui_.Wrap(FONT_SMALL, info.rules, w)) {
+    ui_.Text(FONT_SMALL, x, y, line, theme::Dim); y += ui_.LineHeight(FONT_SMALL) + ui_.S(3);
+  }
+  ui_.Text(FONT_SMALL, x, panel.y + panel.h - ui_.S(38),
+           inGame ? (canEdit ? "Änderungen gelten erst ab der nächsten Runde." : "Der Lobbyleiter legt die Regeln fest.") : "Für alle Karten · mit Bots und Freunden", theme::Faint);
+}
+
 void Game::DrawPlaySetup() {
   float H = (float)ui_.H(), W = (float)ui_.W();
   float a = Appear(0);
@@ -1097,6 +1146,7 @@ void Game::DrawPlaySetup() {
   float ac = Appear(0.2f);
   ui_.SetAlpha(ac);
   DrawMapCard({W - ui_.S(510) + (1 - ac) * ui_.S(40), H - ui_.S(268), ui_.S(460), ui_.S(218)}, true);
+  DrawModePanel({W - ui_.S(510), ui_.S(152), ui_.S(460), ui_.S(350)}, false);
   ui_.SetAlpha(1);
 }
 
@@ -1304,13 +1354,32 @@ void Game::DrawError() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Intro-Videos (in der EXE eingebettet, res/intro.rc)
+// Intro-Videos: im Spielordner unter data/video, alternativ eingebettet (Einzel-EXE).
 // ---------------------------------------------------------------------------------------------
 
 // Reihenfolge: Studio (Kekish Games), Engine, Spiel
 static const int kIntroIds[] = {100, 101, 102};
 
-static bool IntroResource(int id, const void*& data, size_t& size) {
+static bool IntroResource(int id, const void*& data, size_t& size, std::vector<u8>& storage) {
+  static const char* names[] = {"kekishintro.mp4", "engineintro.mp4", "spielintro.mp4"};
+  if (id < 100 || id > 102) return false;
+  std::wstring path = Utf8ToWide(ExeDir() + "data/video/" + names[id - 100]);
+  FILE* f = _wfopen(path.c_str(), L"rb");
+  if (f) {
+    if (_fseeki64(f, 0, SEEK_END) == 0) {
+      i64 length = _ftelli64(f);
+      if (length > 0 && length <= (128ll << 20) && _fseeki64(f, 0, SEEK_SET) == 0) {
+        storage.resize((size_t)length);
+        if (fread(storage.data(), 1, storage.size(), f) == storage.size()) {
+          fclose(f); data = storage.data(); size = storage.size();
+          LOG("Intro %d aus data/video geladen", id);
+          return true;
+        }
+      }
+    }
+    fclose(f);
+    storage.clear();
+  }
   HRSRC res = FindResourceW(nullptr, MAKEINTRESOURCEW(id), RT_RCDATA);
   HGLOBAL g = res ? LoadResource(nullptr, res) : nullptr;
   data = g ? LockResource(g) : nullptr;
@@ -1325,7 +1394,8 @@ void Game::PlayIntros() {
     if (skipAll || !plat::PumpEvents()) break;
     const void* data = nullptr;
     size_t size = 0;
-    if (!IntroResource(id, data, size)) continue;
+    std::vector<u8> storage;
+    if (!IntroResource(id, data, size, storage)) continue;
     VideoPlayer vp;
     if (!vp.Open(data, size)) continue;
     double t0 = plat::Time(), last = t0, fadeOut = -1;
@@ -1386,7 +1456,8 @@ void Game::PlayIntros() {
 bool Game::IntroShot(int index, double t, const char* name) {
   const void* data = nullptr;
   size_t size = 0;
-  if (index < 0 || index >= COUNTOF(kIntroIds) || !IntroResource(kIntroIds[index], data, size)) return false;
+  std::vector<u8> storage;
+  if (index < 0 || index >= COUNTOF(kIntroIds) || !IntroResource(kIntroIds[index], data, size, storage)) return false;
   VideoPlayer vp;
   if (!vp.Open(data, size) || !vp.ShowFrameAt(t)) return false;
   vp.Draw(plat::Width(), plat::Height(), 1.0f);
@@ -1822,12 +1893,18 @@ void Game::DrawPause() {
   ui_.SetAlpha(a);
   float w = 400, h = 58, gap = 12;
   bool online = hosting_ || !serverAddr_.empty();
-  float cx = W / ui_.Scale() * 0.5f - (online ? 240 : 0);
+  float cx = W / ui_.Scale() * 0.5f - 240;
   float x = cx - w * 0.5f, y = H / ui_.Scale() * 0.5f - 160;
   ui_.Label(ui_.S(cx), ui_.S(y - 92), "Pausiert", theme::Accent, ALIGN_CENTER);
   float tw = ui_.Measure(FONT_LARGE, "KEK ME IF YOU CAN").x;
   DrawLogo(ui_.S(cx) - tw * 0.5f, ui_.S(y - 70), false);
-  if (online) DrawInvitePanel(R(cx + w * 0.5f + 40, y - 6, 460, 388));
+  if (online && inviteOpen_) DrawInvitePanel(R(cx + w * .5f + 40, y - 110, 460, 388));
+  else DrawModePanel(R(cx + w * .5f + 40, y - 110, 460, 350), true);
+  if (online) {
+    if (ui_.ButtonEx("pa_invite", R(cx + w * .5f + 40, y + 300, 460, 58), inviteOpen_ ? "Zurück zu den Spielmodi" : "Freunde einladen", icon::Globe, UI::BTN_SECONDARY)) {
+      inviteOpen_ = !inviteOpen_;
+    }
+  }
   if (ui_.ButtonEx("pa_resume", R(x, y, w, h), "Weiter", icon::Play, UI::BTN_PRIMARY)) paused_ = false;
   y += h + gap;
   if (ui_.ButtonEx("pa_help", R(x, y, w, h), "Steuerung", icon::Keyboard, UI::BTN_SECONDARY)) { help_ = true; paused_ = false; }
@@ -1863,6 +1940,11 @@ void Game::DrawHelp() {
                            {{"Q"}, "Sonar – verrät nahe Props"}, {{"Strg"}, "Ducken"}};
   std::vector<K> prop = {{{"E"}, "In anvisiertes Objekt verwandeln"}, {{"R"}, "Drehung sperren / lösen"}, {{"F"}, "Zufälliger Taunt (+Punkte)"},
                          {{"T"}, "Taunt-Auswahl"}, {{"Q"}, "Köder platzieren (2×)"}, {{"Strg"}, "Ducken"}};
+  if (session_ && session_->State().mode == MODE_CLONES) {
+    prop[4].what = "Klon platzieren (max. 3 aktiv)";
+    prop.push_back({{"G"}, "Mit nächstem eigenen Klon tauschen"});
+  }
+  if (session_ && session_->State().mode == MODE_ROULETTE) prop[0].what = "Verwandeln (nur in der Versteckphase)";
   const std::vector<K>* lists[3] = {&common, &hunter, &prop};
   const char* heads[3] = {"Allgemein", "Jäger", "Props"};
   const char* icons[3] = {icon::Keyboard, icon::Search, icon::Package};
@@ -2006,6 +2088,28 @@ void Game::DrawHUD() {
     ui_.TextShadow(FONT_LABEL, W * 0.5f, sy, UI::Upper(sub), theme::Dim, ALIGN_CENTER, ui_.S(1.4f));
   }
 
+  if (st.mode != MODE_CLASSIC || st.nextMode != MODE_CLASSIC) {
+    bool next = st.phase == Phase::Waiting || st.phase == Phase::RoundEnd || st.phase == Phase::MatchEnd;
+    int mode = next ? st.nextMode : st.mode;
+    Color accent = Color::Hex(GetMode(mode).color);
+    Rect p = {ui_.S(24), ui_.S(158), ui_.S(350), ui_.S(118)};
+    ui_.Panel(p, ui_.S(16));
+    ui_.Label(p.x + ui_.S(16), p.y + ui_.S(12), next ? "Nächste Runde" : "Spezialmodus", accent);
+    ui_.Text(FONT_NORMAL, p.x + ui_.S(16), p.y + ui_.S(35), GetMode(mode).name, kWhite);
+    std::string hint = GetMode(mode).tagline;
+    bool prop = lp && lp->alive && lp->team == TEAM_PROPS;
+    if (!next) {
+      if (mode == MODE_ROULETTE) hint = StrFormat("Formwechsel in %.0f s · E nur in der Versteckphase", ceilf(st.modeTimer));
+      if (mode == MODE_CLONES) hint = prop ? StrFormat("Q: Klon · G: Tausch%s · Nachschub %.0f s", lp->abilityTimer > 0 ? " lädt" : " bereit", lp->decoys < 3 ? ceilf(CLONE_RECHARGE - lp->modeMeter) : 0) : "Klone antworten ebenfalls auf Sonar und Taunts.";
+      if (mode == MODE_HOT) hint = prop ? StrFormat("Bewege dich 1 m! Alarm in %.1f s", std::max(0.0f, HOT_LIMIT - lp->modeMeter)) : "Wer stillsteht, hupt und verrät seinen Standort.";
+      if (mode == MODE_MOON) hint = "40 % Schwerkraft · auch für deine Granaten";
+    }
+    float y = p.y + ui_.S(64);
+    for (const auto& line : ui_.Wrap(FONT_SMALL, hint, p.w - ui_.S(32))) {
+      ui_.Text(FONT_SMALL, p.x + ui_.S(16), y, line, theme::Dim); y += ui_.LineHeight(FONT_SMALL);
+    }
+  }
+
   // Killfeed
   {
     float y = ui_.S(18);
@@ -2073,7 +2177,7 @@ void Game::DrawHUD() {
         ix += r.w + ui_.S(8);
       };
       chip("R", lp->rotLock ? "Drehung gesperrt" : "Drehung frei", lp->rotLock ? theme::Accent : kWhite, lp->rotLock);
-      chip("Q", StrFormat("Köder × %d", lp->decoys), lp->decoys ? kWhite : theme::Faint, false);
+      chip("Q", StrFormat(st.mode == MODE_CLONES ? "Klone × %d" : "Köder × %d", lp->decoys), lp->decoys ? kWhite : theme::Faint, false);
       chip("F", lp->tauntTimer > 0 ? "Taunt läuft …" : (lp->tauntCooldown > 0 ? StrFormat("Taunt in %.0f s", ceilf(lp->tauntCooldown)) : "Taunt"),
            lp->tauntCooldown > 0 ? theme::Faint : kWhite, false);
       chip("T", "Liste", kWhite, tauntMenu_);
@@ -2090,7 +2194,7 @@ void Game::DrawHUD() {
       }
       // Hinweis zur Verwandlung
       int hp = view_.HighlightProp();
-      if (hp >= 0 && hp < (int)w.props.size()) {
+      if (hp >= 0 && hp < (int)w.props.size() && !(st.mode == MODE_ROULETTE && st.phase == Phase::Hunting)) {
         const PropDef& d = props::Get(w.props[hp].type);
         std::string t = "Verwandeln in " + d.name;
         std::string hpS = StrFormat("%.0f HP", d.health);
@@ -2351,9 +2455,11 @@ void Game::Autopilot() {
   Shot("pause");
   // Einladungskarte als Gastgeber – nur Anzeige: kein Router-Zugriff, kein Discord
   hosting_ = true;
+  inviteOpen_ = true;
   localIp_ = upnp::LocalIPv4();
   frames(20);
   Shot("invite");
+  inviteOpen_ = false;
   paused_ = false;
   joinRequests_.push_back({"0", "Kek-Freund", time_});
   frames(20);

@@ -21,6 +21,7 @@ struct ClientPlayer {
   float stamina = 1;
   u16 lastButtons = 0;
   u8 decoys = 0;
+  float modeMeter = 0;
   int score = 0, kills = 0, deaths = 0;
   int ping = 0;
   u32 lastCmdSeq = 0;
@@ -48,6 +49,9 @@ struct ClientState {
   Team winner = TEAM_SPECTATOR;
   int mapIndex = 0;
   bool infection = false;
+  GameMode mode = MODE_CLASSIC;
+  int nextMode = MODE_CLASSIC;
+  float modeTimer = 0;
   ClientPlayer players[MAX_PLAYERS];
   ClientDecoy decoys[MAX_DECOYS];
   ClientGrenade grenades[MAX_GRENADES];

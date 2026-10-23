@@ -20,6 +20,7 @@ class Session {
   virtual bool Failed() const { return false; }
   virtual std::string StatusText() const { return ""; }
   virtual bool IsHost() const = 0;
+  virtual void SetNextMode(int) {}  // ausschließlich LocalSession/Host darf Rundenregeln ändern
   virtual void TakeEvents(std::vector<GameEvent>& out) = 0;
   virtual void SendChat(const std::string& text) = 0;
   // Bewegungszustand des lokalen Spielers (vorhergesagt bzw. autoritativ)
@@ -39,6 +40,7 @@ class LocalSession : public Session {
   const World& GetWorld() const override { return world_; }
   bool Ready() const override { return ready_; }
   bool IsHost() const override { return true; }
+  void SetNextMode(int mode) override { sim_.settings.mode = ClampI(mode, 0, MODE_COUNT - 1); }
   void TakeEvents(std::vector<GameEvent>& out) override;
   void SendChat(const std::string& text) override;
   const MoveState* LocalMove() const override;

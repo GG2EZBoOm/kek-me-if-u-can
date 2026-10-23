@@ -145,6 +145,7 @@ bool ApplyMovement(const MoveEnv& env, MoveState& s, const UserCmd& cmd, int pro
 
 void PlayerMove(const MoveEnv& env, MoveState& s, const UserCmd& cmd, int propType, bool frozen, float dt) {
   MoveConfig cfg = MoveConfigFor(propType);
+  if (env.mode == MODE_MOON) cfg.gravity *= 0.4f;
   s.yaw = cmd.yaw;
   s.pitch = Clamp(cmd.pitch, -1.55f, 1.55f);
   u16 b = frozen ? 0 : cmd.buttons;

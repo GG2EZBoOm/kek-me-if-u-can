@@ -12,6 +12,9 @@ void FillClientState(const Sim& sim, ClientState& out, float alpha) {
   out.winner = sim.winner;
   out.mapIndex = sim.settings.mapIndex;
   out.infection = sim.settings.infection;
+  out.mode = sim.mode;
+  out.nextMode = sim.settings.mode;
+  out.modeTimer = sim.modeTimer;
   for (int i = 0; i < MAX_PLAYERS; i++) {
     const Player& p = sim.players[i];
     ClientPlayer& c = out.players[i];
@@ -48,6 +51,7 @@ void FillClientState(const Sim& sim, ClientState& out, float alpha) {
     c.hurtTimer = p.hurtTimer;
     c.stamina = p.ms.stamina;
     c.decoys = p.decoys;
+    c.modeMeter = p.modeMeter;
     c.score = p.score;
     c.kills = p.kills;
     c.deaths = p.deaths;

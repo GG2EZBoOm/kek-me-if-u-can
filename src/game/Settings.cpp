@@ -42,6 +42,7 @@ void Settings::Load(const std::string& path) {
   i("bots", match.bots);
   i("botSkill", match.botSkill);
   b("infection", match.infection);
+  i("mode", match.mode);
   s("lastServer", lastServer);
   s("serverName", serverName);
   sensitivity = Clamp(sensitivity, 0.1f, 5.0f);
@@ -49,6 +50,7 @@ void Settings::Load(const std::string& path) {
   match.bots = ClampI(match.bots, 0, MAX_PLAYERS - 1);
   match.botSkill = ClampI(match.botSkill, 0, 2);
   match.rounds = ClampI(match.rounds, 1, 20);
+  match.mode = ClampI(match.mode, 0, MODE_COUNT - 1);
 }
 
 void Settings::Save(const std::string& path) const {
@@ -62,6 +64,7 @@ void Settings::Save(const std::string& path) const {
   t += StrFormat("map=%d\nrounds=%d\nhideTime=%.0f\nroundTime=%.0f\nbots=%d\nbotSkill=%d\ninfection=%d\n", match.mapIndex,
                  match.rounds, match.hideTime, match.roundTime, match.bots, match.botSkill, match.infection ? 1 : 0);
   t += "lastServer=" + lastServer + "\n";
+  t += StrFormat("mode=%d\n", match.mode);
   t += "serverName=" + serverName + "\n";
   WriteFileText(path, t);
 }

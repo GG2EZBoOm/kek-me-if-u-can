@@ -67,6 +67,7 @@ static void WritePlayer(Writer& w, const Player& p, int i, bool full) {
   w.U8(Q8(p.disguiseTimer, 20));
   w.U8(Q8(p.hurtTimer, 50));
   w.U8(p.decoys);
+  w.U8(Q8(p.modeMeter, 10));
   w.I16((i16)p.score);
   w.U8((u8)std::min(p.kills, 255));
   w.U8((u8)std::min(p.deaths, 255));
@@ -109,6 +110,7 @@ static void ReadPlayer(Reader& r, ClientPlayer& p, bool full) {
   p.disguiseTimer = r.U8() / 20.0f;
   p.hurtTimer = r.U8() / 50.0f;
   p.decoys = r.U8();
+  p.modeMeter = r.U8() / 10.0f;
   p.score = r.I16();
   p.kills = r.U8();
   p.deaths = r.U8();
@@ -330,6 +332,9 @@ void NetServer::SendSnapshot(Sim& sim, Client& c, double now) {
   w.U8((u8)sim.settings.mapIndex);
   bool names = (c.snapshots % 15) == 0;
   w.U8((sim.settings.infection ? 1 : 0) | (names ? 2 : 0));
+  w.U8(sim.mode);
+  w.U8((u8)sim.settings.mode);
+  w.F32(sim.modeTimer);
   u16 mask = 0;
   for (int i = 0; i < MAX_PLAYERS; i++)
     if (sim.players[i].active) mask |= (u16)(1 << i);
@@ -355,16 +360,6 @@ void NetServer::SendSnapshot(Sim& sim, Client& c, double now) {
     w.U8((u8)i);
     w.Pos16(sim.grenades[i].pos);
   }
-  size_t countPos = w.buf.size();
-  w.U8(0);
-  int ne = 0;
-  for (const GameEvent& e : eventLog_) {
-    if (e.id <= c.ackEvent) continue;
-    if (ne >= 24 || w.Size() > 1150) break;
-    WriteEvent(w, e);
-    ne++;
-  }
-  w.buf[countPos] = (u8)ne;
   if (names) {
     for (int i = 0; i < MAX_PLAYERS; i++)
       if (sim.players[i].active) {
@@ -373,6 +368,21 @@ void NetServer::SendSnapshot(Sim& sim, Client& c, double now) {
       }
   }
   sock_.Send(c.addr, w.buf.data(), w.Size());
+  // Ereignisse dürfen bei voller Lobby mit vielen Klonen nicht vom Snapshot verdrängt werden.
+  // Ein eigenes kleines Paket wird bis zur Bestätigung erneut gesendet.
+  Writer ew;
+  Header(ew, MSG_EVENTS);
+  ew.U8(0);
+  int ne = 0;
+  for (const GameEvent& e : eventLog_) {
+    if (e.id <= c.ackEvent) continue;
+    Writer entry; WriteEvent(entry, e);
+    if (ne >= 24 || ew.Size() + entry.Size() > 1200) break;
+    ew.buf.insert(ew.buf.end(), entry.buf.begin(), entry.buf.end());
+    ne++;
+  }
+  ew.buf[3] = (u8)ne;
+  if (ne) sock_.Send(c.addr, ew.buf.data(), ew.Size());
   c.snapshots++;
 }
 
@@ -442,6 +452,7 @@ MoveEnv NetClient::PredictEnv(std::vector<OBox>& storage) const {
   }
   MoveEnv env;
   env.world = &world_;
+  env.mode = L.mode;
   env.others = &storage;
   return env;
 }
@@ -481,6 +492,21 @@ void NetClient::HandlePacket(const u8* data, int size) {
       state_ = FailedState;
       status_ = "Der Server wurde beendet";
       break;
+    case MSG_EVENTS: {
+      if (state_ != Connected) return;
+      int ne = r.U8();
+      u32 maxId = ackEvent_;
+      std::vector<GameEvent> fresh;
+      for (int k = 0; k < ne; k++) {
+        GameEvent e = ReadEvent(r);
+        if (!r.Ok()) return;
+        if (e.id > ackEvent_) { fresh.push_back(e); maxId = std::max(maxId, e.id); }
+      }
+      if (!r.Ok()) return;
+      events_.insert(events_.end(), fresh.begin(), fresh.end());
+      ackEvent_ = maxId;
+      break;
+    }
     case MSG_SNAPSHOT: {
       if (state_ != Connected || slot_ < 0) return;
       Snap s;
@@ -496,6 +522,9 @@ void NetClient::HandlePacket(const u8* data, int size) {
       st.mapIndex = r.U8();
       u8 flags = r.U8();
       st.infection = flags & 1;
+      st.mode = (GameMode)ClampI(r.U8(), 0, MODE_MOON);
+      st.nextMode = ClampI(r.U8(), 0, MODE_COUNT - 1);
+      st.modeTimer = r.F32();
       u16 mask = r.U16();
       for (int i = 0; i < MAX_PLAYERS; i++) {
         if (!(mask & (1 << i))) continue;
@@ -519,17 +548,6 @@ void NetClient::HandlePacket(const u8* data, int size) {
         Vec3 p = r.Pos16();
         if (idx < MAX_GRENADES) { st.grenades[idx].active = true; st.grenades[idx].pos = p; }
       }
-      int ne = r.U8();
-      u32 maxId = ackEvent_;
-      std::vector<GameEvent> fresh;
-      for (int k = 0; k < ne; k++) {
-        GameEvent e = ReadEvent(r);
-        if (!r.Ok()) break;
-        if (e.id > ackEvent_) {
-          fresh.push_back(e);
-          maxId = std::max(maxId, e.id);
-        }
-      }
       if (flags & 2) {
         while (!r.AtEnd()) {
           int idx = r.U8();
@@ -539,8 +557,6 @@ void NetClient::HandlePacket(const u8* data, int size) {
         }
       }
       if (!r.Ok()) return;
-      events_.insert(events_.end(), fresh.begin(), fresh.end());
-      ackEvent_ = maxId;
       lastRecv_ = time_;
       if (s.tick <= lastSnapTick_ && haveSnap_) return;  // veraltet
       lastSnapTick_ = s.tick;
@@ -583,7 +599,7 @@ void NetClient::HandlePacket(const u8* data, int size) {
 
 void NetClient::Update(double frameDt) {
   time_ += frameDt;
-  u8 buf[2048];
+  u8 buf[4096];  // volle Lobby, 48 Klone und alle Spielernamen
   Address from;
   int n;
   while ((n = sock_.Recv(from, buf, sizeof(buf))) > 0)

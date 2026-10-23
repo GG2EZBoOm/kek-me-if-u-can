@@ -14,6 +14,7 @@ enum NetMsg : u8 {
   MSG_BYE,
   MSG_DISCOVER,
   MSG_INFO,
+  MSG_EVENTS,
 };
 constexpr u16 NET_MAGIC = 0x4850;
 

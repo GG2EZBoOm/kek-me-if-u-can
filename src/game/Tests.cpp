@@ -411,9 +411,38 @@ static void NudelfabrikTests(const World& w, const NavGrid& nav, int& fails) {
   }
 }
 
-static void BotMatch(World& w, BotManager& bots, int rounds, int& fails) {
+static void PaketzentrumTests(const World& w, const NavGrid& nav, int& fails) {
+  MoveState s;
+  for (float x : {-21.0f, 21.0f}) {
+    WalkTest(w, {x, .05f, 9.5f}, 0, 2.7f, s);
+    Check(fabsf(s.pos.y - 3.4f) < .1f, "Sucher kommt über die Treppe auf die Sortierbrücke", fails);
+    WalkTest(w, {x, .05f, 9.5f}, 0, 3.5f, s, props::Find("paket_s"));
+    Check(fabsf(s.pos.y - 3.4f) < .1f, "Kleines Paket kommt auf die Sortierbrücke", fails);
+  }
+  for (float z : {-14.5f, -5.5f, 5.5f}) {
+    WalkTest(w, {29, .05f, z}, -PI * .5f, 1.1f, s);
+    Check(fabsf(s.pos.y - 1.2f) < .1f && s.pos.x > 32.5f, "Wechselbrücke über Ladetreppe begehbar", fails);
+  }
+  MoveEnv env; env.world = &w;
+  bool free = true;
+  for (const auto* starts : {&w.hunterSpawns, &w.propSpawns}) for (const auto& spawn : *starts) {
+    s = MoveState(); s.pos = spawn.pos + Vec3(0, .05f, 0);
+    free &= !BoxBlocked(env, PlayerBox(s, -1));
+  }
+  Check(free, "Alle 32 Startplätze frei von Hindernissen", fails);
+  CheckPaths(nav, {{{0, 0, 34}, {0, 0, 8}, "Betriebshof -> Sortierhalle"},
+                   {{0, 0, 8}, {-21, 3.4f, -3}, "Halle -> Sortierbrücke"},
+                   {{-21, 3.4f, -3}, {21, 3.4f, -3}, "Westtreppe -> Osttreppe"},
+                   {{0, 0, 8}, {-18, 0, 25}, "Halle -> Retouren"},
+                   {{0, 0, 8}, {20, 0, 25}, "Halle -> Leitstelle"},
+                   {{0, 0, 8}, {34, 1.2f, -5.5f}, "Halle -> Lkw-Laderaum"}}, fails);
+}
+
+static void BotMatch(World& w, BotManager& bots, int rounds, int& fails, GameMode mode = MODE_CLASSIC) {
   Sim sim;
   MatchSettings ms;
+  ms.mode = mode;
+  LOG("  Bot-Match mit Modus: %s", GetMode(mode).name);
   ms.rounds = rounds;
   ms.hideTime = 25;
   ms.roundTime = 150;
@@ -538,6 +567,8 @@ int RunTests(int matchRounds) {
   InviteTests(fails);
   UpdaterTests(fails);
   props::BuildCatalog();
+  extern int RunModeTests();
+  fails += RunModeTests();
   for (int m = 0; m < (int)AllMaps().size(); m++) {
     World w;
     double t0 = Now();
@@ -553,7 +584,12 @@ int RunTests(int matchRounds) {
     if (w.id == "bundestag") BundestagTests(w, bots.Nav(), fails);
     if (w.id == "oktoberfest") OktoberfestTests(w, bots.Nav(), fails);
     if (w.id == "nudelfabrik") NudelfabrikTests(w, bots.Nav(), fails);
+    if (w.id == "paketzentrum") PaketzentrumTests(w, bots.Nav(), fails);
     if (matchRounds > 0) BotMatch(w, bots, matchRounds, fails);
+    if (matchRounds > 0 && w.id == "paketzentrum") for (int mode = MODE_ROULETTE; mode < MODE_COUNT; mode++) {
+      bots.Init(w);
+      BotMatch(w, bots, 1, fails, (GameMode)mode);
+    }
   }
   LOG("Tests beendet: %d Fehler", fails);
   return fails;
@@ -564,6 +600,8 @@ int RunNetTest() {
   props::BuildCatalog();
   MatchSettings ms;
   ms.bots = 5;
+  ms.mode = MODE_MOON;
+  ms.mapIndex = FindMap("paketzentrum");
   ms.hideTime = 3;
   ms.roundTime = 60;
   LocalSession host;
@@ -575,7 +613,7 @@ int RunNetTest() {
   client.makeCmd = [&]() {
     UserCmd c;
     c.yaw = frame * 0.01f;
-    c.buttons = BTN_FORWARD | ((frame / 30) % 2 ? BTN_FIRE : 0);
+    c.buttons = BTN_FORWARD | ((frame / 30) % 2 ? BTN_FIRE : 0) | (frame % 100 == 0 ? BTN_JUMP : 0);
     return c;
   };
   double t0 = Now();
@@ -591,7 +629,7 @@ int RunNetTest() {
       int id = client.LocalId();
       const Player& sp = host.GetSim().players[id];
       // Vorhersage gegenüber Server (Server liegt ~1 Tick + Latenz zurück, daher grobe Schranke)
-      float err = DistanceXZ(sp.ms.pos, client.LocalMove()->pos);
+      float err = Distance(sp.ms.pos, client.LocalMove()->pos);
       maxErr = std::max(maxErr, err);
     }
     std::this_thread::sleep_for(std::chrono::microseconds(200));
@@ -609,6 +647,37 @@ int RunNetTest() {
   Check(maxErr < 1.5f, "Vorhersage bleibt nah am Server", fails);
   bool named = client.State().players[client.LocalId()].name == std::string("Tester");
   Check(named, "Spielername übertragen", fails);
+  host.SetNextMode(MODE_CLONES);
+  for (int i = 0; i < 30; i++) { host.Update(TICK_DT); client.Update(TICK_DT); std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
+  Check(client.State().mode == MODE_MOON && client.State().nextMode == MODE_CLONES,
+        "Host-Auswahl wird angekündigt, laufende Mondrunde bleibt unverändert", fails);
+  for (int mode = MODE_CLASSIC; mode < MODE_COUNT; mode++) {
+    host.SetNextMode(mode);
+    Sim& sim = host.GetSim(); sim.phase = Phase::RoundEnd; sim.phaseTimer = 0; sim.round = 0;
+    for (int i = 0; i < 60; i++) { host.Update(TICK_DT); client.Update(TICK_DT); std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
+    Check(client.State().mode == sim.mode && client.State().nextMode == mode && fabsf(client.State().modeTimer - sim.modeTimer) < .2f,
+          StrFormat("Aktiver Modus und Timer im Netzwerk: %s", GetMode(mode).name), fails);
+  }
+  Sim& full = host.GetSim();
+  full.phase = Phase::Hiding; full.phaseTimer = 100; full.mode = MODE_CLONES;
+  while (full.CountActive() < MAX_PLAYERS) full.AddPlayer("Langer Testspielername", false);
+  for (int i = 0; i < MAX_DECOYS; i++) {
+    auto& d = full.decoys[i]; d.active = true; d.owner = 0; d.propType = props::Find("paket_s");
+    d.pos = {-37 + (i % 8) * .9f, .02f, 30 + (i / 8) * .9f}; d.life = 45;
+  }
+  for (int i = 0; i < 30; i++) full.Chat(0, StrFormat("Klonlast %d: ", i) + std::string(90, 'x'));
+  int chatEvents = 0;
+  for (int i = 0; i < 180; i++) {
+    host.Update(TICK_DT); client.Update(TICK_DT);
+    std::vector<GameEvent> evs; client.TakeEvents(evs);
+    for (auto& e : evs) if (e.type == EV_CHAT && e.text.rfind("Klonlast ", 0) == 0) chatEvents++;
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  int receivedPlayers = 0, receivedClones = 0;
+  for (auto& p : client.State().players) if (p.active) receivedPlayers++;
+  for (auto& d : client.State().decoys) if (d.active) receivedClones++;
+  Check(receivedPlayers == MAX_PLAYERS && receivedClones == MAX_DECOYS && chatEvents == 30,
+        "Volle Lobby mit 48 Klonen: Snapshots und alle 30 Ereignisse kommen genau einmal an", fails);
   LOG("Netztest beendet: %d Fehler", fails);
   return fails;
 }
