@@ -46,7 +46,7 @@ Der Gastgeber waehlt vor dem Start oder per Esc fuer die naechste Runde.
 Waffenwerkbank im Hauptmenue oder per Esc: MP, Schrotflinte und Pistole mit
 Visierungen, Laeufen, Muendungen, Schaeften, Magazinen und Griffen umbauen.
 Builds werden gespeichert. Aenderungen waehrend der Jagd gelten ab der
-naechsten Runde. Alle Mitspieler brauchen Version $version (Protokoll $protocol).
+naechsten Runde. Alle Mitspieler brauchen Netzwerkprotokoll $protocol.
 Schrot einzeln nachladen; Feuer unterbricht, sobald eine Patrone bereit ist.
 Tasten: 1 MP, 2 Schrotflinte, 3 Pistole, 4 Granate. Pistole: ein Schuss pro
 Klick, 15 Schuss ab Werk, 10/20-Schuss-Magazine und Micro-Reflex optional.

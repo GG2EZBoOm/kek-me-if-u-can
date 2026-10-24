@@ -68,14 +68,14 @@ stehen in [comedy-sources.json](res/audio/comedy-sources.json). Das vorhandene S
 
 ### Grafik und Beschriftung
 
-Materialabhängige Reflexionen, Oberflächenrelief für Stein, Holz, Beton und Wellblech, gefilterte Fugen,
-weichere Schattenübergänge und zurückhaltenderes Bloom geben den Karten mehr Tiefe. Himmel und Oberflächen
-werden im gleichen Farbraum beleuchtet, damit helle Flächen ihre Farbe behalten.
+Version **1.0.9** stellt die Grafik von **1.0.7** wieder her: Materialien, Beleuchtung, Himmel, Wasser,
+Schatten und Nachbearbeitung verwenden wieder die Darstellung vor dem Grafikumbau in 1.0.8.
 Kartenschilder verwenden geglättete proportionale TrueType-Schrift mit Mipmaps statt einzelner 3D-Pixelblöcke.
 Die hohe äußere Mauer des Zwingers ist durch eine unsichtbare Spielerbegrenzung ersetzt; dahinter stehen
 zurückgesetzte Stadthäuser und Bäume. Auch hohe Sprünge bleiben innerhalb der Karte.
 
-Ab **1.0.8 / Protokoll 8** benötigen alle Teilnehmer diese Version, weil die Zwinger-Begrenzung geändert wurde.
+Alle Teilnehmer benötigen **Protokoll 8** wegen der geänderten Zwinger-Begrenzung.
+Version **1.0.9** bleibt mit **1.0.8** im Mehrspieler kompatibel.
 
 ## Selbst bauen
 
@@ -141,8 +141,8 @@ Vertikalgriff auf; unter den kurzen Schrotlauf passt keine 8er-Magazinverlänger
 
 Der Gastgeber prüft alle Teile. **Bis zum Ende der Versteckphase** werden Umbauten übernommen;
 während der Jagd gilt eine Änderung **ab der nächsten Runde**. Auch bei einem späten Beitritt während der Jagd
-wird der gespeicherte Build erst zur nächsten Runde angelegt. Alle Teilnehmer müssen **Version 1.0.8** verwenden
-(Netzwerkprotokoll 8). Andere Spieler sehen dieselben montierten Bauteile.
+wird der gespeicherte Build erst zur nächsten Runde angelegt. Alle Teilnehmer benötigen **Netzwerkprotokoll 8**
+(Version 1.0.8 oder 1.0.9). Andere Spieler sehen dieselben montierten Bauteile.
 
 Die Handhabung nutzt zeitabhängigen Anschlag, serverseitigen Rückstoß, Sprint-Erholung und getrennte Bewegungen
 für Hände, Magazin, Verschluss und Pumpgriff. Die Schrotflinte lädt **Patronen einzeln**; mit Feuer lässt sich
@@ -184,7 +184,7 @@ Die Karte wählst du im Hauptmenü über die Kartenkarte unten rechts oder beim 
 
 Eine für Prop Hunt verkleinerte, stilisierte Interpretation mit eigener Geometrie:
 
-![Dresdner Zwinger ohne die äußere Mauer](docs/screenshots/v1.0.8-zwinger.png)
+![Dresdner Zwinger ohne die äußere Mauer](docs/screenshots/v1.0.9-zwinger.png)
 
 - Innenhof mit **vier Brunnenbecken**, Orangenkübeln und Bänken
 - **Kronentor** mit goldener Krone, Brücke und Graben; Wall- und Glockenspielpavillon
@@ -259,7 +259,7 @@ Gelb-rote Logistikhalle mit dem schrägen **KEK-Schriftzug und Streifen**, ohne 
 - Zehn neue Tarnungen: Päckchen, Paket, zerbrechliches Paket, Versandrolle, Handscanner, Klebeband,
   Postsack, Sortierkiste, Rollcontainer und Etikettendrucker
 
-![KEK-Paketzentrum mit geglätteter Beschriftung](docs/screenshots/v1.0.8-paketzentrum.png)
+![KEK-Paketzentrum mit geglätteter Beschriftung](docs/screenshots/v1.0.9-paketzentrum.png)
 
 Für einen dedizierten Server: `KekMeIfYouCanCLI.exe --server --map paketzentrum --bots 8`.
 
