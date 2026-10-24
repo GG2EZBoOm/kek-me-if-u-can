@@ -1,7 +1,7 @@
 # Kek Me If You Can
 
-Ein Prop-Hunt-Spiel mit **eigener C++-Engine**, ohne externe Laufzeitbibliotheken: Geometrie, Materialien, Taunts und Musik
-werden beim Start prozedural erzeugt; aufbereitete Waffenaufnahmen ergänzen den Klang. Es gibt einen vollständigen Spielordner als ZIP und eine Einzel-EXE mit
+Ein Prop-Hunt-Spiel mit **eigener C++-Engine**, ohne externe Laufzeitbibliotheken: Geometrie, Materialien und Musik
+werden beim Start prozedural erzeugt; aufbereitete Waffenaufnahmen und gesampelte Comedy-Taunts ergänzen den Klang. Es gibt einen vollständigen Spielordner als ZIP und eine Einzel-EXE mit
 eingebetteten Intros. Das Symbol ist eine Dose mit verschmitztem Blick: Das „can“ im Namen ist wörtlich gemeint.
 
 ## Herunterladen
@@ -9,7 +9,7 @@ eingebetteten Intros. Das Symbol ist eine Dose mit verschmitztem Blick: Das „c
 **[Vollständigen Spielordner für Windows herunterladen – ZIP](https://github.com/GG2EZBoOm/kek-me-if-u-can/releases/latest/download/KekMeIfYouCan-Windows.zip)**
 
 Das ZIP vollständig entpacken, dann **KekMeIfYouCan.exe** im entpackten Ordner starten. Es enthält die kleine
-Spiel-EXE (rund 2,8 MB), das Konsolen-/Serverprogramm, alle drei Intro-Videos in `data/video`, eine Anleitung, Audio-Credits und
+Spiel-EXE (rund 6,5 MB), das Konsolen-/Serverprogramm, alle drei Intro-Videos in `data/video`, eine Anleitung, Audio-Credits und
 SHA-256-Prüfsummen. Eine Installation ist nicht nötig. Den Ordner zusammenlassen.
 
 Alternativ: [Einzel-EXE mit eingebetteten Videos](https://github.com/GG2EZBoOm/kek-me-if-u-can/releases/latest/download/KekMeIfYouCan.exe)
@@ -48,10 +48,13 @@ das neue vollständige ZIP herunterladen. Beide Ausgaben enthalten dieselben Spi
 
 ### Taunts und Waffenklänge
 
-Alle **16 Taunts** besitzen jeweils **drei neu gestaltete Varianten**: von der Quietscheente mit abschließendem
-Quietscher über den absackenden Trompeten-Fail bis zum ungeduldigen Glockenläuten und dem verspäteten letzten
-Klatscher beim Applaus. Die Darbietung wechselt bei jedem Taunt. Lautstärken sind angeglichen, Anfänge und Enden
-weich ausgeblendet. Länge, Punkte und Abklingzeiten bleiben gleich. Klone spielen dieselbe Variante wie ihr Besitzer.
+Alle **16 Taunts** besitzen jeweils **drei neu arrangierte Comedy-Varianten**. **26 CC0-Aufnahmen** liefern
+echtes Quietschspielzeug, gespielte Tierimitationen, Lachen, Federn sowie Trompete, Posaune, Flöte, Glockenspiel
+und Schlagzeug. Dazu kommen Slapstick-Pfiffe, Percussion und der bewusst peinliche Applaus.
+Die Pannen-Fanfare sackt am Ende ab, die Mini-Blaskapelle verpatzt ihren Schluss und beim Applaus klatscht
+einer zu spät. Die Varianten wechseln Melodie, Rhythmus oder Darbietung. Das frühere starke Verzerren
+entfällt; natürliche Anschläge bleiben erhalten. Anfänge und Enden sind weich ausgeblendet.
+Länge, Punkte und Abklingzeiten bleiben gleich. Klone spielen dieselbe Variante wie ihr Besitzer.
 
 MP-Schüsse, leere Abzüge, Nachladen sowie Holz-, Metall-, Glas- und Bodentreffer verwenden **24 aufbereitete
 Aufnahmen**. Sie sind in allen EXEs eingebettet und kommen auch über den bisherigen Auto-Updater an.
@@ -59,8 +62,20 @@ Die großen Gefechts-Atmosphären sind nicht enthalten: Hintergrundschüsse wür
 
 Zusätzliche Soundeffekte von **[ZapSplat](https://www.zapsplat.com)**, **GMA** und **Skyclad Sound**.
 Credits und Lizenz stehen in [res/audio/CREDITS.txt](res/audio/CREDITS.txt) und im Spielordner. Die eingebettete
-Aufnahme-Bank gehört zum Spiel und darf nicht als eigenständige Soundbibliothek weitergegeben werden.
-Die Taunts selbst sind eigene prozedurale Klangentwürfe.
+Waffen-Aufnahme-Bank gehört zum Spiel und darf nicht als eigenständige Soundbibliothek weitergegeben werden.
+Die separate Comedy-Bank enthält ausschließlich CC0-Aufnahmen; Autoren, Quellen und Bearbeitungsschritte
+stehen in [comedy-sources.json](res/audio/comedy-sources.json). Das vorhandene Synthese-Set bleibt als Ersatz erhalten.
+
+### Grafik und Beschriftung
+
+Materialabhängige Reflexionen, Oberflächenrelief für Stein, Holz, Beton und Wellblech, gefilterte Fugen,
+weichere Schattenübergänge und zurückhaltenderes Bloom geben den Karten mehr Tiefe. Himmel und Oberflächen
+werden im gleichen Farbraum beleuchtet, damit helle Flächen ihre Farbe behalten.
+Kartenschilder verwenden geglättete proportionale TrueType-Schrift mit Mipmaps statt einzelner 3D-Pixelblöcke.
+Die hohe äußere Mauer des Zwingers ist durch eine unsichtbare Spielerbegrenzung ersetzt; dahinter stehen
+zurückgesetzte Stadthäuser und Bäume. Auch hohe Sprünge bleiben innerhalb der Karte.
+
+Ab **1.0.8 / Protokoll 8** benötigen alle Teilnehmer diese Version, weil die Zwinger-Begrenzung geändert wurde.
 
 ## Selbst bauen
 
@@ -126,8 +141,8 @@ Vertikalgriff auf; unter den kurzen Schrotlauf passt keine 8er-Magazinverlänger
 
 Der Gastgeber prüft alle Teile. **Bis zum Ende der Versteckphase** werden Umbauten übernommen;
 während der Jagd gilt eine Änderung **ab der nächsten Runde**. Auch bei einem späten Beitritt während der Jagd
-wird der gespeicherte Build erst zur nächsten Runde angelegt. Alle Teilnehmer müssen **Version 1.0.7** verwenden
-(Netzwerkprotokoll 7). Andere Spieler sehen dieselben montierten Bauteile.
+wird der gespeicherte Build erst zur nächsten Runde angelegt. Alle Teilnehmer müssen **Version 1.0.8** verwenden
+(Netzwerkprotokoll 8). Andere Spieler sehen dieselben montierten Bauteile.
 
 Die Handhabung nutzt zeitabhängigen Anschlag, serverseitigen Rückstoß, Sprint-Erholung und getrennte Bewegungen
 für Hände, Magazin, Verschluss und Pumpgriff. Die Schrotflinte lädt **Patronen einzeln**; mit Feuer lässt sich
@@ -169,7 +184,7 @@ Die Karte wählst du im Hauptmenü über die Kartenkarte unten rechts oder beim 
 
 Eine für Prop Hunt verkleinerte, stilisierte Interpretation mit eigener Geometrie:
 
-![Dresdner Zwinger mit neuen Gartenanlagen und Osttreppen](docs/screenshots/v1.0.7-zwinger.png)
+![Dresdner Zwinger ohne die äußere Mauer](docs/screenshots/v1.0.8-zwinger.png)
 
 - Innenhof mit **vier Brunnenbecken**, Orangenkübeln und Bänken
 - **Kronentor** mit goldener Krone, Brücke und Graben; Wall- und Glockenspielpavillon
@@ -244,7 +259,7 @@ Gelb-rote Logistikhalle mit dem schrägen **KEK-Schriftzug und Streifen**, ohne 
 - Zehn neue Tarnungen: Päckchen, Paket, zerbrechliches Paket, Versandrolle, Handscanner, Klebeband,
   Postsack, Sortierkiste, Rollcontainer und Etikettendrucker
 
-![KEK-Paketzentrum mit überarbeitetem Eingang](docs/screenshots/v1.0.7-paketzentrum.png)
+![KEK-Paketzentrum mit geglätteter Beschriftung](docs/screenshots/v1.0.8-paketzentrum.png)
 
 Für einen dedizierten Server: `KekMeIfYouCanCLI.exe --server --map paketzentrum --bots 8`.
 
@@ -350,7 +365,7 @@ der Fairness:
 Die Spezialregeln werden zusätzlich in einer kontrollierten Arena und mit Bot-Matches im Paketzentrum geprüft.
 `--nettest` testet Server und Client über Loopback, einschließlich Moduswechseln und voller Lobby mit vielen Klonen.
 `--soundcheck build/audio-preview` prüft die Aufnahme-Bank, Mixer-Transienten und alle 48 Taunt-Varianten.
-Es exportiert die eigenen prozeduralen Taunts und eine zusammenhängende Hörprobe als WAV. Die lizenzpflichtigen
+Es exportiert die Comedy-Taunts und eine zusammenhängende Hörprobe als WAV. Die lizenzpflichtigen
 Waffenaufnahmen werden dabei nicht als Einzeldateien ausgegeben. Zum Neuaufbereiten der vom Projektinhaber
 bereitgestellten Aufnahmen dient `python tools/build_sound_bank.py <Downloadordner>` (benötigt NumPy).
 `--gameshot` klickt sich automatisch durch Menüs und Spiel und

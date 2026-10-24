@@ -116,6 +116,9 @@ def build(downloads):
         pcm = np.rint(samples * 32767).astype("<i2").tobytes()
         bank += struct.pack("<II", len(encoded), len(samples)) + encoded + pcm
     (dest / "game-sfx.bank").write_bytes(bank)
+    comedy = dest / "comedy-sources.json"
+    if comedy.exists():
+        sources["comedy_recordings"] = json.loads(comedy.read_text(encoding="utf-8"))
     (dest / "sources.json").write_text(json.dumps(sources, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"Prepared {len(sounds)} game sounds, {len(bank):,} bytes. Originals remain in Downloads.")
 

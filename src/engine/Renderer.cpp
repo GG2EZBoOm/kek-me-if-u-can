@@ -1,4 +1,5 @@
 #include "engine/Renderer.h"
+#include "engine/WorldText.h"
 
 static const int MAX_LIGHTS = 96;
 
@@ -28,8 +29,8 @@ uniform float uClouds;
 uniform float uTime;
 vec3 skyColor(vec3 d, bool withSun) {
   float y = d.y;
-  vec3 c = mix(uSkyHorizon, uSkyZenith, pow(clamp(y, 0.0, 1.0), 0.55));
-  c = mix(c, uSkyGround, smoothstep(0.0, -0.12, y));
+  vec3 c = mix(pow(uSkyHorizon, vec3(2.2)), pow(uSkyZenith, vec3(2.2)), pow(clamp(y, 0.0, 1.0), 0.42));
+  c = mix(c, pow(uSkyGround, vec3(2.2)), 1.0 - smoothstep(-0.12, 0.0, y));
   float sd = max(dot(d, uSunDir), 0.0);
   c += uSunColor * 0.06 * pow(sd, 6.0);
   if (withSun) {
@@ -49,6 +50,7 @@ vec3 skyColor(vec3 d, bool withSun) {
 
 static const char* kLitVS = R"(
 in vec3 aPos; in vec3 aNormal; in vec4 aColor; in vec4 aAux;
+in vec2 aTexUV; out vec2 vTexUV;
 in vec4 aInst0; in vec4 aInst1; in vec4 aInst2;
 uniform mat4 uViewProj;
 uniform mat4 uModel;
@@ -61,6 +63,7 @@ void main() {
   vec3 n = vec3(c * aNormal.x + s * aNormal.z, aNormal.y, -s * aNormal.x + c * aNormal.z);
   vec4 wp = uModel * vec4(p, 1.0);
   vWorld = wp.xyz;
+  vTexUV = aTexUV;
   vNormal = mat3(uModel) * n;
   vPat = aPos; vPatN = aNormal;
   vColor = vec4(mix(aColor.rgb, aColor.rgb * aInst2.rgb, aInst2.a), aColor.a * aInst1.w);
@@ -72,10 +75,12 @@ void main() {
 
 static const char* kLitFS = R"(
 in vec3 vWorld; in vec3 vNormal; in vec3 vPat; in vec3 vPatN;
+in vec2 vTexUV;
 in vec4 vColor; in vec4 vAux; in vec4 vInst;
 layout(location = 0) out vec4 oColor;
 layout(location = 1) out vec4 oNormal;
 uniform vec3 uCamPos;
+uniform sampler2D uSignAtlas;
 uniform vec3 uSkyAmb; uniform vec3 uGroundAmb; uniform vec3 uIndoorAmb;
 uniform vec3 uFogColor; uniform float uFogDensity;
 uniform sampler2DShadow uShadow0; uniform sampler2DShadow uShadow1;
@@ -86,19 +91,34 @@ uniform int uGlass;
 uniform vec3 uHighlightColor;
 layout(std140) uniform Lights { vec4 uLightPos[MAX_LIGHTS]; vec4 uLightCol[MAX_LIGHTS]; };
 
-float shadowLookup(sampler2DShadow tex, mat4 m, vec3 wp, float texel) {
-  vec4 sp = m * vec4(wp, 1.0);
-  vec3 p = sp.xyz / sp.w * 0.5 + 0.5;
-  if (p.x < 0.0 || p.y < 0.0 || p.x > 1.0 || p.y > 1.0 || p.z > 1.0) return -1.0;
-  float s = 0.0;
+// Stable tent-filtered PCF; blend cascades before reaching the near-map border.
+float shadowLookup(sampler2DShadow tex, vec3 p, float texel, float bias) {
+  float sum = 0.0;
   for (int x = -1; x <= 1; x++)
-    for (int y = -1; y <= 1; y++) s += texture(tex, vec3(p.xy + vec2(x, y) * texel, p.z - 0.0004));
-  return s / 9.0;
+    for (int y = -1; y <= 1; y++) {
+      float w = float((2 - abs(x)) * (2 - abs(y)));
+      sum += w * texture(tex, vec3(p.xy + vec2(x, y) * texel * 1.35, p.z - bias));
+    }
+  return sum / 16.0;
 }
+vec3 shadowCoord(mat4 m, vec3 wp) {
+  vec4 p = m * vec4(wp, 1.0);
+  return p.xyz / p.w * 0.5 + 0.5;
+}
+bool insideShadow(vec3 p) { return all(greaterThan(p,vec3(0.001))) && all(lessThan(p,vec3(0.999))); }
 float shadowAt(vec3 wp, vec3 n) {
-  float s = shadowLookup(uShadow0, uShadowMat0, wp + n * 0.03, uShadowTexel.x);
-  if (s < 0.0) s = shadowLookup(uShadow1, uShadowMat1, wp + n * 0.08, uShadowTexel.y);
-  return s < 0.0 ? 1.0 : s;
+  vec3 nearP = shadowCoord(uShadowMat0, wp + n * 0.018);
+  float edge = max(abs(nearP.x - 0.5), abs(nearP.y - 0.5));
+  float blend = smoothstep(0.43, 0.49, edge);
+  float slope = 1.0 - max(dot(n,uSunDir),0.0);
+  float nearS = 1.0;
+  if (insideShadow(nearP)) {
+    nearS = shadowLookup(uShadow0, nearP, uShadowTexel.x, 0.000045 + slope * 0.000035);
+    if (blend <= 0.0) return nearS;
+  } else blend = 1.0;
+  vec3 farP = shadowCoord(uShadowMat1, wp + n * 0.035);
+  float farS = insideShadow(farP) ? shadowLookup(uShadow1, farP, uShadowTexel.y, 0.00012 + slope * 0.00008) : 1.0;
+  return mix(nearS,farS,blend);
 }
 vec2 planarUV(vec3 p, vec3 n) {
   vec3 a = abs(n);
@@ -117,13 +137,50 @@ float filteredStripe(float x, float width, float footprint) {
   return clamp((stripeIntegral(p + fw * 0.5, width) - stripeIntegral(p - fw * 0.5, width)) / fw, 0.0, 1.0);
 }
 
+// Screen derivatives transform object-space detail correctly on rotated/scaled props.
+vec3 reliefNormal(vec3 n, float height) {
+  vec3 dx = dFdx(vWorld), dy = dFdy(vWorld);
+  vec3 r1 = cross(dy,n), r2 = cross(n,dx);
+  float det = dot(dx,r1);
+  vec3 gradient = sign(det) * (dFdx(height)*r1 + dFdy(height)*r2);
+  float area = max(abs(det),1e-10);
+  // Grazing-angle relief is bounded so thin geometry never acquires flipped normals.
+  gradient *= min(1.0, area * 0.65 / max(length(gradient),1e-10));
+  return normalize(area*n - gradient);
+}
+vec3 fresnelSchlick(float cosine, vec3 f0) { return f0 + (1.0-f0)*pow(1.0-cosine,5.0); }
+vec3 surfaceBRDF(vec3 N, vec3 V, vec3 L, vec3 albedo, float rough, float metal) {
+  float nv=max(dot(N,V),0.001), nl=max(dot(N,L),0.0);
+  vec3 H=normalize(V+L);
+  float nh=max(dot(N,H),0.0), vh=max(dot(V,H),0.0);
+  float a=rough*rough, a2=a*a;
+  float denom=nh*nh*(a2-1.0)+1.0;
+  float D=a2 / max(3.14159265*denom*denom,1e-6);
+  float k=(rough+1.0)*(rough+1.0)*0.125;
+  float G=(nv/(nv*(1.0-k)+k))*(nl/(nl*(1.0-k)+k));
+  vec3 F=fresnelSchlick(vh,mix(vec3(0.04),albedo,metal));
+  return ((1.0-F)*(1.0-metal)*albedo/3.14159265 + D*G*F/max(4.0*nv*nl,0.001))*nl;
+}
+
 void main() {
   vec3 N = normalize(vNormal);
   vec3 V = normalize(uCamPos - vWorld);
   int mat = int(vAux.x * 255.0 + 0.5);
   vec3 alb = vColor.rgb;
-  alb *= alb;  // Vertexfarben sind sRGB
+  alb = pow(max(alb,vec3(0.0)),vec3(2.2));  // Vertex colors use the same sRGB space as the sky.
+  if (mat == 24) {
+    float ink = texture(uSignAtlas,vTexUV).r;
+    if (vAux.w < 0.5) {
+      if (ink < 0.45) discard;
+    } else {
+      // Filter ink coverage into the matte board color, including distant mip levels.
+      alb = mix(pow(vec3(29.0,36.0,48.0)/255.0,vec3(2.2)),alb,ink);
+    }
+  }
   float spec = 0.08, shin = 24.0, refl = 0.0;
+  float height = 0.0;
+  float footprint = max(length(dFdx(vPat)),length(dFdy(vPat)));
+  float micro = 1.0 - smoothstep(0.015,0.10,footprint);
   vec3 emit = vec3(0.0);
   vec3 P = vPat;
   vec2 uv = planarUV(P, vPatN);
@@ -131,37 +188,45 @@ void main() {
   if (mat == 1) {  // Holz
     float g = vnoise(vec3(uv.x * 2.5, uv.y * 28.0, P.y * 3.0));
     float g2 = vnoise(vec3(uv.x * 0.6, uv.y * 4.0, 1.0));
-    alb *= 0.78 + 0.3 * g + 0.12 * g2; spec = 0.18; shin = 32.0;
+    height = (g - 0.5) * 0.0025 * micro;
+    alb *= 0.72 + 0.34 * g + 0.15 * g2; spec = 0.18; shin = 32.0;
   } else if (mat == 2) {  // Fliesen
-    vec2 q = uv / 0.3; vec2 f = fract(q);
-    float e = min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y));
-    alb *= 0.92 + 0.12 * hash12(floor(q));
-    alb = mix(alb * 0.55, alb, smoothstep(0.015, 0.035, e)); spec = 0.6; shin = 80.0; refl = 0.05;
+    vec2 q = uv / 0.3;
+    float seam = 1.0-(1.0-filteredStripe(q.x,0.035,fwidth(q.x)))*(1.0-filteredStripe(q.y,0.035,fwidth(q.y)));
+    alb *= 0.85 + 0.19 * hash12(floor(q));
+    alb = mix(alb,alb*0.46,seam);
+    height = -seam*0.003*micro;
+    spec = 0.6; shin = 80.0; refl = 0.05;
   } else if (mat == 3) {  // Gras
     float n = fbm(P * 0.9);
     alb *= 0.6 + 0.65 * n;
-    alb *= 0.8 + 0.35 * vnoise(P * 22.0);
+    float blade = vnoise(P * vec3(55.0,9.0,55.0));
+    alb *= vec3(0.83,0.92,0.76) * mix(0.9,0.65+0.5*blade,micro);
+    height = blade*0.018*micro;
     spec = 0.02;
   } else if (mat == 4) {  // Sandstein-Quader
     vec2 q = uv / vec2(1.25, 0.55); float row = floor(q.y);
     q.x += mod(row, 2.0) * 0.5;
-    vec2 f = fract(q); vec2 id = floor(q);
-    float ex = min(f.x, 1.0 - f.x) * 1.25, ey = min(f.y, 1.0 - f.y) * 0.55;
-    float m = smoothstep(0.004, 0.018, min(ex, ey));
+    vec2 id = floor(q);
+    float seam = 1.0-(1.0-filteredStripe(q.x,0.012,fwidth(q.x)))*(1.0-filteredStripe(q.y,0.025,fwidth(q.y)));
     float w = fbm(P * 2.5);
-    alb *= (0.88 + 0.16 * hash12(id + row * 7.31)) * (0.82 + 0.35 * w);
-    alb = mix(alb * 0.62, alb, m); spec = 0.05;
+    float stone = hash12(id + row * 7.31);
+    alb *= (0.76 + 0.28 * stone) * (0.78 + 0.38 * w);
+    alb = mix(alb, alb * 0.44, seam);
+    height = ((w-0.5)*0.012 - seam*0.009)*micro; spec = 0.05;
   } else if (mat == 5) {  // Teppich
-    alb *= 0.88 + 0.2 * vnoise(P * 70.0) + 0.06 * vnoise(P * 4.0); spec = 0.01;
+    alb *= 0.96 + 0.2 * (vnoise(P * 70.0)-0.5)*micro + 0.06 * vnoise(P * 4.0); spec = 0.01;
   } else if (mat == 6) {  // Metall
-    alb *= 0.92 + 0.1 * vnoise(vec3(uv * vec2(2.0, 120.0), 0.0)); spec = 0.9; shin = 72.0; refl = 0.18;
+    alb *= 0.95 + 0.1 * (vnoise(vec3(uv * vec2(2.0,120.0),0.0))-0.5)*micro; spec = 0.9; shin = 72.0; refl = 0.18;
   } else if (mat == 7) {  // Stoff
-    alb *= 0.86 + 0.1 * (sin(uv.x * 420.0) * sin(uv.y * 420.0) * 0.5 + 0.5) + 0.08 * vnoise(P * 9.0); spec = 0.02;
+    alb *= 0.86 + 0.05 + 0.05 * sin(uv.x * 420.0) * sin(uv.y * 420.0) * micro + 0.08 * vnoise(P * 9.0); spec = 0.02;
   } else if (mat == 8) {  // Beton
     alb *= 0.78 + 0.3 * fbm(P * 3.0);
-    alb *= 1.0 - 0.25 * step(0.94, hash13(floor(P * 55.0))); spec = 0.05;
+    float pores = vnoise(P*38.0);
+    alb *= 0.94 + (pores-0.5)*0.14*micro;
+    height = (pores-0.5)*0.004*micro; spec = 0.05;
   } else if (mat == 10) {  // Bildschirm
-    float sl = 0.85 + 0.15 * sin(vWorld.y * 500.0);
+    float sl = 0.92 + 0.08 * sin(vWorld.y * 500.0)*micro;
     emit = alb * 2.2 * sl; alb *= 0.15; spec = 0.8; shin = 128.0;
   } else if (mat == 11) {  // Blätter
     alb *= 0.55 + 0.7 * fbm(P * 5.0); spec = 0.04;
@@ -176,13 +241,15 @@ void main() {
   } else if (mat == 14) {  // Papier
     alb *= 0.95 + 0.06 * vnoise(P * 35.0); spec = 0.04;
   } else if (mat == 15) {  // Wasser
-    float t = uTime;
-    vec3 wn = vec3(vnoise(vec3(P.xz * 1.8, t * 0.6)) - 0.5, 0.0, vnoise(vec3(P.xz * 1.8 + 9.0, t * 0.6)) - 0.5);
-    N = normalize(N + wn * 0.5); spec = 1.2; shin = 160.0; refl = 0.55;
+    float wave = sin(P.x*7.0+P.z*3.0+uTime*1.7)*0.007 + sin(P.z*13.0-P.x*4.0-uTime*2.1)*0.003;
+    height = wave;
+    alb *= vec3(0.42,0.72,0.8); spec = 1.2; shin = 160.0; refl = 0.55;
   } else if (mat == 16) {  // Spiegel / Chrom
-    alb *= 0.25; spec = 1.6; shin = 300.0; refl = 0.85;
+    alb = mix(alb,vec3(0.7),0.75); spec = 1.6; shin = 300.0; refl = 0.85;
   } else if (mat == 17) {  // Asphalt
-    alb *= 0.7 + 0.35 * vnoise(P * 18.0) * fbm(P * 1.5) + 0.1; spec = 0.08;
+    float aggregate=vnoise(P*32.0);
+    alb *= 0.63 + 0.3*fbm(P*1.5) + (aggregate-0.5)*0.22*micro;
+    height=(aggregate-0.5)*0.005*micro; spec = 0.08;
   } else if (mat == 18) {  // Parkett
     vec2 q = uv / vec2(0.9, 0.14); float row = floor(q.y);
     q.x += hash12(vec2(row, 3.7)) * 3.0;
@@ -190,9 +257,12 @@ void main() {
     float tint = 0.78 + 0.32 * hash12(pid);
     float grain = vnoise(vec3(uv.x * 4.0, uv.y * 45.0, row));
     float edge = smoothstep(0.0, 0.04, f.y) * smoothstep(0.0, 0.04, 1.0 - f.y) * smoothstep(0.0, 0.006, f.x) * smoothstep(0.0, 0.006, 1.0 - f.x);
+    edge = mix(0.94,edge,micro);
+    height = ((grain-0.5)*0.0015-(1.0-edge)*0.003)*micro;
     alb *= tint * (0.84 + 0.22 * grain) * mix(0.5, 1.0, edge); spec = 0.35; shin = 60.0; refl = 0.04;
   } else if (mat == 19) {  // Putz
-    alb *= 0.93 + 0.09 * fbm(P * 1.8); spec = 0.03;
+    float plaster=vnoise(P*24.0);
+    alb *= 0.88 + 0.12 * fbm(P * 1.8); height=(plaster-0.5)*0.003*micro; spec = 0.03;
   } else if (mat == 20) {  // Gold
     spec = 1.3; shin = 90.0; refl = 0.4;
   } else if (mat == 21) {  // Leder
@@ -210,53 +280,51 @@ void main() {
     brick = mix(brick, brick * vec3(0.5, 0.46, 0.44), step(0.93, hash12(id * 1.7 + 4.1)));  // dunkel gebrannte Steine
     brick = mix(alb * 0.89, brick, detail);
     alb = mix(brick, vec3(0.14, 0.13, 0.11) * (0.85 + 0.2 * vnoise(P * 3.0)), mortar);
+    height = (-mortar*0.006 + (vnoise(P*18.0)-0.5)*0.003)*detail;
     spec = 0.04;
   } else if (mat == 23) {  // Wellblech: Welle über die Normale, Schmutzschlieren
-    vec3 a = abs(vPatN);
-    vec3 tU = (a.y >= a.x && a.y >= a.z) ? vec3(1.0, 0.0, 0.0) : (a.x >= a.z ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0));
     float detail = 1.0 - smoothstep(0.15, 0.5, fwidth(uv.x) / 0.076);
-    N = normalize(N + tU * cos(uv.x * (6.2831 / 0.076)) * (0.38 * detail));
+    height = sin(uv.x*(6.2831/0.076))*0.0045*detail;
     alb *= 0.9 + 0.12 * vnoise(vec3(uv.x * 3.0, uv.y * 0.4, 0.0)) - 0.14 * smoothstep(0.55, 0.9, fbm(vec3(uv.x * 4.0, uv.y * 0.6, 3.0)));
     spec = 0.55; shin = 44.0; refl = 0.06;
   }
+  vec3 geometricN = N;
+  N = reliefNormal(N,height);
   emit += alb * vAux.z * 6.0;
-  // Metalle spiegeln in ihrer eigenen Farbe: dunkler Stahl glänzt dezent, helles Metall bleibt hell
-  vec3 metalTint = mat == 6 ? mix(vec3(0.18), vec3(1.0), clamp(alb * 2.2, 0.0, 1.0)) : vec3(1.0);
-
-  float sky = vAux.y * vInst.x;
+  float rough = clamp(pow(2.0/(shin+2.0),0.25),0.13,0.96);
+  if (spec < 0.1) rough = 0.91;
+  float metal = (mat==6 || mat==16 || mat==20) ? 0.88 : (mat==23 ? 0.45 : 0.0);
+  if (mat==15) rough=0.18;
+  // Broaden subpixel highlights to avoid sparkling metal and rippling-water aliasing.
+  rough = clamp(rough + 0.2*length(fwidth(N)),0.13,1.0);
+  vec3 f0=mix(vec3(mat==15 ? 0.02 : 0.04),alb,metal);
+  float sky = clamp(vAux.y * vInst.x,0.0,1.0);
   if (uGlass == 1 && dot(N, V) < 0.0) N = -N;
   float up = N.y * 0.5 + 0.5;
-  vec3 ambOut = mix(uGroundAmb, uSkyAmb, up);
+  vec3 ambOut = mix(uGroundAmb, uSkyAmb, up)*0.82;
   vec3 amb = mix(uIndoorAmb * (0.7 + 0.3 * up), ambOut, sky);
-  vec3 col = alb * amb;
+  vec3 col = alb * amb * (1.0-metal);
 
   float ndl = dot(N, uSunDir);
   float sh = 0.0;
   if (ndl > 0.0) {
-    sh = shadowAt(vWorld, N);
-    vec3 H = normalize(V + uSunDir);
-    col += uSunColor * sh * ndl * (alb + spec * metalTint * pow(max(dot(N, H), 0.0), shin));
+    sh = shadowAt(vWorld, geometricN);
+    col += uSunColor * sh * surfaceBRDF(N,V,uSunDir,alb,rough,metal);
   }
   for (int i = 0; i < uLightCount; i++) {
     vec3 L = uLightPos[i].xyz - vWorld;
-    float d2 = dot(L, L);
-    float r = uLightPos[i].w;
+    float d2 = dot(L, L), r = uLightPos[i].w;
     if (d2 > r * r) continue;
-    float d = sqrt(d2);
-    L /= d;
+    float d = sqrt(max(d2,0.0001)); L /= d;
     float x = d / r;
-    float win = clamp(1.0 - x * x * x * x, 0.0, 1.0);
+    float win = clamp(1.0 - x*x*x*x, 0.0, 1.0);
     float att = win * win / (d2 + 1.0);
-    float nl = max(dot(N, L), 0.0);
-    vec3 H = normalize(V + L);
-    col += uLightCol[i].rgb * att * nl * (alb + spec * metalTint * pow(max(dot(N, H), 0.0), shin));
+    col += uLightCol[i].rgb * att * surfaceBRDF(N,V,L,alb,rough,metal)*2.0;
   }
   float fres = pow(1.0 - max(dot(N, V), 0.0), 5.0);
-  if (refl > 0.0) {
-    vec3 R = reflect(-V, N);
-    vec3 env = mix(uIndoorAmb * 2.5, skyColor(R, false), sky);
-    col += env * (refl + (1.0 - refl) * fres * 0.5) * (mat == 20 ? alb * 2.0 : metalTint);
-  }
+  vec3 R = reflect(-V,N);
+  vec3 env = mix(uIndoorAmb*1.5, mix(skyColor(R,false),ambOut,rough*rough),sky);
+  col += env * fresnelSchlick(max(dot(N,V),0.0),f0) * (1.0-rough*0.55);
   col += emit;
   if (vInst.y > 0.0) {
     float rim = 0.25 + 0.75 * pow(1.0 - max(dot(N, V), 0.0), 2.0);
@@ -276,7 +344,7 @@ void main() {
   }
   float dist = length(vWorld - uCamPos);
   float fog = 1.0 - exp(-max(dist - 12.0, 0.0) * uFogDensity);
-  col = mix(col, uFogColor, fog * mix(0.25, 1.0, sky));
+  col = mix(col, pow(uFogColor,vec3(2.2)), fog * mix(0.25, 1.0, sky));
   oColor = vec4(col, vColor.a);
   oNormal = vec4(N * 0.5 + 0.5, 1.0);
 }
@@ -284,8 +352,10 @@ void main() {
 
 static const char* kDepthVS = R"(
 in vec3 aPos; in vec4 aInst0; in vec4 aInst1;
+in vec4 aAux; out float vMaterial;
 uniform mat4 uViewProj; uniform mat4 uModel;
 void main() {
+  vMaterial = aAux.x*255.0;
   float c = cos(aInst0.w), s = sin(aInst0.w);
   vec3 lp = aPos * aInst1.z;
   vec3 p = vec3(c * lp.x + s * lp.z, lp.y, -s * lp.x + c * lp.z) + aInst0.xyz;
@@ -293,7 +363,8 @@ void main() {
 }
 )";
 static const char* kDepthFS = R"(
-void main() {}
+in float vMaterial;
+void main() { if(vMaterial>23.5 && vMaterial<24.5) discard; }
 )";
 
 static const char* kFullscreenVS = R"(
@@ -409,7 +480,7 @@ void main() {
   vec3 col = e * 0.125 + (a + c + g + i) * 0.03125 + (b + d + f + h) * 0.0625 + (j + k + l + m) * 0.125;
   if (uPrefilter == 1) {
     float br = max(col.r, max(col.g, col.b));
-    float knee = 0.6, thr = 1.4;
+    float knee = 0.45, thr = 1.8;
     float soft = clamp(br - thr + knee, 0.0, 2.0 * knee);
     soft = soft * soft / (4.0 * knee + 1e-4);
     float contrib = max(soft, br - thr) / max(br, 1e-4);
@@ -467,7 +538,7 @@ void main() {
   float r = dot(q, q);
   c *= 1.0 - uVignette * smoothstep(0.1, 0.55, r);
   c = mix(c, vec3(0.75, 0.02, 0.02), uDamage * smoothstep(0.05, 0.5, r));
-  c = pow(c, vec3(1.0 / 2.2));
+  c = pow(max(c,vec3(0.0)), vec3(1.0 / 2.2));
   c += (hash12(gl_FragCoord.xy + fract(uTime) * 100.0) - 0.5) / 255.0;
   c *= 1.0 - uBlackout;
   oColor = vec4(c, dot(c, vec3(0.299, 0.587, 0.114)));
@@ -574,6 +645,8 @@ bool Renderer::Init(const RenderSettings& s) {
   lit_.BindBlock("Lights", 0);
   lit_.Set("uShadow0", 0);
   lit_.Set("uShadow1", 1);
+  lit_.Set("uSignAtlas", 3);
+  signTex_ = CreateWorldTextTexture();
 
   glGenVertexArrays(1, &emptyVao_);
   glGenBuffers(1, &instanceVbo_);
@@ -634,6 +707,8 @@ void Renderer::ApplySettings(const RenderSettings& s) {
 }
 
 void Renderer::Shutdown() {
+  if (signTex_) glDeleteTextures(1, &signTex_);
+  signTex_ = 0;
   DestroyTargets();
   world_.Destroy();
   glass_.Destroy();
@@ -924,6 +999,9 @@ void Renderer::Render(const ScreenFX& fx) {
   fx_ = fx;
   if (decalsDirty_) RebuildDecalMesh();
   ComputeShadowMatrices();
+  glActiveTexture(GL_TEXTURE0 + 3);
+  glBindTexture(GL_TEXTURE_2D, signTex_);
+  glActiveTexture(GL_TEXTURE0);
 
   // --- Schattenkarten ---
   glEnable(GL_DEPTH_TEST);
@@ -992,7 +1070,7 @@ void Renderer::Render(const ScreenFX& fx) {
     ssao_.Set("uProj", cam_.proj);
     ssao_.Set("uInvProj", Inverse(cam_.proj));
     ssao_.Set("uView", cam_.view);
-    ssao_.Set("uRadius", 0.55f);
+    ssao_.Set("uRadius", 0.65f);
     glUniform3fv(ssao_.Loc("uKernel"), 16, &ssaoKernel_[0].x);
     Fullscreen();
     glBindFramebuffer(GL_FRAMEBUFFER, aoBlur_.fbo);
@@ -1126,8 +1204,8 @@ void Renderer::Render(const ScreenFX& fx) {
   composite_.Set("uHdr", 0);
   composite_.Set("uAO", 1);
   composite_.Set("uBloom", 2);
-  composite_.Set("uAOStrength", aoOn ? 0.85f : 0.0f);
-  composite_.Set("uBloomStrength", settings_.bloom ? 0.07f : 0.0f);
+  composite_.Set("uAOStrength", aoOn ? 0.72f : 0.0f);
+  composite_.Set("uBloomStrength", settings_.bloom ? 0.045f : 0.0f);
   composite_.Set("uExposure", env_.exposure);
   composite_.Set("uSaturation", fx_.saturation);
   composite_.Set("uVignette", fx_.vignette);

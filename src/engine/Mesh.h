@@ -30,6 +30,7 @@ enum Material : u8 {
   MAT_LEATHER,
   MAT_BRICK,       // Backstein im Läuferverband
   MAT_CORRUGATED,  // Wellblech
+  MAT_SIGN,        // geglättete Beschriftung aus dem gemeinsamen Schriftatlas
   MAT_COUNT
 };
 
@@ -38,6 +39,7 @@ struct Vertex {
   Vec3 normal;
   u8 color[4];
   u8 aux[4];  // x = Material, y = Himmelslicht (0..255), z = Leuchtkraft, w = frei
+  Vec2 uv = Vec2(0,0);  // nur MAT_SIGN verwendet den Schriftatlas
 };
 
 struct MeshData {

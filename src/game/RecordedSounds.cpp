@@ -30,10 +30,13 @@ bool DecodeRecordedSounds(const u8* data, size_t size, RecordedSoundBank& out) {
   return true;
 }
 
-bool LoadRecordedSounds(RecordedSoundBank& out) {
+static bool LoadSoundResource(int id, RecordedSoundBank& out) {
   HMODULE module = GetModuleHandleW(nullptr);
-  HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(301), RT_RCDATA);
+  HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(id), RT_RCDATA);
   if (!resource) { out.clear(); return false; }
   HGLOBAL loaded = LoadResource(module, resource);
   return DecodeRecordedSounds((const u8*)LockResource(loaded), SizeofResource(module, resource), out);
 }
+
+bool LoadRecordedSounds(RecordedSoundBank& out) { return LoadSoundResource(301,out); }
+bool LoadComedySounds(RecordedSoundBank& out) { return LoadSoundResource(302,out); }

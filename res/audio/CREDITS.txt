@@ -10,6 +10,32 @@ standalone redistribution or use as a sound-effects library. The embedded
 game-sfx.bank is part of this game, not an independently licensed asset pack.
 See the supplied ZapSplat-EULA.pdf for the included pack's license.
 
-All 16 taunt designs and their 48 synthesized variations are original procedural
-audio created for Kek Me If You Can. No celebrity voices or commercial songs
-are used. The long field recordings are not included in the game.
+COMEDY TAUNTS (16 designs, 48 arranged variations)
+
+26 recording excerpts are dedicated to the public domain under CC0 1.0:
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Squeak toy sounds and Spring sounds - bart
+https://opengameart.org/content/squeak-toy-sounds
+https://opengameart.org/content/spring-sounds
+Kitten Mew (performed animal imitation) - AntumDeluge
+https://opengameart.org/content/kitten-mew
+Sci-Fi Aliens and Cows Pack (mouth-made cow performances) - qubodup
+https://opengameart.org/content/sci-fi-aliens-and-cows-pack
+Gastric Distress (mouth/hand Foley) - LFA
+https://opengameart.org/content/gastric-distress
+Group giggling - Nocturnal_Vanguard / AuraVoice
+https://opengameart.org/content/group-giggling
+Tiny creatures sounds (laugh) - fvcalderan
+https://opengameart.org/content/tiny-creatures-sounds
+Metal Pole/Low Bell Hit - Hydroque
+https://opengameart.org/content/metal-polelow-bell-hit
+VS Chamber Orchestra: Community Edition - Versilian Studios
+Recorded by Sam Gossner & Simon Dalzell; sample cutting by Elan Hickler/Soundemote.
+https://github.com/sgossner/VSCO-2-CE
+
+Excerpts were trimmed, resampled, filtered, pitched and arranged into short gags.
+Source URLs, hashes and edit points are in sources.json (comedy_recordings).
+comedy-sfx.bank contains only these CC0 excerpts; it is independent of game-sfx.bank.
+Additional whistles, claps, percussion and the fallback sound set are procedural.
+No celebrity voices, commercial songs or background birdsong are included.

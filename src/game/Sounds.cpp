@@ -547,22 +547,167 @@ const TauntMaker kTauntMakers[NUM_TAUNTS] = {Kuckuck, Ente, Pupser, Klingel, Tro
 
 void MasterTaunt(Buf& b, float duration) {
   b.resize((size_t)llround(duration * SR), 0);
-  Biquad hp, lp; hp.HP(65); lp.LP(8500, .65f);
+  Biquad hp, lp; hp.HP(55); lp.LP(7200, .65f);
   float peak = 0;
   for (float& x : b) { x = lp.Run(hp.Run(x)); peak = std::max(peak, fabsf(x)); }
   if (peak < 1e-7f) return;
-  // Die Sättigung einer asymmetrischen Stimme kann Gleichspannung erzeugen.
-  // Deshalb auch nach der Dynamikbearbeitung filtern und zentrieren.
-  Biquad post; post.HP(65);
+  // Preserve the natural attack and breath of recordings. The former tanh drive
+  // flattened every voice into the same buzzy timbre and added sharp harmonics.
   double mean = 0;
-  for (float& x : b) { x = post.Run(tanhf(x / peak * 2.2f)); mean += x; }
+  for (float x : b) mean += x;
   mean /= b.size();
   double power = 0; peak = 0;
   for (float& x : b) { x -= (float)mean; power += x * x; peak = std::max(peak, fabsf(x)); }
   float rms = (float)sqrt(power / b.size());
-  float gain = std::min(.82f / std::max(peak,.001f), .21f / std::max(rms, .001f));
+  float gain = std::min(.80f / std::max(peak,.001f), .17f / std::max(rms, .001f));
   for (float& x : b) x *= gain;
   Fade(b, .002f, .045f);
+}
+
+// A small sampler for the CC0 performances. The preparation bank is low-passed
+// at 7 kHz; playback rates stay below 2x, safely below the 22.05 kHz Nyquist limit.
+// Every phrase is assembled once on load, so this adds no per-frame audio work.
+Buf Performance(const RecordedSoundBank& bank, const char* key, float len, float rate=1, float endRate=0) {
+  const Buf& src = bank.at(key);
+  Buf b = Make(len);
+  double cursor = 0;
+  if (endRate <= 0) endRate = rate;
+  for (size_t i=0; i<b.size(); i++) {
+    size_t at=(size_t)cursor;
+    if (at+1>=src.size()) break;
+    float frac=(float)(cursor-at);
+    b[i]=src[at]*(1-frac)+src[at+1]*frac;
+    float u=T(i)/len;
+    cursor += rate+(endRate-rate)*u*u;
+  }
+  Fade(b,.004f,.065f);
+  return b;
+}
+
+bool ComedyBankComplete(const RecordedSoundBank& bank) {
+  for (const char* key : {"cat","bell","trumpet","trombone","mute","flute","glock","xylo","snare","snare2","cymbal"})
+    if (!bank.count(key)) return false;
+  for (const char* group : {"toy","cow","laugh","fart","spring"}) {
+    int count = std::string(group)=="toy" ? 4 : std::string(group)=="cow" ? 2 : 3;
+    for (int i=0;i<count;i++) if (!bank.count(StrFormat("%s_%d",group,i))) return false;
+  }
+  return true;
+}
+
+Buf ComedyTaunt(const RecordedSoundBank& bank, int kind, int take) {
+  Buf b=Make(kTaunts[kind].duration);
+  auto sample=[&](const char* key,float at,float len,float gain=1,float rate=1,float endRate=0) {
+    Mix(b,Performance(bank,key,len,rate,endRate),at,gain);
+  };
+  auto note=[&](const char* key,int midi,int root,float at,float len,float gain=1,float bend=1) {
+    float rate=powf(2.0f,(midi-root)/12.0f);
+    sample(key,at,len,gain,rate,rate*bend);
+  };
+  switch(kind) {
+    case 0: { // A wooden cuckoo-clock duet: answer, hesitation, or an impatient third call.
+      const float timing[3][4]={{.02f,.30f,.77f,1.06f},{.02f,.33f,.91f,1.22f},{.01f,.24f,.65f,.95f}};
+      for(int i=0;i<4;i++) {
+        note("flute",i%2 ? 77 : 81,72,timing[take][i],i%2 ? .31f : .23f,.9f);
+        Mix(b,WoodenTap(640,.06f),timing[take][i],.05f);
+      }
+      if(take==2) note("flute",76,72,1.29f,.23f,.65f);
+      break;
+    }
+    case 1: { // Different real toy squeezes, with a delayed punchline.
+      const int seq[3][3]={{0,1,3},{2,1,0},{1,3,2}};
+      const float at[3][3]={{.01f,.56f,1.15f},{.01f,.72f,1.08f},{.01f,.35f,.93f}};
+      for(int i=0;i<3;i++) sample(StrFormat("toy_%d",seq[take][i]).c_str(),at[take][i],i==2 ? .48f : .53f,1, i==2 ? .88f : 1);
+      break;
+    }
+    case 2:
+      sample(StrFormat("fart_%d",take).c_str(),.01f,1.06f,1);
+      if(take==1) sample("fart_1",.69f,.30f,.7f,1.3f);
+      Mix(b,SlideWhistle(.18f,530,980,.6f),1.07f,.08f);
+      break;
+    case 3: { // Ding-ding, hesitant ding, and an impatient little bell roll.
+      const float at[3][4]={{.01f,.13f,.53f,.64f},{.01f,.17f,.74f,.86f},{.01f,.10f,.19f,.61f}};
+      for(int i=0;i<4;i++) note("glock",i%2 ? 84 : 79,84,at[take][i],.52f,.8f);
+      Mix(b,WoodenTap(950,.08f),.01f,.06f);
+      break;
+    }
+    case 4: { // Real brass with a sinking last note; three deliberately botched endings.
+      const int melodies[3][4]={{57,55,53,51},{60,57,55,52},{55,54,52,48}};
+      for(int i=0;i<4;i++) note(take==1 ? "mute" : "trombone",melodies[take][i],60,
+          i*.44f+.01f,i==3 ? 1.2f : .38f,.85f,i==3 ? .73f : .99f);
+      break;
+    }
+    case 5:
+      if(take==0) sample("cow_1",.02f,1.72f,1,.93f);
+      else if(take==1) {sample("cow_0",.02f,.79f);sample("cow_0",.92f,.79f,.95f,.86f);}
+      else {sample("cow_0",.02f,.53f,.7f,1.18f);sample("cow_1",.53f,1.20f,1,1.05f);}
+      break;
+    case 6:
+      if(take==2) {sample("cat",.01f,.52f,.8f,1.28f);sample("cat",.57f,.58f,1,1.16f);}
+      else sample("cat",.01f,1.14f,1,take==0 ? .96f : 1.10f,take==0 ? .88f : 1.02f);
+      break;
+    case 7: {
+      const int melody[3][3]={{67,60,64},{60,67,55},{64,60,57}};
+      const float timing[3][3]={{.01f,.30f,.84f},{.01f,.35f,.73f},{.01f,.22f,.62f}};
+      for(int i=0;i<3;i++) note("mute",melody[take][i],60,timing[take][i],i==2 ? .23f : .29f,.9f,.87f);
+      break;
+    }
+    case 8:
+      if(take==0) Mix(b,SlideWhistle(.78f,1800,430,.7f),.01f,.65f);
+      else if(take==1) {Mix(b,SlideWhistle(.32f,640,1550,.6f),.01f,.60f);Mix(b,SlideWhistle(.48f,1550,410,1.4f),.39f,.65f);}
+      else {Mix(b,SlideWhistle(.40f,700,1600),.01f,.62f);Mix(b,SlideWhistle(.52f,1600,330,.7f),.47f,.65f);}
+      note("xylo",48,72,take==2 ? 1.05f : .92f,.4f,.8f);
+      break;
+    case 9: {
+      const int melodies[3][7]={{79,83,86,91,88,83,80},{84,88,91,88,86,83,81},{91,88,86,83,81,79,78}};
+      for(int i=0;i<7;i++) note("glock",melodies[take][i],84,i*(take==2 ? .17f : .20f),.96f,.8f);
+      note("xylo",55,72,1.65f,.6f,.7f);
+      break;
+    }
+    case 10:
+      sample(StrFormat("laugh_%d",take).c_str(),.02f,1.81f,1,take==2 ? .91f : 1);
+      break;
+    case 11:
+      sample(StrFormat("spring_%d",take).c_str(),.01f,.94f,1,1.18f);
+      Mix(b,Boing(),0,.16f);
+      break;
+    case 12: {
+      const float timing[3][3]={{.01f,.32f,.70f},{.01f,.21f,1.04f},{.01f,.54f,.74f}};
+      for(int i=0;i<3;i++) sample("bell",timing[take][i],.92f,.8f,1.0f+take*.07f);
+      Mix(b,WoodenTap(220,.20f),1.66f,.35f);
+      break;
+    }
+    case 13: { // Small, deliberately unenthusiastic audience; one person is always late.
+      int people=take==0 ? 3 : take==1 ? 5 : 2;
+      for(int person=0;person<people;person++)
+        for(int hit=0;hit<(take==1 ? 6 : 4);hit++)
+          Mix(b,HandClap(850+person*310),.02f+person*.048f+hit*(take==1 ? .27f : .40f)+g_rng.Range(0,.03f),.75f);
+      Mix(b,HandClap(1350),take==2 ? 2.70f : 2.54f,.9f);
+      break;
+    }
+    case 14: {
+      const float at[3][3]={{.01f,.23f,.50f},{.01f,.15f,.57f},{.01f,.31f,.69f}};
+      sample("snare",at[take][0],.24f,.8f); sample("snare2",at[take][1],.28f,1);
+      sample("snare",at[take][2],.25f,.7f); sample("cymbal",at[take][2],1.45f,.7f);
+      Mix(b,Thump(.18f,130,65,18),at[take][2],.15f);
+      break;
+    }
+    case 15: { // Three original miniature brass-band gags, with an off-key last note.
+      const int melodies[3][10]={{60,64,67,64,65,69,67,62,64,59},{67,64,60,64,67,69,65,62,59,60},{60,60,67,65,64,62,64,67,65,58}};
+      float at=.01f;
+      for(int i=0;i<10;i++) {
+        float len=i==9 ? .65f : (i%3==0 ? .35f : .24f);
+        note(i==9 ? "trombone" : "mute",melodies[take][i],60,at,len,.85f,i==9 ? .84f : 1);
+        if(i%2==0) note("trombone",i%4 ? 55 : 48,60,at,.23f,.45f);
+        if(i%2==1) sample(i%4 ? "snare2" : "snare",at,.13f,.12f);
+        at+=len+.035f;
+      }
+      break;
+    }
+  }
+  // A tiny room tail gives the acoustic performances body without washing out direction.
+  if(kind!=2 && kind!=13) Echo(b,.043f,.065f,2);
+  MasterTaunt(b,kTaunts[kind].duration);
+  return b;
 }
 
 // --- Oberfläche, Fanfaren, Atmosphäre --------------------------------------------------------
@@ -858,6 +1003,16 @@ static SoundVariations MakeSoundVariations() {
     }
   }
   g_tauntVariant = 0;
+  RecordedSoundBank comedy;
+  if (LoadComedySounds(comedy) && ComedyBankComplete(comedy)) {
+    for (int k=0;k<NUM_TAUNTS;k++) for (int v=0;v<TAUNT_VARIANTS;v++) {
+      g_rng=Rng(10813u+k*397u+v*7919u);
+      g_tauntVariant=v;
+      sounds[SND_TAUNT_FIRST+k][v]=ComedyTaunt(comedy,k,v);
+    }
+    g_tauntVariant=0;
+    LOG("Audio: 26 CC0-Aufnahmen für 48 Comedy-Taunts geladen.");
+  } else LOG("Audio: Comedy-Bank fehlt oder ist beschädigt; Synthese-Ersatz wird verwendet.");
   RecordedSoundBank recordings;
   bool recorded = LoadRecordedSounds(recordings);
   for (const char* key : {"smg_shot", "smg_burst", "arcade_punch", "empty", "switch_0", "switch_1"})
@@ -952,6 +1107,11 @@ int RunSoundTests(const std::string& previewDir) {
   check(audio::TestTransientStart(), "Kurze Klanganfänge bleiben bis zum ersten Mixer-Update erhalten");
   RecordedSoundBank recordings;
   check(LoadRecordedSounds(recordings) && recordings.size() == 24, "Alle 24 eingebetteten Aufnahmen lesbar");
+  RecordedSoundBank comedy;
+  check(LoadComedySounds(comedy) && comedy.size()==26 && ComedyBankComplete(comedy),
+        "Alle 26 CC0-Comedy- und Instrumentenaufnahmen eingebettet und vollständig");
+  auto missing=comedy; missing.erase("cat");
+  check(!ComedyBankComplete(missing),"Unvollständige Comedy-Bank aktiviert den sicheren Synthese-Ersatz");
   std::vector<u8> packet = {'K','S','B','1',0x44,0xac,0,0,1,0,0,0,1,0,0,0,2,0,0,0,'a',0,0x80,0xff,0x7f};
   RecordedSoundBank decoded;
   check(DecodeRecordedSounds(packet.data(),packet.size(),decoded) && decoded.at("a")[0] == -1 && decoded.at("a")[1] > .999f,

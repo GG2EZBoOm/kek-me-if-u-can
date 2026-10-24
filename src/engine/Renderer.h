@@ -167,6 +167,7 @@ class Renderer {
   GLuint particleVao_ = 0, particleVbo_ = 0;
   GLuint lightUbo_ = 0;
   GLuint noiseTex_ = 0;
+  GLuint signTex_ = 0;
   int lightCount_ = 0;
   Vec3 ssaoKernel_[16];
   RenderStats stats_;

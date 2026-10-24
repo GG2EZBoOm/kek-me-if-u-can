@@ -268,28 +268,36 @@ class Zwinger {
     k.Sign("VORSICHT: BEWEGLICHE AUSSTELLUNG", {-29.6f, 2.7f, 9}, PI * .5f, .045f, 0xb7a17a);
   }
   void Boundary() {
-    // Sichtbare hohe Gartenmauern am äußeren Spielrand, auch für Mondschicht geschlossen.
-    Stone(DARK);
-    k.Solid({-46, 0, -52}, {-45.5f, 9, 52}); k.Solid({41.5f, 0, -52}, {42, 9, 52});
-    k.Solid({-45.5f, 0, -52}, {41.5f, 9, -51.5f}); k.Solid({-45.5f, 0, 51.5f}, {41.5f, 9, 52});
-    Stone(LIGHT);
-    for (float z = -48; z <= 48; z += 8) for (float x : {-45.4f, 41.4f}) {
-      k.Visual({x - .2f, 0, z - .32f}, {x + .2f, 9.3f, z + .32f});
-    }
-    // Stadtkulisse hinter dem Spielrand: abwechslungsreiche Dachsilhouette statt leerem Horizont.
-    for (int i = 0; i < 10; i++) {
-      float z = -45 + i * 10.0f, h = 10.2f + (i % 3) * 1.1f;
+    // Unsichtbarer Spielrand: auch hohe Sprünge verlassen die Karte nicht.
+    // Kein Mesh, kein Schatten und keine unsichtbare Deckung gegen Schüsse.
+    k.Clip({-46, -3, -52}, {-45.5f, 40, 52}, COL_PLAYER);
+    k.Clip({41.5f, -3, -52}, {42, 40, 52}, COL_PLAYER);
+    k.Clip({-45.5f, -3, -52}, {41.5f, 40, -51.5f}, COL_PLAYER);
+    k.Clip({-45.5f, -3, 51.5f}, {41.5f, 40, 52}, COL_PLAYER);
+    // Landschaft nur hinter dem spielbaren Boden; keine neue Mauer am Horizont.
+    k.FloorFinish(-145, -145, 145, 145, -.14f, MAT_GRASS, 0x5b7544);
+    k.FloorFinish(-57, -85, -47, 85, -.12f, MAT_TILE, 0x9c998a);
+    k.FloorFinish(43, -85, 53, 85, -.12f, MAT_TILE, 0x9c998a);
+    // Abgesetzte Stadthäuser mit Lücken und zurückhaltender Silhouette.
+    for (int i = 0; i < 8; i++) {
+      float z = -49 + i * 14.0f, h = 7.2f + (i % 3) * 1.1f;
       for (float side : {-1.0f, 1.0f}) {
-        float x = side < 0 ? -48.0f : 44.0f;
+        float x = side < 0 ? -69.0f - (i % 2)*6 : 65.0f + (i % 2)*6;
         k.Style(MAT_PLASTER, i % 2 ? 0xbeb6a4 : 0xa8a398); k.Visual({x - 1.8f, 0, z - 4.7f}, {x + 1.8f, h, z + 4.7f});
         k.Style(MAT_METAL, 0x596468);
         k.ob.Push(Translation({x, h, z}) * Scaling({1.95f, 1, 4.9f})); k.ob.Frustum({}, 1, .60f, 1.7f, 4); k.ob.Pop();
         k.Style(MAT_GLASS, 0x52666c);
-        for (float y : {5.0f, 8.2f}) for (float dz : {-3.0f, 0.0f, 3.0f}) {
+        for (float y : {1.4f, 4.4f}) for (float dz : {-3.0f, 0.0f, 3.0f}) {
           float xx = x - side * 1.83f;
           k.Visual({xx - .015f, y, z + dz - .55f}, {xx + .015f, y + 1.4f, z + dz + .55f});
         }
       }
+    }
+    for (int i = 0; i < 12; i++) for (float side : {-1.0f, 1.0f}) {
+      float x = side < 0 ? -60.0f : 57.0f, z = -67 + i * 12.0f;
+      k.Style(MAT_WOOD, 0x68533d); k.ob.Cylinder({x, -.14f, z}, .22f, 3.1f, 8);
+      k.Style(MAT_LEAVES, i % 2 ? 0x536d35 : 0x668144);
+      k.ob.Ellipsoid({x, 4.3f, z}, {2.2f, 2.5f, 2.0f}, 12, 8);
     }
   }
  public:

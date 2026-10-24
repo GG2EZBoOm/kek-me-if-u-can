@@ -27,7 +27,7 @@ KEK ME IF YOU CAN $version - Windows x64
 3. data/video und folder-install.txt neben der EXE behalten.
 
 Enthalten: Spiel, Konsolen-/Serverprogramm und alle drei Intro-Videos.
-Karten, Figuren und Taunts werden von der Engine erzeugt. Waffenaufnahmen
+Karten und Figuren werden von der Engine erzeugt. Waffen- und Comedy-Aufnahmen
 sind in der EXE enthalten; Audio-Quellen und Lizenz stehen in CREDITS.txt.
 Es fehlen keine zusaetzlichen Asset-Pakete.
 Kein Installer und keine Administratorrechte erforderlich.

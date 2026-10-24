@@ -34,6 +34,7 @@ bool Shader::Build(const char* name, const std::string& vs, const std::string& f
   glBindAttribLocation(prog_, 4, "aInst0");
   glBindAttribLocation(prog_, 5, "aInst1");
   glBindAttribLocation(prog_, 6, "aInst2");
+  glBindAttribLocation(prog_, 7, "aTexUV");
   glLinkProgram(prog_);
   glDeleteShader(v);
   glDeleteShader(f);

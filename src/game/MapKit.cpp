@@ -1,4 +1,5 @@
 #include "game/MapKit.h"
+#include "engine/WorldText.h"
 #include "game/Shapes.h"
 
 void MapKit::Solid(Vec3 mn, Vec3 mx, u32 faces, u8 flags) {
@@ -219,16 +220,19 @@ void MapKit::Sign(const char* text, Vec3 center, float yaw, float pixel, u32 col
   Material m = ob.CurMat();
   ob.Push(Translation(center) * RotationY(yaw));
   if (backing) {
-    ob.Mat(MAT_PLASTIC);
+    ob.Mat(MAT_PLAIN);
     ob.ColorHex(0x1d2430);
     ob.Box(Vec3(-width * 0.5f - pixel * 2, -height * 0.5f - pixel * 2, -0.04f), Vec3(width * 0.5f + pixel * 2, height * 0.5f + pixel * 2, 0.0f));
   }
-  ob.Mat(glow > 0 ? MAT_PLASTIC : MAT_GOLD);
+  ob.Mat(MAT_PLAIN);
   ob.ColorHex(color);
   ob.Emissive(glow);
-  ob.Push(Translation(Vec3(-width * 0.5f, -height * 0.5f, 0)));
-  BuildPixelText(ob, text, pixel, pixel * 0.6f);
-  ob.Pop();
+  if (WorldTextReady()) BuildWorldText(ob,text,height,width,backing);
+  else {
+    ob.Push(Translation(Vec3(-width*.5f,-height*.5f,.008f)));
+    BuildPixelText(ob,text,pixel,pixel*.6f);
+    ob.Pop();
+  }
   ob.Emissive(0);
   ob.Pop();
   ob.Mat(m);

@@ -1,5 +1,6 @@
 // Automatische Tests ohne Fenster: Bewegung, Navigation, komplettes Bot-Match, Netzwerk.
 #include "engine/Upnp.h"
+#include "engine/WorldText.h"
 #include "game/Bot.h"
 #include "game/Invite.h"
 #include "game/Maps.h"
@@ -466,8 +467,39 @@ static void NavigationRegressionTests(int& fails) {
   Check(!nav.FindPath({1, 0, 4}, {6, 3, 6}, path), "Navigation: isolierte Plattform meldet fehlenden Weg", fails);
 }
 
+static void WorldTextTests(int& fails) {
+  Check(WorldTextReady(),"Schilder: geglätteter TrueType-Schriftatlas verfügbar",fails);
+  Check(WorldTextWidth("III",1)<WorldTextWidth("WWW",1),"Schilder: proportionale Buchstabenbreiten",fails);
+  MeshData mesh;MeshBuilder builder(&mesh);builder.Mat(MAT_WOOD);
+  builder.Push(Translation({2,3,4})*RotationY(PI*.5f));
+  BuildWorldText(builder,"ÄÖÜ & KEK",.7f,4,true);builder.Pop();
+  bool valid=!mesh.Empty() && mesh.verts.size()<=9*4 && builder.CurMat()==MAT_WOOD;
+  for(const Vertex& v:mesh.verts) valid &= std::isfinite(v.pos.x) &&
+      v.uv.x>=0 && v.uv.x<=1 && v.uv.y>=0 && v.uv.y<=1 && v.aux[0]==MAT_SIGN && v.aux[3]==255;
+  Check(valid,"Schilder: Umlaute, Drehung, begrenzte Geometrie und gültige Atlas-Koordinaten",fails);
+}
+
 static void ZwingerTests(const World& w, const NavGrid& nav, int& fails) {
   MoveState s;
+  // The removed visual perimeter still contains every player size and high jumps,
+  // while bullets must never hit invisible scenery.
+  const Vec3 edgeStarts[]={{-44,0,35},{40,0,45},{10,0,-50},{10,0,50}};
+  const Vec3 outward[]={{-1,0,0},{1,0,0},{0,0,-1},{0,0,1}};
+  const float edgeYaw[]={PI*.5f,-PI*.5f,0,PI};
+  bool contained=true, transparent=true;
+  for(int edge=0;edge<4;edge++) {
+    for(int prop : {-1,props::Find("zwinger_vase")}) {
+      WalkTest(w,edgeStarts[edge]+Vec3(0,.05f,0),edgeYaw[edge],1.2f,s,prop);
+      contained &= s.pos.x>-45.5f && s.pos.x<41.5f && s.pos.z>-51.5f && s.pos.z<51.5f;
+    }
+    for(float y : {1.0f,12.0f,30.0f}) {
+      Vec3 from=edgeStarts[edge]+Vec3(0,y,0);
+      contained &= w.Raycast(from,outward[edge],4,COL_PLAYER,false).hit;
+      transparent &= !w.Raycast(from,outward[edge],4,COL_BULLET,false).hit;
+    }
+  }
+  Check(contained,"Zwinger: unsichtbarer Rand hält Sucher, kleine Props und hohe Sprünge auf allen vier Seiten",fails);
+  Check(transparent,"Zwinger: unsichtbarer Rand erzeugt keine unsichtbaren Schusstreffer",fails);
   for (float z : {-13.0f, 13.0f}) {
     WalkTest(w, {-19.3f, .05f, z}, PI * .5f, 2.1f, s);
     Check(fabsf(s.pos.y - 4.3f) < .1f, "Zwinger: Sucher erreicht die Galerieterrasse über die Treppe", fails);
@@ -674,6 +706,7 @@ static void UpdaterTests(int& fails) {
 int RunTests(int matchRounds) {
   int fails = 0;
   InviteTests(fails);
+  WorldTextTests(fails);
   UpdaterTests(fails);
   fails += RunSoundTests();
   NavigationRegressionTests(fails);
