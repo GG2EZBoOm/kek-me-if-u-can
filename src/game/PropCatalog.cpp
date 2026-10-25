@@ -2310,9 +2310,9 @@ void BuildCatalog() {
       {"vase", "Vase", true, Vase},
       {"globus", "Globus", true, Globus},
       {"staffelei", "Gemälde", true, Staffelei},
-      {"polizeiauto", "Polizeiwagen", false, [](PK& k) { Auto(k, 0xf2f2f2, true); }},
-      {"auto_grau", "Limousine", false, [](PK& k) { Auto(k, 0x3a3f47, false); }},
-      {"auto_blau", "Kleinwagen", false, [](PK& k) { Auto(k, 0x2a4a8a, false); }},
+      {"polizeiauto", "Polizeiwagen", true, [](PK& k) { Auto(k, 0xf2f2f2, true); }},
+      {"auto_grau", "Limousine", true, [](PK& k) { Auto(k, 0x3a3f47, false); }},
+      {"auto_blau", "Kleinwagen", true, [](PK& k) { Auto(k, 0x2a4a8a, false); }},
       {"stapelstuehle", "Stuhlstapel", true, Stapelstuehle},
       {"getraenkekiste", "Getränkekiste", true, Getraenkekiste},
       {"sonnenschirm", "Sonnenschirm", true, Sonnenschirm},
@@ -2363,7 +2363,7 @@ void BuildCatalog() {
       {"teigwanne", "Teigwanne", true, Teigwanne},
       {"trockenwagen", "Trockenwagen", true, Trockenwagen},
       {"hubwagen", "Hubwagen", true, Hubwagen},
-      {"gabelstapler", "Gabelstapler", false, Gabelstapler},
+      {"gabelstapler", "Gabelstapler", true, Gabelstapler},
       {"spind", "Spind", true, Spind},
       {"stechuhr", "Stechuhr", true, Stechuhr},
       {"schutzhelm", "Schutzhelm", true, Schutzhelm},
@@ -2427,6 +2427,10 @@ void BuildCatalog() {
                              "zwinger_orange", "zwinger_statue", "zwinger_kunstkiste"})
       if (d.id == heavy) d.ramDamage = 70;
     if (d.id == "autoscooter") d.ramDamage = 105;
+    if(d.id=="auto_grau" || d.id=="auto_blau" || d.id=="polizeiauto" || d.id=="gabelstapler") {
+      d.vehicle=true;d.ramDamage=105;
+      d.lookYawOffset=d.id=="gabelstapler" ? 0 : PI*.5f;
+    }
   }
   LOG("Prop-Katalog: %d Gegenstände", (int)g_defs.size());
 }

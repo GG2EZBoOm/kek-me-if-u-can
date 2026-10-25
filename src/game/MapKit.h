@@ -49,6 +49,8 @@ class MapKit {
   void Zone(Vec3 mn, Vec3 mx, float sky, const char* name, int prio = 0);
   // Schild aus Pixel-Buchstaben. facing: Blickrichtung der Schrift (Normale).
   void Sign(const char* text, Vec3 center, float yaw, float pixel, u32 color, float glow = 0, bool backing = true);
+  // KEK wayfinding: fitted yellow enamel panel, red accent, proportional lettering.
+  void ParcelSign(const char* text, Vec3 center, float yaw, float pixel);
 
   // Würde ein Prop an dieser Stelle eine registrierte Tür versperren?
   bool BlocksDoor(int type, Vec3 pos, float yaw) const;

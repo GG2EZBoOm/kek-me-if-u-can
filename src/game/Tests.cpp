@@ -738,29 +738,38 @@ int RunTests(int matchRounds) {
       for (Vec3 goal : {Vec3(-28, 4.3f, 10), Vec3(-12, 4.3f, -37), Vec3(12, 4.3f, -37),
                         Vec3(27, 4.3f, -25.2f), Vec3(12, 4.3f, 37), Vec3(27, 4.3f, 25.2f),
                         Vec3(11, 0, 11), Vec3(-11, 0, -11), Vec3(11, 0, -11), Vec3(-11, 0, 11),
-                        Vec3(27, 0, -37), Vec3(-40, 0, 0), Vec3(0, 0, -47)})
+                        Vec3(27, 0, -37), Vec3(-40, 0, 0), Vec3(0, 0, -47),
+                        Vec3(29.3f,3.8f,0),Vec3(-16,0,45),Vec3(16,0,47)})
         Check(BotRouteTest::Walk(bots, w, {0, 0, 0}, goal),
               StrFormat("Sucher läuft real zum Zwinger-Ziel (%.1f %.1f %.1f)", goal.x, goal.y, goal.z), fails);
       Check(BotRouteTest::Walk(bots, w, {27, 4.3f, -25.2f}, {0, 0, 0}), "Sucher verlässt die Nordostterrasse wieder", fails);
       Check(BotRouteTest::Walk(bots, w, {27, 4.3f, 25.2f}, {0, 0, 0}), "Sucher verlässt die Südostterrasse wieder", fails);
+      Check(BotRouteTest::Walk(bots,w,{29.3f,3.8f,0},{0,0,0}),"Sucher verlässt die obere Sammlung",fails);
     }
     if (w.id == "paketzentrum") {
       for (Vec3 goal : {Vec3(0, 0, -38), Vec3(-48, 0, -15), Vec3(-40, 0, -9),
-                        Vec3(-44, 0, 17), Vec3(36, 0, 34)})
+                        Vec3(-44, 0, 17), Vec3(36, 0, 34),Vec3(-18,4.5f,20),Vec3(22,4.5f,22),Vec3(0,4.525f,23.6f)})
         Check(BotRouteTest::Walk(bots, w, {0, 0, 30}, goal),
               StrFormat("Sucher läuft real zum KEK-Ziel (%.1f %.1f %.1f)", goal.x, goal.y, goal.z), fails);
+      Check(BotRouteTest::Walk(bots,w,{-18,4.5f,20},{22,4.5f,22}),"Sucher nutzt Hofbruecke zwischen den Dachbereichen",fails);
+      Check(BotRouteTest::Walk(bots,w,{22,4.5f,22},{0,0,30}),"Sucher verlässt die Dachterrasse",fails);
     }
     if (w.id == "nudelfabrik") {
-      for (Vec3 goal : {Vec3(16, 0, 43), Vec3(25, 2.4f, 46), Vec3(-24, 0, 40)})
+      for (Vec3 goal : {Vec3(16, 0, 43), Vec3(25, 2.4f, 46), Vec3(-24, 0, 40),Vec3(-44,0,41),Vec3(-46,3.025f,33)})
         Check(BotRouteTest::Walk(bots, w, {0, 0, 30}, goal),
               StrFormat("Sucher läuft real zum Werksziel (%.1f %.1f %.1f)", goal.x, goal.y, goal.z), fails);
+      Check(BotRouteTest::Walk(bots,w,{-46,3.025f,33},{0,0,30}),"Sucher verlässt die Kesselwarte",fails);
     }
     if (w.id == "bundestag") {
       Check(BotRouteTest::Walk(bots, w, {-70, -1.2f, 0}, {-55, -1.2f, 25}), "Sucher erreicht das Besucherforum", fails);
       Check(BotRouteTest::Walk(bots, w, {-22, 0, 8}, {0, 16, 4.5f}), "Sucher erreicht die Kuppelplattform real", fails);
     }
-    if (w.id == "oktoberfest")
+    if (w.id == "oktoberfest") {
       Check(BotRouteTest::Walk(bots, w, {55, 0, 33}, {19.5f, 0, 49}), "Sucher erreicht das Fundbüro durch die Festinseln", fails);
+      for(Vec3 goal : {Vec3(49,0,2),Vec3(42,3,0),Vec3(56,3,0),Vec3(49,3,10)})
+        Check(BotRouteTest::Walk(bots,w,{55,0,33},goal),StrFormat("Sucher erreicht Almhütten-Ziel %.1f %.1f %.1f",goal.x,goal.y,goal.z),fails);
+      Check(BotRouteTest::Walk(bots,w,{49,3,10},{55,0,33}),"Sucher verlässt den Almbalkon",fails);
+    }
     if (matchRounds > 0) BotMatch(w, bots, matchRounds, fails);
     if (matchRounds > 0 && (w.id == "paketzentrum" || w.id == "zwinger")) for (int mode = MODE_ROULETTE; mode < MODE_COUNT; mode++) {
       bots.Init(w);
@@ -931,6 +940,25 @@ int RunNetTest() {
         }
         Check(kills == 1 && !guest.State().players[0].alive && guest.State().players[remote].kills == 1 &&
               guest.State().winner == TEAM_PROPS, "Erschlagen durch Gast überträgt Abschuss, Punkte und Props-Rundensieg", fails);
+        for(const char* vehicle : {"auto_blau","gabelstapler"}) {
+          const int type=props::Find(vehicle);
+          for(int i : {0,remote}) {
+            Player& p=impact.players[i];p.alive=true;p.team=i ? TEAM_PROPS : TEAM_HUNTERS;
+            p.propType=i ? type : -1;p.health=p.maxHealth=i ? 150.0f : 100.0f;
+            p.ms=MoveState();p.ms.pos={0,0,i ? 9.0f : 0.0f};p.ms.onGround=true;p.ms.rotLock=true;
+            p.ms.colYaw=i ? props::Get(type).lookYawOffset : 0;
+            p.switchTimer=p.disguiseTimer=p.ramDistance=0;p.pending.clear();p.autoTaunt=1000;
+          }
+          impact.phase=Phase::Hunting;impact.phaseTimer=300;
+          guest.makeCmd=[](){UserCmd c;c.buttons=BTN_FORWARD|BTN_SPRINT;return c;};
+          int vehicleKills=0;
+          for(int i=0;i<140;i++) {
+            pump();std::vector<GameEvent> evs;guest.TakeEvents(evs);
+            for(const auto& e:evs) if(e.type==EV_KILL && e.a==remote && e.b==0 && e.c==KILL_RAM) vehicleKills++;
+          }
+          Check(vehicleKills==1 && guest.State().players[remote].propType==type && !guest.State().players[0].alive,
+                StrFormat("%s als Gast: Fahrzeugform, Bewegung und genau ein Ramm-Abschuss übertragen",vehicle),fails);
+        }
         // Reuse the real guest connection to test the entire gunsmith command/snapshot path.
         impact.phase=Phase::Hiding; impact.phaseTimer=300;
         impact.players[0].team=TEAM_PROPS; impact.players[0].alive=true; impact.players[0].propType=props::Find("karton");

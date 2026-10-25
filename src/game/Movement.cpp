@@ -6,6 +6,10 @@ MoveConfig MoveConfigFor(int propType) {
     c.maxSpeed = 4.4f;
     c.sprintMul = 1.42f;
     c.jumpVel = 6.9f;
+    if(props::Get(propType).vehicle) {
+      c.maxSpeed=props::Get(propType).id=="gabelstapler" ? 3.8f : 4.8f;
+      c.sprintMul=1.55f;c.accel=5.5f;c.friction=5.0f;c.jumpVel=4.2f;
+    }
   }
   return c;
 }
@@ -105,9 +109,11 @@ bool BoxBlocked(const MoveEnv& env, const OBox& b, float lift) {
 
 void UpdatePropRotation(const MoveEnv& env, MoveState& s, int propType) {
   if (propType < 0 || s.rotLock) return;
-  float target = WrapAngle(s.yaw + PI);
+  const PropDef& def=props::Get(propType);
+  float target = WrapAngle(s.yaw + def.lookYawOffset);
   float diff = AngleDiff(s.colYaw, target);
   if (fabsf(diff) < 0.0005f) return;
+  if(def.vehicle) diff=Clamp(diff,-2.0f*TICK_DT,2.0f*TICK_DT);
   float tries[3] = {diff, Clamp(diff, -0.25f, 0.25f), Clamp(diff, -0.08f, 0.08f)};
   for (float step : tries) {
     MoveState t = s;

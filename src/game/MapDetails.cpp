@@ -27,8 +27,13 @@ void Canopy(MapKit& k, float x0, float z0, float x1, float z1, float h, u32 colo
 void Board(MapKit& k, Vec3 p, const char* title, const char* subtitle, u32 color) {
   k.Style(MAT_METAL, STEEL);
   k.Solid(p + Vec3(-.09f, 0, -.09f), p + Vec3(.09f, 2.3f, .09f));
-  k.Sign(title, p + Vec3(0, 2.35f, .13f), 0, .065f, color);
-  k.Sign(subtitle, p + Vec3(0, 1.76f, .13f), 0, .043f, 0xe6e4d5);
+  if(k.w.id=="paketzentrum") {
+    k.ParcelSign(title,p+Vec3(0,2.35f,.13f),0,.055f);
+    k.ParcelSign(subtitle,p+Vec3(0,1.76f,.13f),0,.038f);
+  } else {
+    k.Sign(title, p + Vec3(0, 2.35f, .13f), 0, .065f, color);
+    k.Sign(subtitle, p + Vec3(0, 1.76f, .13f), 0, .043f, 0xe6e4d5);
+  }
 }
 
 void ParcelPile(MapKit& k, Vec3 p, bool factory = false) {
@@ -50,7 +55,8 @@ void Container(MapKit& k, Vec3 p, u32 color, const char* label) {
     k.Visual(p + Vec3(x - .08f, 0, -5.08f), p + Vec3(x + .08f, 3.04f, -4.95f));
     k.Visual(p + Vec3(x - .08f, 0, 4.95f), p + Vec3(x + .08f, 3.04f, 5.08f));
   }
-  k.Sign(label, p + Vec3(0, 2.79f, 5.12f), 0, .05f, 0xf2ddad);
+  if(k.w.id=="paketzentrum") k.ParcelSign(label,p+Vec3(0,2.79f,5.12f),0,.05f);
+  else k.Sign(label, p + Vec3(0, 2.79f, 5.12f), 0, .05f, 0xf2ddad);
   k.Prop("kiste", p + Vec3(-.95f, 0, 1.7f), 0);
   k.Prop("papierkorb", p + Vec3(1, 0, -2), 0);
   k.Light(p + Vec3(0, 2.7f, 0), 5, {1.1f, 1.2f, 1.3f});
@@ -156,9 +162,9 @@ void Parcel(MapKit& k) {
   k.WallZ(-45.8f, -30, 21.8f, 22, 0, 5.5f, {{-40, -36, 0, 3.5f}});
   k.Slab(-24.2f, -46.2f, 22.2f, -29.6f, 5.75f, .25f, MAT_METAL, 0x52616c);
   k.FloorFinish(-23.8f, -45.8f, 21.8f, -30, .018f, MAT_CONCRETE, 0x878f8d);
-  k.Sign("KEK  /  EXPRESS-UMSCHLAG", {-1, 4.9f, -29.7f}, 0, .105f, YELLOW);
+  k.ParcelSign("KEK / EXPRESS-UMSCHLAG", {-1, 4.9f, -29.7f}, 0, .085f);
   for (float x : {-15.5f, 0.0f, 14.5f}) {
-    k.Sign(x < -1 ? "EXPRESS 01" : x > 1 ? "EXPRESS 03" : "EXPRESS 02", {x, 3.92f, -29.68f}, 0, .065f, YELLOW);
+    k.ParcelSign(x < -1 ? "EXPRESS 01" : x > 1 ? "EXPRESS 03" : "EXPRESS 02", {x, 3.92f, -29.68f}, 0, .055f);
     k.FloorFinish(x - 2, -33, x - 1.9f, -30.5f, .04f, MAT_PLASTIC, YELLOW);
     k.FloorFinish(x + 1.9f, -33, x + 2, -30.5f, .04f, MAT_PLASTIC, YELLOW);
   }
@@ -207,7 +213,7 @@ void Parcel(MapKit& k) {
   k.Zone({-52, 0, 10}, {-36, 6, 23}, 1, "Service & Pause", 2);
   // Eingang als erkennbarer Ort statt einer langen weißen Wand.
   Canopy(k, -7, 14.5f, 7, 21, 4.4f, RED);
-  k.Sign("ANKOMMEN. ABTAUCHEN. KEK.", {0, 4.12f, 21.27f}, 0, .09f, YELLOW);
+  k.ParcelSign("ANKOMMEN. ABTAUCHEN. KEK.", {0, 4.12f, 21.33f}, 0, .065f);
   for (float x : {-8.0f, 9.5f}) Planter(k, {x, 0, 33.5f}, 3, 0xe5b639);
   for (float x : {-24.0f, -12.0f, 16.0f, 24.0f}) {
     k.Style(MAT_METAL, RED);
@@ -226,7 +232,7 @@ void Parcel(MapKit& k) {
       k.Style(MAT_METAL, STEEL); k.Visual({x + 1.25f, y + .32f, 36.43f}, {x + 1.43f, y + .4f, 36.45f});
     }
   }
-  k.Sign("PAKETSTATION 24/7", {36, 3.03f, 31.64f}, PI, .09f, RED);
+  k.ParcelSign("PAKETSTATION 24/7", {36, 3.03f, 31.64f}, PI, .075f);
   for (float z = 22; z < 29; z += 1.2f)
     k.FloorFinish(-3, z, 3, z + .45f, .02f, MAT_PLASTIC, 0xd5d4bf);
   Board(k, {11, 0, 24}, "KEK-WEGWEISER", "EXPRESS  <   >  PAKETSTATION", YELLOW);
@@ -266,4 +272,5 @@ void RefineMap(World& world) {
   else if (world.id == "nudelfabrik") Factory(k);
   else if (world.id == "paketzentrum") Parcel(k);
   else if (world.id == "zwinger") Zwinger(k);
+  BuildMapDistricts(world);
 }

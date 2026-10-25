@@ -22,7 +22,7 @@ class ParcelCenter {
     b.Pop();
   }
   void Text(const char* text, Vec3 pos, float pixel = .075f, float yaw = 0) {
-    k.Sign(text, pos, yaw, pixel, 0xffdf42, 0, true);
+    k.ParcelSign(text, pos, yaw, pixel);
   }
   void Package(Vec3 pos, int variant, float yaw = 0) {
     const char* names[] = {"paket_s", "paket_m", "paket_fragil", "versandrolle", "postsack", "sortierkiste"};
@@ -52,7 +52,7 @@ class ParcelCenter {
     k.Style(MAT_PLASTIC, YELLOW);
     k.Visual({-26.25f, 5.1f, 14.21f}, {26.25f, 8.15f, 14.3f});
     Logo({0, 6.62f, 14.32f}, 1.65f);
-    Text("PAKETZENTRUM", {0, 4.7f, 14.32f}, .075f);
+    Text("PAKETZENTRUM", {0, 4.7f, 14.44f}, .075f);
     Text("KEIN PAKET ZURUECKLASSEN", {0, 2.85f, -22.25f}, .07f, PI);
     for (float x : {-18.0f, -9.0f, 0.0f, 9.0f, 18.0f}) {
       k.Style(MAT_METAL, STEEL);
@@ -75,8 +75,8 @@ class ParcelCenter {
     k.Glass({14.06f, 1.1f, 18}, {14.12f, 3.2f, 22}, 0x99c8dd, .22f);
     k.Slab(-26.3f, 14.3f, -9.9f, 27.3f, 4.5f, .28f, MAT_CONCRETE, 0x83898d);
     k.Slab(13.9f, 14.3f, 26.3f, 27.3f, 4.5f, .28f, MAT_CONCRETE, 0x83898d);
-    Text("RETOUREN & ABHOLUNG", {-18, 3.5f, 27.25f}, .085f);
-    Text("LEITSTELLE", {20, 3.5f, 27.25f}, .09f);
+    Text("RETOUREN & ABHOLUNG", {-18, 3.5f, 27.31f}, .067f);
+    Text("LEITSTELLE", {20, 3.5f, 27.31f}, .067f);
   }
 
   void Conveyor(float x) {

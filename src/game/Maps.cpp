@@ -9,19 +9,19 @@ const std::vector<MapInfo>& AllMaps() {
        BuildBundestag},
       {"oktoberfest", "Oktoberfest",
        "Festzelt auf der Theresienwiese: Bierbänke, Musikpodium, Empore mit Boxen, Ausschank und Hendlküche – draußen "
-       "Biergarten, Wirtsbudenstraße mit Festinseln, Fundbüro, Riesenrad, Kettenflieger und Autoscooter.",
+       "Biergarten, zweistöckige Almhütte mit Balkon, Wirtsbudenstraße, Fundbüro, Riesenrad, Kettenflieger und Autoscooter.",
        BuildOktoberfest},
       {"nudelfabrik", "Nudelfabrik",
        "Alte Backsteinfabrik: Produktionshalle mit Rührwerken, Nudelpresse und Spaghetti-Straße, Laufstege, Trockenraum, "
-       "Mehllager, Verpackung mit Lkw an der Rampe – draußen ein zweites Versandlager mit Galerie, Leergutcontainer und Pausenhof.",
+       "Mehllager, Verpackung und Lkw-Rampe – draußen Versandlager mit Galerie, Kesselhaus mit zwei Aufgängen, Leergutcontainer und Pausenhof.",
        BuildNudelfabrik},
       {"paketzentrum", "KEK-Paketzentrum",
        "Gelb-rote Sortierhalle mit laufenden Paketbändern, begehbarer Sortierbrücke, Paketregalen, Retourenschalter, "
-       "Leitstelle und drei begehbaren Lkw-Wechselbrücken. Dazu Express-Umschlag, Containerhof, Servicebereich und Paketstation.",
+       "Leitstelle und drei begehbaren Lkw-Wechselbrücken. Pausendeck und Dachterrasse verbindet eine Hofbrücke; dazu Expresshalle, Containerhof und Paketstation.",
        BuildPaketzentrum},
       {"zwinger", "Dresdner Zwinger",
        "Barocker Innenhof mit vier Brunnen, Blumengärten, goldenem Kronentor und Bogengalerien mit vier Terrassenaufgängen. "
-       "Zwischen Porzellan, Orangenkübeln und Nymphenbad wird aus Kunst plötzlich Gegenwehr.",
+       "Zweistöckige Sammlung, Orangerie-Café und Restaurierungshof ergänzen Porzellan, Orangenkübel und Nymphenbad.",
        BuildZwinger},
   };
   return maps;

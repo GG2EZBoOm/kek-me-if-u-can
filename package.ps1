@@ -33,10 +33,13 @@ Es fehlen keine zusaetzlichen Asset-Pakete.
 Kein Installer und keine Administratorrechte erforderlich.
 
 Fuenf Karten: Bundestag, Oktoberfest, Nudelfabrik, KEK-Paketzentrum,
-Dresdner Zwinger mit vier Terrassenaufgaengen, Blumengaerten und Nymphenbad.
-KEK: Expresshalle, Containerhof, Servicebereich und Paketstation.
-Nudelfabrik: zusaetzliches Versandlager mit begehbarer Galerie.
+Dresdner Zwinger mit oberer Sammlung, Orangerie-Cafe und Restaurierungshof.
+KEK: Pausendeck, Hofbruecke und Dachterrasse mit gelb-roten Wegweisern.
+Nudelfabrik: Versandlager, Kesselhaus und begehbare Kesselwarte.
+Oktoberfest: zweistoeckige Almhuette mit zwei Treppen und Balkon.
 Alle Karten haben neue Versteckgruppen und praezisere Bot-Navigation.
+Autos, Polizeiwagen und Gabelstapler sind mit E als Tarnung spielbar.
+R entsperrt die Drehung; Fahrzeuge beschleunigen und drehen traeger.
 Schwere Props koennen Sucher rammen (Umschalt + 1,5 m Anlauf) oder
 aus ausreichender Hoehe erschlagen. Nach einem Treffer: 2 s Pause.
 Spezialmodi: Prop-Roulette, Klon-Alarm, Hummeln im Hintern, Mondschicht.

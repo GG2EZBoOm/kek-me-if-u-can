@@ -19,6 +19,8 @@ struct PropDef {
   float health = 100;
   float volume = 0;
   float ramDamage = 0;      // nur schwere, massive Tarnungen; 0 = kein Kollisionsangriff
+  bool vehicle = false;     // schwerere Bewegung und begrenzte Drehgeschwindigkeit
+  float lookYawOffset = PI; // Modellfront auf Blickrichtung ausrichten (Standard: +Z)
   bool light = false;        // Lampe
   Vec3 lightOffset;
   Vec3 lightColor;

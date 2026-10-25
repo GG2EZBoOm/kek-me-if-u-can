@@ -4,6 +4,6 @@
 // Nur #define, damit auch der Ressourcen-Compiler die Datei lesen kann.
 #define KEK_VERSION_MAJOR 1
 #define KEK_VERSION_MINOR 0
-#define KEK_VERSION_PATCH 9
-#define KEK_VERSION_STR "1.0.9"
+#define KEK_VERSION_PATCH 10
+#define KEK_VERSION_STR "1.0.10"
 #endif

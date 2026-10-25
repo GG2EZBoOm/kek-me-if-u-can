@@ -183,25 +183,21 @@ class Zwinger {
   void SemperGallery() {
     Stone();
     std::vector<Hole> entries = {{-3, 3, 0, 4}, {-17, -14, 0, 3}, {14, 17, 0, 3}};
+    for(float z : {-12.0f,-8.0f,-4.5f,4.5f,8.0f,12.0f}) entries.push_back({z-.72f,z+.72f,4.9f,6.7f,true});
     k.WallZ(-18, 18, 26.8f, 27.1f, 0, 7.6f, entries);
     k.WallZ(-18, 18, 33, 33.3f, 0, 7.6f, {{-3, 3, 0, 4}});
     k.Slab(26.7f, -18, 33.4f, 18, 7.9f, .3f, MAT_METAL, 0x617775);
     for (float z : {-15.5f, 0.0f, 15.5f}) Arch({26.58f, 0, z}, -PI * .5f, z == 0 ? 5.7f : 2.7f, z == 0 ? 2.2f : 2.0f);
     for (float z : {-12.0f, -8.0f, -4.5f, 4.5f, 8.0f, 12.0f}) {
       for (float y : {1.0f, 4.9f}) {
-        k.Style(MAT_GLASS, 0x3b5963); k.Visual({26.74f, y, z - .72f}, {26.77f, y + 1.8f, z + .72f});
+        if(y>4) k.Glass({26.91f,y,z-.72f},{26.97f,y+1.8f,z+.72f},0x9eb9bf,.22f);
+        else { k.Style(MAT_GLASS, 0x3b5963); k.Visual({26.74f, y, z - .72f}, {26.77f, y + 1.8f, z + .72f}); }
         Stone(LIGHT); k.Visual({26.56f, y - .12f, z - .9f}, {26.79f, y, z + .9f});
       }
       Column({26.5f, 0, z + 1.4f}, 7.4f, .22f);
     }
     Stone(LIGHT); k.Visual({26.45f, 4.0f, -18}, {26.79f, 4.23f, 18});
     k.Sign("SEMPERGALERIE", {26.38f, 6.7f, 0}, -PI * .5f, .11f, 0xe4c78e, 0, false);
-    for (float z : {-11.0f, 9.0f}) {
-      k.Prop("zwinger_kunstkiste", {31.8f, 0, z}, -PI * .5f);
-      k.Prop("zwinger_kunstkiste", {31.7f, 0, z + 2}, 0);
-      k.Prop("zwinger_statue", {28.3f, 0, z + 1}, -PI * .5f);
-      k.Light({30, 5.5f, z}, 9, {2.1f, 1.8f, 1.3f});
-    }
     k.Zone({27.2f, 0, -18}, {32.9f, 7.5f, 18}, .35f, "Sempergalerie", 2);
   }
   void Fountain(float x, float z) {

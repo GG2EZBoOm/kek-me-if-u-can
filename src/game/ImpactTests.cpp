@@ -85,6 +85,41 @@ int RunImpactTests() {
   move(180, 0);
   check(health < 1000 && sim.players[1].health == health && events(EV_HIT, KILL_CRUSH) == 1,
         "Aufprall federt ab, löst aber keine Schadensschleife beim Landen aus");
+  for(const char* form : {"auto_grau","auto_blau","polizeiauto","gabelstapler"}) {
+    const int type=props::Find(form);
+    World showroom;
+    showroom.AddCollider(OBox({0,-1,0},{30,1,30}),COL_SOLID,MAT_CONCRETE);
+    showroom.AddProp(type,{0,0,-4.5f},0);showroom.Finalize();
+    start("paket_m",&showroom);
+    sim.players[1].ms.pos={15,0,15};
+    UserCmd use;use.buttons=BTN_USE;
+    sim.QueueCmd(0,use);sim.Tick();
+    std::vector<OBox> others;
+    bool changed=sim.players[0].propType==type;
+    check(changed && !BoxBlocked(sim.MakeEnv(0,others),PlayerBox(sim.players[0].ms,type),.02f),
+          StrFormat("%s: E verwandelt am echten Weltfahrzeug ohne Überlappung",form).c_str());
+    showroom.AddCollider(OBox({-1.6f,1.6f,.25f},{1.2f,1.6f,1.75f}),COL_SOLID,MAT_CONCRETE);
+    showroom.AddCollider(OBox({1.6f,1.6f,.25f},{1.2f,1.6f,1.75f}),COL_SOLID,MAT_CONCRETE);
+    showroom.Finalize();start("paket_m",&showroom);sim.players[1].ms.pos={15,0,15};
+    sim.QueueCmd(0,use);sim.Tick();
+    bool nofit=false;for(const auto& e:sim.events) nofit|=e.type==EV_NOFIT;
+    check(nofit && sim.players[0].propType==props::Find("paket_m"),
+          StrFormat("%s: zu schmale Stelle verhindert Verwandlung",form).c_str());
+    start(form);sim.players[0].ms.colYaw=props::Get(type).lookYawOffset;
+    sim.players[1].ms.pos={0,0,-9};move(140,charge);
+    check(!sim.players[1].alive && events(EV_KILL,KILL_RAM)==1,
+          StrFormat("%s: Sprint-Anlauf überrollt Sucher genau einmal",form).c_str());
+    MoveEnv env;env.world=&arena;MoveState steer;steer.onGround=true;steer.yaw=0;steer.colYaw=0;steer.rotLock=false;
+    for(int i=0;i<120;i++) UpdatePropRotation(env,steer,type);
+    Vec3 front=RotateY(props::Get(type).id=="gabelstapler" ? Vec3(0,0,-1) : Vec3(1,0,0),steer.colYaw);
+    check(Dot(front,Vec3(0,0,-1))>.99f,StrFormat("%s: entsperrte Modellfront folgt der Blickrichtung",form).c_str());
+    env.world=&wall;steer.pos={0,0,-1};steer.colYaw=0;steer.yaw=0;
+    // Start beside the wall in a fitting orientation, then turn toward it.
+    if(form==std::string("gabelstapler")) {steer.pos={0,0,-.8f};steer.colYaw=PI*.5f;steer.yaw=0;}
+    bool fits=!BoxBlocked(env,PlayerBox(steer,type),.02f);
+    for(int i=0;i<180;i++) UpdatePropRotation(env,steer,type);
+    check(fits && !BoxBlocked(env,PlayerBox(steer,type),.02f),StrFormat("%s: Drehen respektiert Wandkollision",form).c_str());
+  }
   LOG("Aufpralltests beendet: %d Fehler", fails);
   return fails;
 }

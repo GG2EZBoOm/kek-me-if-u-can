@@ -3,3 +3,4 @@
 
 // Spielbare Ergänzungen und Orientierungspunkte, vor World::Finalize aufgebaut.
 void RefineMap(World& world);
+void BuildMapDistricts(World& world);

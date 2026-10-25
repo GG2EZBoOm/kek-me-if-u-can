@@ -74,8 +74,15 @@ Kartenschilder verwenden geglättete proportionale TrueType-Schrift mit Mipmaps 
 Die hohe äußere Mauer des Zwingers ist durch eine unsichtbare Spielerbegrenzung ersetzt; dahinter stehen
 zurückgesetzte Stadthäuser und Bäume. Auch hohe Sprünge bleiben innerhalb der Karte.
 
-Alle Teilnehmer benötigen **Protokoll 8** wegen der geänderten Zwinger-Begrenzung.
-Version **1.0.9** bleibt mit **1.0.8** im Mehrspieler kompatibel.
+Version **1.0.10** erweitert die vier Karten neben dem Bundestag um zusätzliche Innenräume und verbundene Ebenen:
+Pausendeck und Dachterrasse im KEK-Paketzentrum, Kesselhaus und Kesselwarte in der Nudelfabrik,
+Almhütte mit Empore und Balkon auf dem Oktoberfest sowie obere Sammlung, Orangerie-Café und Restaurierungshof im Zwinger.
+Das Pausendeck hat eine integrierte Beschriftung, Fensterrahmen, Kaffeeküche und offene Handläufe;
+die KEK-Wegweiser verwenden gelbe Tafeln mit roter Schrift. Die Darstellung aus 1.0.9 bleibt erhalten.
+Neue Treppen und Rundwege werden mit realer Bot-Bewegung auf Hin- und Rückwegen geprüft.
+
+Alle Teilnehmer benötigen **Version 1.0.10 / Protokoll 9** wegen der neuen Kartengeometrie und Fahrzeugbewegung.
+Ältere Versionen können dieser Lobby nicht beitreten.
 
 ## Selbst bauen
 
@@ -102,6 +109,7 @@ Danach `KekMeIfYouCan.exe` starten. Voraussetzung: Visual Studio 2022/2026 mit �
 | Ausrichtung übernehmen | Beim Verwandeln übernimmt man die Drehung des Vorbilds und sperrt sie automatisch, damit man sich sauber in Reihen einfügt. |
 | Drehung mit Kollision | Große Objekte lassen sich nicht in Wände drehen. Ein Sofa muss sich seitlich durch die Tür schieben. |
 | Schwere Props schlagen zurück | Mit Umschalt und 1,5 m freiem Anlauf rammen; aus ausreichender Höhe auf Sucher fallen. HUD markiert geeignete Formen und zeigt die Abklingzeit. |
+| Fahrzeuge als Tarnung | Limousine, Kleinwagen, Polizeiwagen und Gabelstapler mit E kopieren. Trägere Beschleunigung und Drehung, 150 HP und 105 Rammschaden nach freiem Sprint-Anlauf. |
 | Taunts mit Punkten | 16 Taunts mit je drei Varianten (Präsidentenglocke, Applaus, Kuckuck, Quietscheente …). Längere Taunts bringen mehr Punkte. |
 | Zwangs-Taunt | Wer zu lange still ist, tauntet automatisch: alle 45 s, im Endspurt alle 20 s. |
 | Köder | Props stellen zwei Kopien ihrer Tarnung auf. Treffer darauf kosten die Jäger Lebenspunkte. |
@@ -141,8 +149,8 @@ Vertikalgriff auf; unter den kurzen Schrotlauf passt keine 8er-Magazinverlänger
 
 Der Gastgeber prüft alle Teile. **Bis zum Ende der Versteckphase** werden Umbauten übernommen;
 während der Jagd gilt eine Änderung **ab der nächsten Runde**. Auch bei einem späten Beitritt während der Jagd
-wird der gespeicherte Build erst zur nächsten Runde angelegt. Alle Teilnehmer benötigen **Netzwerkprotokoll 8**
-(Version 1.0.8 oder 1.0.9). Andere Spieler sehen dieselben montierten Bauteile.
+wird der gespeicherte Build erst zur nächsten Runde angelegt. Alle Teilnehmer benötigen **Netzwerkprotokoll 9**
+(Version 1.0.10). Andere Spieler sehen dieselben montierten Bauteile.
 
 Die Handhabung nutzt zeitabhängigen Anschlag, serverseitigen Rückstoß, Sprint-Erholung und getrennte Bewegungen
 für Hände, Magazin, Verschluss und Pumpgriff. Die Schrotflinte lädt **Patronen einzeln**; mit Feuer lässt sich
@@ -191,10 +199,13 @@ Eine für Prop Hunt verkleinerte, stilisierte Interpretation mit eigener Geometr
 - Offene Bogengalerien und **begehbare Terrassen** mit vier Hofaufgängen, breiteren Pavillonrändern und Verbindung über das Kronentor
 - Blumenbeete, Hofmedaillon, Sitzgruppen und gerahmte Gemälde in der Sempergalerie
 - Sempergalerie, Porzellansammlung, Mathematisch-Physikalischer Salon und **Nymphenbad** mit Kaskade
+- **Obere Sammlung** mit zwei Treppen und verschiedenen Gemälden, Orangerie-Café und Restaurierungshof hinter den Arkaden
 - Sechs neue Tarnungen: Porzellanvase, Barockurne, Orangenkübel, Sandsteinfigur, historisches Fernrohr und Kunsttransportkiste
 
 Architekturorientierung: [Schlösserland Sachsen – Highlights des Dresdner Zwingers](https://wissen.schloesserland-sachsen.de/haeuser-gaerten/dresdner-zwinger/highlights-der-architektur/).
 Die Spielkarte ist kein maßstabsgetreuer Museumsplan. Alle Modelle entstehen im Spielcode.
+
+![Obere Sammlung im Zwinger](docs/screenshots/v1.0.10-sammlung.png)
 
 Für einen dedizierten Server: `KekMeIfYouCanCLI.exe --server --map zwinger --bots 8`.
 
@@ -225,8 +236,11 @@ Ein Festzelt auf der Theresienwiese in der Abenddämmerung:
   Souvenirs, Zuckerwatte, Brezn und Lose
 - **Fahrgeschäfte**: drehendes Riesenrad, Kettenflieger, Autoscooter-Halle und Kinderkarussell
 - **Festinseln** mit Tischen und Fässern sowie überdachtes Fundbüro mit Fahrkartenbereich
+- **Almhütte** mit Stube, zwei Treppen, umlaufender Empore und begehbarem Balkon
 - **Hinterhof** mit Toilettenhäuschen, Strohballen und Fässern. Im Hintergrund stehen Bavaria, Ruhmeshalle und
   die Türme der Frauenkirche.
+
+![Almhütte mit Empore und Balkon](docs/screenshots/v1.0.10-almhuette.png)
 
 ### Nudelfabrik
 
@@ -240,8 +254,11 @@ Eine Backsteinfabrik mit Werkshof und zwei Produktionslinien:
 - **Bürotrakt** mit Kantine, Umkleide, Meisterbüro, Labor und Archiv
 - **Außengelände** mit drei Mehlsilos, Parkplatz, Pförtnerhaus, Hinterhof und Schornstein
 - **Versandlager 02** mit fünf Zugängen und begehbarer Galerie; Leergutcontainer, Pausenhof und zusätzliche Ladegruppen
+- **Kesselhaus** mit Oberlicht, Rohrleitungen, Werkstatt und zwei Treppen zur Kesselwarte
 
 ![Neues Versandlager mit Galerie](docs/screenshots/v1.0.7-versandlager.png)
+
+![Kesselhaus mit begehbarer Kesselwarte](docs/screenshots/v1.0.10-kesselhaus.png)
 
 Für einen dedizierten Server: `KekMeIfYouCanCLI.exe --server --map nudelfabrik --bots 8`.
 
@@ -252,6 +269,7 @@ Gelb-rote Logistikhalle mit dem schrägen **KEK-Schriftzug und Streifen**, ohne 
 - Zwei laufende Paketbänder mit Scanportalen und große Paketregale
 - Eine begehbare Sortierbrücke mit zwei Treppen und Rundwegen
 - Retourenschalter, Packplätze und Leitstelle
+- **Pausendeck** mit Kaffeeküche und Sitzecken, Dachterrasse der Leitstelle und zurückgesetzte Verbindungsbrücke mit zwei äußeren Treppen
 - Drei begehbare Lkw-Laderäume mit Ladetreppen und ein Betriebshof
 - **Express-Umschlaghalle**, zwei begehbare Container, Service- und Pausenbereich sowie Paketstation
 - Das umzäunte Gelände ist **106 × 94 Meter** groß, rund **49 % mehr Fläche** als zuvor.
@@ -259,7 +277,7 @@ Gelb-rote Logistikhalle mit dem schrägen **KEK-Schriftzug und Streifen**, ohne 
 - Zehn neue Tarnungen: Päckchen, Paket, zerbrechliches Paket, Versandrolle, Handscanner, Klebeband,
   Postsack, Sortierkiste, Rollcontainer und Etikettendrucker
 
-![KEK-Paketzentrum mit geglätteter Beschriftung](docs/screenshots/v1.0.9-paketzentrum.png)
+![Überarbeitetes Pausendeck mit integrierter Beschriftung und schlanken Geländern](docs/screenshots/v1.0.10-pausendeck.png)
 
 Für einen dedizierten Server: `KekMeIfYouCanCLI.exe --server --map paketzentrum --bots 8`.
 

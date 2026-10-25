@@ -214,6 +214,19 @@ void MapKit::Zone(Vec3 mn, Vec3 mx, float sky, const char* name, int prio) {
   w.zones.push_back(z);
 }
 
+void MapKit::ParcelSign(const char* text, Vec3 center, float yaw, float pixel) {
+  const float height=7*pixel;
+  const float width=WorldTextReady() ? WorldTextWidth(text,height) : PixelTextWidth(text,pixel);
+  const float pad=height*.45f;
+  ob.Push(Translation(center)*RotationY(yaw));
+  Style(MAT_PLAIN,0xffcf20);
+  Visual({-width*.5f-pad,-height*.5f-pad*.65f,-.07f},{width*.5f+pad,height*.5f+pad*.65f,0});
+  Style(MAT_PLAIN,0xc91b10);
+  Visual({-width*.5f-pad,-height*.5f-pad*.65f,.006f},{-width*.5f-pad*.75f,height*.5f+pad*.65f,.018f});
+  ob.Pop();
+  Sign(text,center+RotateY({0,0,.025f},yaw),yaw,pixel,0x9e1812,0,false);
+}
+
 void MapKit::Sign(const char* text, Vec3 center, float yaw, float pixel, u32 color, float glow, bool backing) {
   float width = PixelTextWidth(text, pixel);
   float height = 7 * pixel;
