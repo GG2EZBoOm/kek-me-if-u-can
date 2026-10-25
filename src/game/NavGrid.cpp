@@ -166,6 +166,22 @@ bool NavGrid::WalkableLine(int a, int b) const {
   return fabsf(y - pb.y) < 0.6f;
 }
 
+int NavGrid::Below(Vec3 p, float maxDrop) const {
+  int cx=(int)floorf((p.x-origin_.x)/cell_),cz=(int)floorf((p.z-origin_.z)/cell_);
+  int best=-1;float score=1e9f;
+  for(int z=cz-1;z<=cz+1;z++) for(int x=cx-1;x<=cx+1;x++) {
+    if(x<0 || z<0 || x>=gw_ || z>=gh_) continue;
+    int col=ColIndex(x,z);
+    for(int i=0;i<colCount_[col];i++) {
+      int n=colStart_[col]+i;Vec3 q=NodePos(n);float drop=p.y-q.y;
+      if(drop<-.15f || drop>maxDrop || DistanceXZ(p,q)>.32f) continue;
+      float s=std::max(0.0f,drop)*4+DistanceXZ(p,q);
+      if(s<score) {score=s;best=n;}
+    }
+  }
+  return best;
+}
+
 bool NavGrid::FindPath(Vec3 from, Vec3 to, std::vector<Vec3>& out, int maxExpand) const {
   out.clear();
   int s = Nearest(from, 2.0f), g = Nearest(to, 3.0f);

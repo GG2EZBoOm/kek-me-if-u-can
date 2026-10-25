@@ -38,6 +38,9 @@ KEK: Pausendeck, Hofbruecke und Dachterrasse mit gelb-roten Wegweisern.
 Nudelfabrik: Versandlager, Kesselhaus und begehbare Kesselwarte.
 Oktoberfest: zweistoeckige Almhuette mit zwei Treppen und Balkon.
 Alle Karten haben neue Versteckgruppen und praezisere Bot-Navigation.
+Sucher folgen fluechtenden Props von Daechern und ueber niedrige Gelaender.
+Sie pruefen Flugbahn und Landeflaeche und verfolgen unten weiter.
+Sucher haben nun dieselbe Sprunghoehe wie normale Props.
 Autos, Polizeiwagen und Gabelstapler sind mit E als Tarnung spielbar.
 R entsperrt die Drehung; Fahrzeuge beschleunigen und drehen traeger.
 Schwere Props koennen Sucher rammen (Umschalt + 1,5 m Anlauf) oder

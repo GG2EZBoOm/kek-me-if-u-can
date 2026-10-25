@@ -1,4 +1,4 @@
-KEK ME IF YOU CAN 1.0.10 - Windows x64
+KEK ME IF YOU CAN 1.0.11 - Windows x64
 
 1. Das gesamte ZIP entpacken (nicht direkt im ZIP starten).
 2. Im entpackten Ordner KekMeIfYouCan.exe starten.
@@ -16,6 +16,9 @@ KEK: Pausendeck, Hofbruecke und Dachterrasse mit gelb-roten Wegweisern.
 Nudelfabrik: Versandlager, Kesselhaus und begehbare Kesselwarte.
 Oktoberfest: zweistoeckige Almhuette mit zwei Treppen und Balkon.
 Alle Karten haben neue Versteckgruppen und praezisere Bot-Navigation.
+Sucher folgen fluechtenden Props von Daechern und ueber niedrige Gelaender.
+Sie pruefen Flugbahn und Landeflaeche und verfolgen unten weiter.
+Sucher haben nun dieselbe Sprunghoehe wie normale Props.
 Autos, Polizeiwagen und Gabelstapler sind mit E als Tarnung spielbar.
 R entsperrt die Drehung; Fahrzeuge beschleunigen und drehen traeger.
 Schwere Props koennen Sucher rammen (Umschalt + 1,5 m Anlauf) oder
@@ -27,7 +30,7 @@ Der Gastgeber waehlt vor dem Start oder per Esc fuer die naechste Runde.
 Waffenwerkbank im Hauptmenue oder per Esc: MP, Schrotflinte und Pistole mit
 Visierungen, Laeufen, Muendungen, Schaeften, Magazinen und Griffen umbauen.
 Builds werden gespeichert. Aenderungen waehrend der Jagd gelten ab der
-naechsten Runde. Alle Mitspieler brauchen Netzwerkprotokoll 9.
+naechsten Runde. Alle Mitspieler brauchen Netzwerkprotokoll 10.
 Schrot einzeln nachladen; Feuer unterbricht, sobald eine Patrone bereit ist.
 Tasten: 1 MP, 2 Schrotflinte, 3 Pistole, 4 Granate. Pistole: ein Schuss pro
 Klick, 15 Schuss ab Werk, 10/20-Schuss-Magazine und Micro-Reflex optional.

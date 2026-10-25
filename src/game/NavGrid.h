@@ -8,6 +8,8 @@ class NavGrid {
   bool Ready() const { return !nodes_.empty(); }
   // nächster Knoten zu einer Position (-1 wenn keiner in der Nähe)
   int Nearest(Vec3 p, float maxDist = 2.0f) const;
+  // Highest usable surface below a falling target, without snapping back onto a roof beside it.
+  int Below(Vec3 p, float maxDrop = 24.0f) const;
   Vec3 NodePos(int n) const;
   bool FindPath(Vec3 from, Vec3 to, std::vector<Vec3>& out, int maxExpand = 360000) const;
   int RandomNode(Rng& rng) const;

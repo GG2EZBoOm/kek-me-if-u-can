@@ -11,7 +11,7 @@ struct MoveConfig {
   float airAccel = 1.6f;
   float friction = 7.0f;
   float stopSpeed = 1.5f;
-  float jumpVel = 6.6f;
+  float jumpVel = 6.9f; // same clearance as ordinary props, including 1.05 m roof rails
   float gravity = 20.0f;
   float stepHeight = 0.45f;
   float staminaDrain = 0.24f;  // pro Sekunde beim Sprinten

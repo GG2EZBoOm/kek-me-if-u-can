@@ -427,6 +427,51 @@ static void NudelfabrikTests(const World& w, const NavGrid& nav, int& fails) {
 // Führt dieselbe Pfadverfolgung und Steuerung wie ein Sucher mit echter Kollision aus.
 // So zählen keine Pfade, die nur rechnerisch über eine Ecke oder auf die falsche Etage führen.
 struct BotRouteTest {
+  static bool Drop(BotManager& bots,const World& w,Vec3 from,Vec3 to,GameMode mode=MODE_CLASSIC,bool requireJump=false) {
+    Player p;p.team=TEAM_HUNTERS;p.ms.pos=from+Vec3(0,.01f,0);p.ms.onGround=true;
+    BotManager::Brain b;
+    if(!FindBotDrop(w,bots.Nav(),p.ms.pos,to,mode,b.drop)) {
+      LOG("  Kein Absprung von %.2f %.2f %.2f nach %.2f %.2f %.2f",from.x,from.y,from.z,to.x,to.y,to.z);return false;
+    }
+    if(requireJump && !b.drop.jump) {LOG("  Erwarteter Gelaendersprung wurde nicht gefunden");return false;}
+    LOG("  Absprung %.2f %.2f %.2f -> %.2f %.2f %.2f, Sprung=%d",b.drop.takeoff.x,b.drop.takeoff.y,b.drop.takeoff.z,
+        b.drop.landing.x,b.drop.landing.y,b.drop.landing.z,b.drop.jump);
+    b.dropStage=1;b.path=b.drop.approach;b.pathIdx=b.path.size()>1 ? 1 : 0;b.hasGoal=true;
+    MoveEnv env;env.world=&w;env.mode=mode;bool airborne=false;
+    for(int i=0;i<15*TICK_RATE;i++) {
+      UserCmd cmd;
+      bool following=bots.FollowDrop(p,b,mode,cmd);cmd.yaw=b.yaw;
+      ApplyMovement(env,p.ms,cmd,-1,false);b.lastButtons=cmd.buttons;
+      airborne|=!p.ms.onGround;
+      if(!following) {
+        bool landed=airborne && p.ms.onGround && from.y-p.ms.pos.y>1.2f;
+        if(!landed) LOG("  Absprung abgebrochen bei %.2f %.2f %.2f",p.ms.pos.x,p.ms.pos.y,p.ms.pos.z);
+        return landed && Walk(bots,w,p.ms.pos,to);
+      }
+    }
+    LOG("  Absprung haengt bei %.2f %.2f %.2f (Stufe %d)",p.ms.pos.x,p.ms.pos.y,p.ms.pos.z,b.dropStage);return false;
+  }
+  static bool PursueFallingProp(BotManager& bots,World& w) {
+    Sim sim;sim.Init(&w,MatchSettings());sim.AddPlayer("Sucher",true);sim.AddPlayer("Fluechtendes Prop",false);
+    for(int i=0;i<2;i++) {
+      Player& p=sim.players[i];p.alive=true;p.team=i ? TEAM_PROPS : TEAM_HUNTERS;
+      p.propType=i ? props::Find("paket_m") : -1;p.ms.pos=i ? Vec3(0,6,-4.7f) : Vec3(0,6,-2);
+      p.ms.onGround=true;p.ms.rotLock=true;p.health=p.maxHealth=10000;p.autoTaunt=1000;
+    }
+    auto& brain=bots.brains_[0];brain.round=sim.round;brain.team=TEAM_HUNTERS;brain.target=1;brain.suspicion[1]=5;
+    sim.phase=Phase::Hunting;sim.phaseTimer=300;
+    bool propFell=false,hunterAirborne=false;
+    for(int i=0;i<10*TICK_RATE;i++) {
+      UserCmd flee;flee.buttons=sim.players[1].ms.pos.z>-10 ? BTN_FORWARD : 0;
+      if(i==0) flee.buttons|=BTN_JUMP;
+      sim.QueueCmd(1,flee);bots.Think(sim);sim.Tick();bots.OnEvents(sim,sim.events);sim.events.clear();
+      propFell|=sim.players[1].ms.pos.y<1;
+      hunterAirborne|=!sim.players[0].ms.onGround;
+      if(propFell && hunterAirborne && sim.players[0].ms.onGround && sim.players[0].ms.pos.y<.2f) return true;
+    }
+    LOG("  Verfolgung endet bei %.2f %.2f %.2f, Ziel %.2f %.2f %.2f",sim.players[0].ms.pos.x,sim.players[0].ms.pos.y,sim.players[0].ms.pos.z,
+        sim.players[1].ms.pos.x,sim.players[1].ms.pos.y,sim.players[1].ms.pos.z);return false;
+  }
   static bool Walk(BotManager& bots, const World& w, Vec3 from, Vec3 to) {
     Player p; p.ms.pos = from + Vec3(0, .025f, 0);
     BotManager::Brain b;
@@ -465,6 +510,38 @@ static void NavigationRegressionTests(int& fails) {
   Check(upper >= 0 && fabsf(nav.NodePos(upper).y - 3) < .01f,
         "Navigation: unerreichbare obere Etage wird nicht durch unteren Boden ersetzt", fails);
   Check(!nav.FindPath({1, 0, 4}, {6, 3, 6}, path), "Navigation: isolierte Plattform meldet fehlenden Weg", fails);
+  {
+    World roof;MapKit k(roof);k.Style(MAT_CONCRETE,0x888888);
+    k.Solid({-20,-1,-20},{20,0,20});k.Solid({-5,0,-5},{5,6,5});roof.Finalize();
+    BotManager bots;bots.Init(roof);
+    Check(BotRouteTest::Drop(bots,roof,{0,6,0},{0,0,-10}),"Dachverfolgung: echte Bewegung ueber freie Kante bis zum Ziel am Boden",fails);
+    Check(BotRouteTest::PursueFallingProp(bots,roof),"Sucher-KI erkennt fluechtendes Prop und folgt eigenstaendig vom Dach",fails);
+    BotDropPlan up;
+    Check(!FindBotDrop(roof,bots.Nav(),{0,0,-10},{0,6,0},MODE_CLASSIC,up),"Absprung ist keine Verbindung nach oben",fails);
+    k.Railing({-5,6,-5},{5,6,-5},1.05f,false);roof.Finalize();bots.Init(roof);
+    k.Railing({-5,6,5},{5,6,5},1.05f,false);
+    for(float x:{-5.0f,5.0f}) k.Railing({x,6,-5},{x,6,5},1.05f,false);
+    roof.Finalize();bots.Init(roof);
+    Check(BotRouteTest::Drop(bots,roof,{0,6,-2},{0,0,-10},MODE_CLASSIC,true),"Dachverfolgung: Sprung ueber 1,05-m-Gelaender",fails);
+    Check(BotRouteTest::Drop(bots,roof,{0,6,-2},{0,0,-12},MODE_MOON),"Dachverfolgung: Flugbahn in Mondschicht separat berechnet",fails);
+    // A sealed roof cannot be crossed, even when a ground node exists directly below it.
+    for(float x:{-5.0f,5.0f}) k.Solid({x-.1f,6,-5.1f},{x+.1f,10,5.1f});
+    for(float z:{-5.0f,5.0f}) k.Solid({-5.1f,6,z-.1f},{5.1f,10,z+.1f});
+    roof.Finalize();bots.Init(roof);
+    Check(!FindBotDrop(roof,bots.Nav(),{0,6,0},{0,0,-10},MODE_CLASSIC,up),"Dachverfolgung: hohe Waende sperren die Flugbahn",fails);
+  }
+  {
+    World voidWorld;MapKit k(voidWorld);k.Style(MAT_CONCRETE,0x888888);
+    k.Solid({-5,5,-5},{5,6,5});voidWorld.Finalize();BotManager bots;bots.Init(voidWorld);BotDropPlan plan;
+    Check(!FindBotDrop(voidWorld,bots.Nav(),{0,6,0},{0,0,-10},MODE_CLASSIC,plan),"Dachverfolgung: kein Absprung ohne Landeflaeche",fails);
+  }
+  {
+    // A ground island beyond a cliff is not a usable landing if braking rolls off its edge.
+    World ledge;MapKit k(ledge);k.Style(MAT_CONCRETE,0x888888);
+    k.Solid({-5,5,-5},{5,6,5});k.Solid({-2,-1,-9.3f},{2,0,-8.8f});ledge.Finalize();
+    BotManager bots;bots.Init(ledge);BotDropPlan plan;
+    Check(!FindBotDrop(ledge,bots.Nav(),{0,6,0},{0,0,-9},MODE_CLASSIC,plan),"Dachverfolgung: schmale Landekante ohne Bremsweg wird abgewiesen",fails);
+  }
 }
 
 static void WorldTextTests(int& fails) {
@@ -735,6 +812,7 @@ int RunTests(int matchRounds) {
     if (w.id == "paketzentrum") PaketzentrumTests(w, bots.Nav(), fails);
     if (w.id == "zwinger") ZwingerTests(w, bots.Nav(), fails);
     if (w.id == "zwinger") {
+      Check(BotRouteTest::Drop(bots,w,{27,4.3f,25.2f},{19,0,20}),"Zwinger: Sucher folgt vom Terrassenrand in den Hof",fails);
       for (Vec3 goal : {Vec3(-28, 4.3f, 10), Vec3(-12, 4.3f, -37), Vec3(12, 4.3f, -37),
                         Vec3(27, 4.3f, -25.2f), Vec3(12, 4.3f, 37), Vec3(27, 4.3f, 25.2f),
                         Vec3(11, 0, 11), Vec3(-11, 0, -11), Vec3(11, 0, -11), Vec3(-11, 0, 11),
@@ -747,6 +825,8 @@ int RunTests(int matchRounds) {
       Check(BotRouteTest::Walk(bots,w,{29.3f,3.8f,0},{0,0,0}),"Sucher verlässt die obere Sammlung",fails);
     }
     if (w.id == "paketzentrum") {
+      Check(BotRouteTest::Drop(bots,w,{22,4.5f,25},{20,0,35}),"KEK: Sucher springt von der Dachterrasse in den Betriebshof",fails);
+      Check(BotRouteTest::Drop(bots,w,{-17,7.92f,23},{-17,0,35}),"KEK: Sucher steigt vom Pausendeck-Dach nach unten ab",fails);
       for (Vec3 goal : {Vec3(0, 0, -38), Vec3(-48, 0, -15), Vec3(-40, 0, -9),
                         Vec3(-44, 0, 17), Vec3(36, 0, 34),Vec3(-18,4.5f,20),Vec3(22,4.5f,22),Vec3(0,4.525f,23.6f)})
         Check(BotRouteTest::Walk(bots, w, {0, 0, 30}, goal),
@@ -755,16 +835,19 @@ int RunTests(int matchRounds) {
       Check(BotRouteTest::Walk(bots,w,{22,4.5f,22},{0,0,30}),"Sucher verlässt die Dachterrasse",fails);
     }
     if (w.id == "nudelfabrik") {
+      Check(BotRouteTest::Drop(bots,w,{-44,6.7f,44},{-44,0,52}),"Nudelfabrik: Sucher folgt vom Kesselhausdach in den Werkshof",fails);
       for (Vec3 goal : {Vec3(16, 0, 43), Vec3(25, 2.4f, 46), Vec3(-24, 0, 40),Vec3(-44,0,41),Vec3(-46,3.025f,33)})
         Check(BotRouteTest::Walk(bots, w, {0, 0, 30}, goal),
               StrFormat("Sucher läuft real zum Werksziel (%.1f %.1f %.1f)", goal.x, goal.y, goal.z), fails);
       Check(BotRouteTest::Walk(bots,w,{-46,3.025f,33},{0,0,30}),"Sucher verlässt die Kesselwarte",fails);
     }
     if (w.id == "bundestag") {
+      Check(BotRouteTest::Drop(bots,w,{0,10,17},{0,-1.2f,26}),"Bundestag: Sucher springt ueber die Dachbruestung auf den Platz",fails);
       Check(BotRouteTest::Walk(bots, w, {-70, -1.2f, 0}, {-55, -1.2f, 25}), "Sucher erreicht das Besucherforum", fails);
       Check(BotRouteTest::Walk(bots, w, {-22, 0, 8}, {0, 16, 4.5f}), "Sucher erreicht die Kuppelplattform real", fails);
     }
     if (w.id == "oktoberfest") {
+      Check(BotRouteTest::Drop(bots,w,{49,3,10},{49,0,17}),"Oktoberfest: Sucher springt vom Almbalkon",fails);
       Check(BotRouteTest::Walk(bots, w, {55, 0, 33}, {19.5f, 0, 49}), "Sucher erreicht das Fundbüro durch die Festinseln", fails);
       for(Vec3 goal : {Vec3(49,0,2),Vec3(42,3,0),Vec3(56,3,0),Vec3(49,3,10)})
         Check(BotRouteTest::Walk(bots,w,{55,0,33},goal),StrFormat("Sucher erreicht Almhütten-Ziel %.1f %.1f %.1f",goal.x,goal.y,goal.z),fails);

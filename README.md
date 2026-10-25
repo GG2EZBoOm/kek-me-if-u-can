@@ -81,7 +81,7 @@ Das Pausendeck hat eine integrierte Beschriftung, Fensterrahmen, Kaffeeküche un
 die KEK-Wegweiser verwenden gelbe Tafeln mit roter Schrift. Die Darstellung aus 1.0.9 bleibt erhalten.
 Neue Treppen und Rundwege werden mit realer Bot-Bewegung auf Hin- und Rückwegen geprüft.
 
-Alle Teilnehmer benötigen **Version 1.0.10 / Protokoll 9** wegen der neuen Kartengeometrie und Fahrzeugbewegung.
+Alle Teilnehmer benötigen **Version 1.0.11 / Protokoll 10** wegen der angepassten Suchersprünge.
 Ältere Versionen können dieser Lobby nicht beitreten.
 
 ## Selbst bauen
@@ -118,6 +118,7 @@ Danach `KekMeIfYouCan.exe` starten. Voraussetzung: Visual Studio 2022/2026 mit �
 | Waffenwerkbank | MP, Schrotflinte und Pistole mit passenden Anbauteilen, vier Build-Vorlagen, 3D-Vorschau und wirksamen Handhabungswerten. |
 | 3D-Klang mit Verdeckung | Geräusche hinter Wänden klingen gedämpft. So lassen sich Taunts orten. |
 | Bots für beide Teams | Prop-Bots suchen sich passende Gruppen gleicher Objekte, richten sich aus, verteilen sich über die Karte und fliehen bei Treffern. Jäger-Bots gehen Geräuschen nach, nutzen Sonar und geben Testschüsse ab. |
+| Verfolgung vom Dach | Sucher folgen flüchtenden Props über Dachkanten und niedrige Geländer. Absprung, Flugbahn und Bremsweg auf der Landefläche werden mit echter Spielerphysik geprüft, auch in der Mondschicht. |
 | Ausgerüstete Sucher | Geformte Uniformen, Plattenträger mit Taschen und Funkgerät, Schutzbrille, Headset und Stiefel. Arme greifen die Waffe per Zweigelenk-IK; Lauf- und Hockposen werden animiert. |
 | Infektionsmodus | Gefundene Props jagen mit (optional). |
 | Lebendige Karten | Fahnen wehen im Wind, Riesenrad und Kettenflieger drehen sich. |
@@ -149,8 +150,8 @@ Vertikalgriff auf; unter den kurzen Schrotlauf passt keine 8er-Magazinverlänger
 
 Der Gastgeber prüft alle Teile. **Bis zum Ende der Versteckphase** werden Umbauten übernommen;
 während der Jagd gilt eine Änderung **ab der nächsten Runde**. Auch bei einem späten Beitritt während der Jagd
-wird der gespeicherte Build erst zur nächsten Runde angelegt. Alle Teilnehmer benötigen **Netzwerkprotokoll 9**
-(Version 1.0.10). Andere Spieler sehen dieselben montierten Bauteile.
+wird der gespeicherte Build erst zur nächsten Runde angelegt. Alle Teilnehmer benötigen **Netzwerkprotokoll 10**
+(Version 1.0.11). Andere Spieler sehen dieselben montierten Bauteile.
 
 Die Handhabung nutzt zeitabhängigen Anschlag, serverseitigen Rückstoß, Sprint-Erholung und getrennte Bewegungen
 für Hände, Magazin, Verschluss und Pumpgriff. Die Schrotflinte lädt **Patronen einzeln**; mit Feuer lässt sich

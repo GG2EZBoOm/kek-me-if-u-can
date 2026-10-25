@@ -112,6 +112,7 @@ void BotManager::AimAt(Brain& b, Vec3 from, Vec3 to, float rate, float dt) {
 
 void BotManager::Think(Sim& sim) {
   time_ += TICK_DT;
+  dropPlansThisTick_=0;
   skill_ = ClampI(sim.settings.botSkill, 0, 2);
   for (int id = 0; id < MAX_PLAYERS; id++) {
     Player& p = sim.players[id];
@@ -128,6 +129,8 @@ void BotManager::Think(Sim& sim) {
       b.sonarTimer = rng_.Range(5, 20);
     }
     UserCmd cmd;
+    b.dropRetry=std::max(0.0f,b.dropRetry-TICK_DT);
+    if(!p.alive) b.dropStage=0;
     cmd.seq = ++b.seq;
     cmd.weapon = p.weapon;
     if (p.alive && (sim.phase == Phase::Hiding || sim.phase == Phase::Hunting)) {
@@ -364,6 +367,7 @@ void BotManager::ThinkHunter(Sim& sim, int id, Brain& b, UserCmd& cmd) {
     b.yaw = WrapAngle(b.yaw + 0.25f * TICK_DT);
     return;
   }
+  if(b.dropStage && FollowDrop(p,b,sim.mode,cmd)) return;
   Vec3 eye = EyePos(p.ms, -1);
   b.perceptTimer -= TICK_DT;
   if (b.perceptTimer <= 0) {
@@ -442,7 +446,16 @@ void BotManager::ThinkHunter(Sim& sim, int id, Brain& b, UserCmd& cmd) {
         if(p.ammo[b.weaponWant]==0 || (p.weapon==WPN_PISTOL && p.ammo[WPN_PISTOL]>0)) b.weaponWant=WPN_PISTOL;
         cmd.weapon = b.weaponWant;
         if(b.weaponWant==WPN_PISTOL && (p.fireTimer>0 || (p.prevButtons&BTN_FIRE))) cmd.buttons &= ~BTN_FIRE;
-        if (d > 6.0f || !vis) {
+        if (d > 6.0f || !vis || fabsf(q.ms.pos.y-p.ms.pos.y)>1.2f) {
+          if(p.ms.onGround && p.ms.pos.y-q.ms.pos.y>1.2f && b.targetSeen<1.0f &&
+             b.dropRetry<=0 && dropPlansThisTick_<1) {
+            b.dropRetry=1.5f;dropPlansThisTick_++;
+            if(FindBotDrop(w,nav_,p.ms.pos,q.ms.pos,sim.mode,b.drop)) {
+              b.dropStage=1;b.dropTimer=0;b.dropAirborne=false;
+              b.path=b.drop.approach;b.pathIdx=b.path.size()>1 ? 1 : 0;b.hasGoal=true;
+              if(FollowDrop(p,b,sim.mode,cmd)) return;
+            }
+          }
           b.repath -= TICK_DT;
           if (b.repath <= 0) {
             SetGoal(p, b, q.ms.pos);

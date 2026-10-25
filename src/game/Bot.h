@@ -2,6 +2,7 @@
 // KI-Mitspieler für beide Teams.
 #include "game/NavGrid.h"
 #include "game/Sim.h"
+#include "game/BotDrop.h"
 
 class BotManager {
   friend struct BotRouteTest;
@@ -60,10 +61,15 @@ class BotManager {
     int testShots = 0;
     std::vector<int> cleared;
     u8 weaponWant = WPN_SMG;
+    BotDropPlan drop;
+    int dropStage=0; // 1 approach, 2 airborne, 3 brake after landing
+    float dropTimer=0,dropRetry=0;
+    bool dropAirborne=false;
   };
 
   void ThinkProp(Sim& sim, int id, Brain& b, UserCmd& cmd);
   void ThinkHunter(Sim& sim, int id, Brain& b, UserCmd& cmd);
+  bool FollowDrop(const Player& p,Brain& b,GameMode mode,UserCmd& cmd);
   // Folgt dem Pfad; gibt gewünschte Laufrichtung (XZ) zurück, Länge 0 = angekommen
   Vec3 FollowPath(const Player& p, Brain& b);
   bool SetGoal(const Player& p, Brain& b, Vec3 goal);
@@ -79,4 +85,5 @@ class BotManager {
   std::vector<Sound> sounds_;
   float time_ = 0;
   int skill_ = 1;
+  int dropPlansThisTick_=0;
 };
