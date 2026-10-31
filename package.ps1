@@ -33,7 +33,10 @@ Es fehlen keine zusaetzlichen Asset-Pakete.
 Kein Installer und keine Administratorrechte erforderlich.
 
 Fuenf Karten: Bundestag, Oktoberfest, Nudelfabrik, KEK-Paketzentrum,
-Dresdner Zwinger mit oberer Sammlung, Orangerie-Cafe und Restaurierungshof.
+Dresdner Zwinger mit Hofbuehne, Rosenboskett, Sternengarten und Stufenbrunnen.
+Zwei Treppen verbinden das Porzellandepot unter dem Hof mit den Gaerten.
+Vier Durchgaenge durch die Arkaden bieten Fluchtwege. Neu zum Tarnen:
+Porzellankanne im Depot und Violoncello auf der Hofbuehne.
 KEK: Pausendeck, Hofbruecke und Dachterrasse mit gelb-roten Wegweisern.
 Nudelfabrik: Versandlager, Kesselhaus und begehbare Kesselwarte.
 Oktoberfest: zweistoeckige Almhuette mit zwei Treppen und Balkon.

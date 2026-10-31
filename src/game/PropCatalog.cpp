@@ -2226,6 +2226,44 @@ void ZwingerCrate(PK& k) {
   k.push(Translation({-PixelTextWidth("KUNST", .035f) * .5f, .47f, .58f})); BuildPixelText(k.b, "KUNST", .035f, .006f); k.pop();
 }
 
+void ZwingerPitcher(PK& k) {
+  k.mat(MAT_PLASTIC); k.col(0xe3ded1);
+  k.fr({},.14f,.20f,.08f); k.ell({0,.24f,0},{.225f,.21f,.225f},20,12);
+  k.fr({0,.38f,0},.15f,.12f,.065f); k.fr({0,.445f,0},.14f,.065f,.05f);
+  k.col(0x355481); k.sph({0,.51f,0},.039f);
+  k.torus({0,.085f,0},.176f,.014f);
+  k.push(Translation({-.24f,.265f,0})*RotationX(PI*.5f)*Scaling({.79f,1,1.18f}));
+  k.torus({},.12f,.027f); k.pop();
+  k.col(0xe3ded1);
+  k.push(Translation({.155f,.24f,0})*RotationZ(-.68f));
+  k.fr({},.078f,.049f,.255f,14); k.col(0x355481); k.torus({0,.252f,0},.049f,.009f); k.pop();
+  for (int i=0; i<8; ++i) {
+    float a=TAU*i/8; k.push(RotationY(a));
+    k.ell({0,.245f,.217f},{.028f,.057f,.012f},8,6); k.pop();
+  }
+}
+
+void ZwingerCello(PK& k) {
+  k.mat(MAT_METAL); k.col(0x44433d); k.cyl({},.018f,.19f,8);
+  k.mat(MAT_WOOD); k.col(0x924a27);
+  k.ell({0,.44f,0},{.25f,.29f,.105f},20,12);
+  k.ell({0,.68f,0},{.145f,.20f,.091f},16,10);
+  k.ell({0,.84f,0},{.196f,.19f,.097f},18,10);
+  k.boxc({0,1.17f,0},{.038f,.28f,.037f}); k.ell({0,1.48f,0},{.06f,.085f,.049f});
+  k.col(0x302923); k.boxc({0,1.03f,.075f},{.039f,.34f,.015f});
+  k.boxc({0,.38f,.106f},{.044f,.09f,.012f});
+  k.col(0xd8b27c); k.boxc({0,.59f,.105f},{.070f,.026f,.017f});
+  for (int i=0; i<4; ++i) {
+    float x=(i-1.5f)*.014f;
+    k.col(0xc9bda4); k.boxc({x,.89f,.115f},{.0025f,.49f,.004f});
+    k.col(0x392e29); k.cylx({i%2 ? -.058f : .058f,1.40f+i*.035f,0},.019f,.058f,8);
+  }
+  for (float side : {-1.f,1.f}) {
+    k.col(0x473020); k.ell({side*.097f,.60f,.091f},{.014f,.066f,.012f},8,6);
+    k.mat(MAT_METAL); k.col(0x373c39); k.tubeYZ({side*.10f,.20f,-.02f},{side*.10f,.019f,-.17f},.014f);
+  }
+}
+
 struct Entry {
   const char* id;
   const char* name;
@@ -2398,6 +2436,8 @@ void BuildCatalog() {
       {"zwinger_statue", "Sandsteinfigur", true, ZwingerStatue},
       {"zwinger_fernrohr", "Historisches Fernrohr", true, ZwingerTelescope},
       {"zwinger_kunstkiste", "Kunsttransportkiste", true, ZwingerCrate},
+      {"zwinger_kanne", "Porzellankanne", true, ZwingerPitcher},
+      {"zwinger_cello", "Violoncello", true, ZwingerCello},
   };
   g_defs.reserve(COUNTOF(entries));
   for (const Entry& e : entries) {

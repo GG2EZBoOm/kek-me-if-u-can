@@ -81,7 +81,7 @@ Das Pausendeck hat eine integrierte Beschriftung, Fensterrahmen, Kaffeeküche un
 die KEK-Wegweiser verwenden gelbe Tafeln mit roter Schrift. Die Darstellung aus 1.0.9 bleibt erhalten.
 Neue Treppen und Rundwege werden mit realer Bot-Bewegung auf Hin- und Rückwegen geprüft.
 
-Alle Teilnehmer benötigen **Version 1.0.11 / Protokoll 10** wegen der angepassten Suchersprünge.
+Alle Teilnehmer benötigen **Version 1.0.12 / Protokoll 11**, damit der Zwinger und die beiden neuen Tarnungen bei allen übereinstimmen.
 Ältere Versionen können dieser Lobby nicht beitreten.
 
 ## Selbst bauen
@@ -150,8 +150,8 @@ Vertikalgriff auf; unter den kurzen Schrotlauf passt keine 8er-Magazinverlänger
 
 Der Gastgeber prüft alle Teile. **Bis zum Ende der Versteckphase** werden Umbauten übernommen;
 während der Jagd gilt eine Änderung **ab der nächsten Runde**. Auch bei einem späten Beitritt während der Jagd
-wird der gespeicherte Build erst zur nächsten Runde angelegt. Alle Teilnehmer benötigen **Netzwerkprotokoll 10**
-(Version 1.0.11). Andere Spieler sehen dieselben montierten Bauteile.
+wird der gespeicherte Build erst zur nächsten Runde angelegt. Alle Teilnehmer benötigen **Netzwerkprotokoll 11**
+(Version 1.0.12). Andere Spieler sehen dieselben montierten Bauteile.
 
 Die Handhabung nutzt zeitabhängigen Anschlag, serverseitigen Rückstoß, Sprint-Erholung und getrennte Bewegungen
 für Hände, Magazin, Verschluss und Pumpgriff. Die Schrotflinte lädt **Patronen einzeln**; mit Feuer lässt sich
@@ -193,20 +193,22 @@ Die Karte wählst du im Hauptmenü über die Kartenkarte unten rechts oder beim 
 
 Eine für Prop Hunt verkleinerte, stilisierte Interpretation mit eigener Geometrie:
 
-![Dresdner Zwinger ohne die äußere Mauer](docs/screenshots/v1.0.9-zwinger.png)
+![Der neue Hof mit Rosenboskett, Brunnen, Hofbühne und Sternengarten](docs/screenshots/v1.0.12-zwinger.jpg)
 
-- Innenhof mit **vier Brunnenbecken**, Orangenkübeln und Bänken
+- Im **Rosenboskett** brechen versetzte Hecken die Sicht. Auf der **Hofbühne** führen zwei Aufgänge und ein Durchlass im Vorhang hinter die Instrumente.
+- Vom Stufenbrunnen zum **Sternengarten** mit beweglicher Himmelskugel führt ein zweiter Weg unter dem Hof hindurch. Im **Porzellandepot** kannst du die Regalreihe wechseln oder dich zwischen Vasen und Kannen tarnen.
+- Vier Durchgänge durch die Bogengalerien verbinden die Hofwege direkt mit den Gärten hinter den Arkaden und dem Nymphenbad.
 - **Kronentor** mit goldener Krone, Brücke und Graben; Wall- und Glockenspielpavillon
 - Offene Bogengalerien und **begehbare Terrassen** mit vier Hofaufgängen, breiteren Pavillonrändern und Verbindung über das Kronentor
 - Blumenbeete, Hofmedaillon, Sitzgruppen und gerahmte Gemälde in der Sempergalerie
 - Sempergalerie, Porzellansammlung, Mathematisch-Physikalischer Salon und **Nymphenbad** mit Kaskade
 - **Obere Sammlung** mit zwei Treppen und verschiedenen Gemälden, Orangerie-Café und Restaurierungshof hinter den Arkaden
-- Sechs neue Tarnungen: Porzellanvase, Barockurne, Orangenkübel, Sandsteinfigur, historisches Fernrohr und Kunsttransportkiste
+- Acht Zwinger-Tarnungen, darunter eine **Porzellankanne** für das Depot und ein **Violoncello** für die Hofbühne
 
 Architekturorientierung: [Schlösserland Sachsen – Highlights des Dresdner Zwingers](https://wissen.schloesserland-sachsen.de/haeuser-gaerten/dresdner-zwinger/highlights-der-architektur/).
 Die Spielkarte ist kein maßstabsgetreuer Museumsplan. Alle Modelle entstehen im Spielcode.
 
-![Obere Sammlung im Zwinger](docs/screenshots/v1.0.10-sammlung.png)
+![Unter dem Hof im Porzellandepot](docs/screenshots/v1.0.12-depot.jpg)
 
 Für einen dedizierten Server: `KekMeIfYouCanCLI.exe --server --map zwinger --bots 8`.
 
@@ -284,7 +286,7 @@ Für einen dedizierten Server: `KekMeIfYouCanCLI.exe --server --map paketzentrum
 
 ### Gegenstände
 
-155 verschiedene Gegenstände. Im Bundestag gibt es unter anderem Aktenordner, Wasserglas, Laptop, Mate-Flasche,
+157 verschiedene Gegenstände. Im Bundestag gibt es unter anderem Aktenordner, Wasserglas, Laptop, Mate-Flasche,
 Currywurst, Wahlurne, Präsidentenglocke, Büste und Ficus. Auf dem Oktoberfest kommen Maßkrug, Wiesnbrezn,
 Lebkuchenherz, Bierfass, Hendl, Radi, Trachtenhut, Tuba, Teddybär, Gartenzwerg, Karussellpferd, Autoscooter und
 viele mehr dazu. Die Nudelfabrik ergänzt 32 Gegenstände, darunter Mehlsack, Europalette, Spaghetti-Packung,
@@ -371,8 +373,8 @@ KekMeIfYouCan.exe --gameshot build\game
 
 `--test` prüft Einladungscodes, Updater, Audio, Bewegung, Türen und Wegfindung auf allen Karten. Für die Nudelfabrik werden
 zusätzlich alle Startplätze, die Förderband-Umläufe und die Sperre der Spaghetti-Bahn geprüft. Danach spielt es auf jeder
-Karte ein komplettes Bot-Match im Zeitraffer. **26 Routen werden mit der tatsächlichen Bot-Steuerung und Spielerkollision
-abgelaufen**, darunter die Zwinger-Terrassen in beide Richtungen, alle vier Brunnen, die Bundestagskuppel und die neuen
+Karte ein komplettes Bot-Match im Zeitraffer. **Sucher laufen die Routen mit der tatsächlichen Bot-Steuerung und Spielerkollision
+ab**, darunter beide Treppen ins Porzellandepot, die vier Arkadendurchgänge in beide Richtungen, die Zwinger-Terrassen, die Bundestagskuppel und die neuen
 Lagerbereiche. Das Navigationsgitter berücksichtigt die Sucherbreite auf einem 25-cm-Raster, blockierte diagonale Ecken
 und übereinanderliegende Etagen. Zwei Prüfungen gelten der Grafik und
 der Fairness:

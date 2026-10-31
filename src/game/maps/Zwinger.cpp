@@ -3,6 +3,7 @@
 #include "game/MapKit.h"
 #include "game/Maps.h"
 #include "game/Shapes.h"
+#include "ZwingerCourts.h"
 
 namespace {
 constexpr u32 STONE = 0xcab994, LIGHT = 0xe0d0ad, DARK = 0x9c8866, COPPER = 0x588578, GOLD = 0xe1b84c;
@@ -119,12 +120,31 @@ class Zwinger {
         Vec3 p = (p0 + p1) * .5f;
         Vec3 inward = Normalize(Vec3(-17 * cosf(m), 0, -side * 27 * sinf(m)));
         float yaw = atan2f(inward.x, inward.z), len = Distance(p0, p1);
-        Stone(); k.SolidR(p - inward * 1.9f + Vec3(0, 2, 0), {len * .5f + .02f, 2, .16f}, yaw);
+        // Open selected cross-bays all the way through. These are flank routes to
+        // the rear gardens, the Nymphenbad and the workshops behind the arcade.
+        bool passage = i == (side < 0 ? 2 : 3) || i == 12;
+        Vec3 outer = p - inward*1.9f;
+        float wallHalf = len*.5f+.02f;
+        Stone();
+        if (passage) {
+          constexpr float doorHalf=1.16f;
+          float jambHalf=(wallHalf-doorHalf)*.5f;
+          for (float edge : {-1.f,1.f}) {
+            Vec3 offset=RotateY({edge*(doorHalf+jambHalf),2,0},yaw);
+            k.SolidR(outer+offset,{jambHalf,2,.16f},yaw);
+          }
+          k.SolidR(outer+Vec3(0,3.62f,0),{doorHalf,.38f,.16f},yaw);
+          Arch(outer-inward*.21f,yaw+PI,2.32f,2.18f);
+          k.Style(MAT_MARBLE,0x727c69);
+          k.VisualR(p+Vec3(0,.021f,0),{.90f,.008f,2.53f},yaw);
+        } else {
+          k.SolidR(outer+Vec3(0,2,0),{wallHalf,2,.16f},yaw);
+        }
         Stone(LIGHT); k.SolidR(p + Vec3(0, DECK - .15f, 0), {len * .5f + .07f, .15f, 2.1f}, yaw);
         Arch(p + inward * 1.8f, yaw, len - .65f, 2.25f);
         Balustrade(p0 - inward * 2 + Vec3(0, DECK, 0), p1 - inward * 2 + Vec3(0, DECK, 0));
         if (i % 3 == 1) k.Prop("zwinger_urne", p + Vec3(0, DECK, 0), 0);
-        if (i % 4 == 2) k.Prop("zwinger_vase", p - inward * .9f, yaw);
+        if (i % 4 == 2 && !passage) k.Prop("zwinger_vase", p - inward * .9f, yaw);
       }
       Pavilion(0, side * 39, side < 0 ? "WALLPAVILLON" : "GLOCKENSPIEL", side > 0);
       for (float sx : {-1.0f, 1.0f}) Terrace(sx < 0 ? -6.2f : 4.2f, side * 39 - 1.8f,
@@ -172,8 +192,16 @@ class Zwinger {
       float a = i * TAU / 8;
       b.Frustum({-28 + 1.03f * cosf(a), 11.65f, 1.03f * sinf(a)}, .09f, .055f, .60f, 10);
       b.Sphere({-28 + 1.03f * cosf(a), 12.29f, 1.03f * sinf(a)}, .12f, 10, 6);
+      // Eight gilded arches meet at the orb and tie the crown into a single silhouette.
+      b.Push(Translation({-28,12.27f,0})*RotationY(-a));
+      for (int j=0; j<7; ++j) {
+        float t=PI*.5f*j/7, u=PI*.5f*(j+1)/7;
+        Vec2 p(1.03f*cosf(t),.54f*sinf(t)), q(1.03f*cosf(u),.54f*sinf(u));
+        ExtrudeConvex(b,{p,q,q+Vec2(0,.075f),p+Vec2(0,.075f)},-.045f,.045f);
+      }
+      b.Pop();
     }
-    b.Sphere({-28, 12.6f, 0}, .21f); b.BoxC({-28, 13.0f, 0}, {.04f, .27f, .04f}); b.BoxC({-28, 13.08f, 0}, {.21f, .04f, .04f});
+    b.Sphere({-28, 12.87f, 0}, .21f); b.BoxC({-28, 13.22f, 0}, {.04f, .27f, .04f}); b.BoxC({-28, 13.29f, 0}, {.21f, .04f, .04f});
     k.Sign("KRONENTOR", {-23.48f, 4.75f, 0}, PI * .5f, .08f, 0x695235, 0, false);
     k.Style(MAT_WOOD, 0x8a6b44); k.Solid({-43, -.15f, -2.4f}, {-32, .03f, 2.4f});
     Balustrade({-43, .03f, -2.5f}, {-32.2f, .03f, -2.5f}); Balustrade({-43, .03f, 2.5f}, {-32.2f, .03f, 2.5f});
@@ -197,7 +225,7 @@ class Zwinger {
       Column({26.5f, 0, z + 1.4f}, 7.4f, .22f);
     }
     Stone(LIGHT); k.Visual({26.45f, 4.0f, -18}, {26.79f, 4.23f, 18});
-    k.Sign("SEMPERGALERIE", {26.38f, 6.7f, 0}, -PI * .5f, .11f, 0xe4c78e, 0, false);
+    k.Sign("SEMPERGALERIE", {26.38f, 6.7f, 0}, -PI * .5f, .11f, 0x665036, 0, false);
     k.Zone({27.2f, 0, -18}, {32.9f, 7.5f, 18}, .35f, "Sempergalerie", 2);
   }
   void Fountain(float x, float z) {
@@ -208,12 +236,19 @@ class Zwinger {
       k.Solid({x + side * 3.57f - .13f, 0, z - 2.47f}, {x + side * 3.57f + .13f, .28f, z + 2.47f});
     }
     k.FloorFinish(x - 3.42f, z - 2.46f, x + 3.42f, z + 2.46f, .09f, MAT_WATER, 0x579896);
-    Stone(); k.Solid({x - .3f, 0, z - .3f}, {x + .3f, .45f, z + .3f});
-    k.Style(MAT_WATER, 0xbad7cf); k.ob.Cylinder({x, .45f, z}, .055f, 2.0f, 10);
+    Stone(); k.Solid({x - .4f, 0, z - .4f}, {x + .4f, .45f, z + .4f});
+    k.ob.Frustum({x,.45f,z},.36f,.19f,.67f,24);
+    k.Style(MAT_METAL,0x568477); k.ob.Frustum({x,1.12f,z},.19f,.94f,.31f,32);
+    k.ob.Torus({x,1.42f,z},.94f,.057f,36,8);
+    k.Style(MAT_WATER,0x81b7ad); k.ob.Ring({x,1.46f,z},.14f,.91f,32);
+    Stone(LIGHT); k.ob.Frustum({x,1.43f,z},.24f,.13f,.54f,20);
+    k.Style(MAT_GOLD,0xb39763); k.ob.Frustum({x,1.97f,z},.13f,.45f,.21f,24);
+    k.ClipR({x,.93f,z},{.44f,.93f,.44f},0,COL_SOLID);
+    k.Style(MAT_WATER, 0xbad7cf); k.ob.Cylinder({x, 2.18f, z}, .052f, .75f, 10);
     for (int j = 0; j < 6; j++) {
       float a = j * TAU / 6;
       for (int i = 0; i < 18; i++) {
-        float t = i / 17.0f; Vec3 p(x + cosf(a) * 1.8f * t, .13f + 2.1f * (1 - t * t), z + sinf(a) * 1.8f * t);
+        float t = i / 17.0f; Vec3 p(x + cosf(a) * 1.8f * t, .13f + 2.77f * (1 - t * t), z + sinf(a) * 1.8f * t);
         k.ob.Sphere(p, .035f + .015f * t, 6, 4);
       }
     }
@@ -257,6 +292,7 @@ class Zwinger {
       k.Prop("zwinger_urne", {x, 0, z - 2.0f}, 0);
     }
     for (float x : {-10.0f, 10.0f}) for (float z : {-28.0f, 28.0f}) {
+      if (x * z > 0) continue;  // Stairs to the depot occupy this pair of bays.
       k.Prop("zwinger_orange", {x, 0, z}, 0);
       k.Prop("zwinger_statue", {x + (x < 0 ? -2.3f : 2.3f), 0, z}, z < 0 ? 0 : PI);
     }
@@ -271,7 +307,10 @@ class Zwinger {
     k.Clip({-45.5f, -3, -52}, {41.5f, 40, -51.5f}, COL_PLAYER);
     k.Clip({-45.5f, -3, 51.5f}, {41.5f, 40, 52}, COL_PLAYER);
     // Landschaft nur hinter dem spielbaren Boden; keine neue Mauer am Horizont.
-    k.FloorFinish(-145, -145, 145, 145, -.14f, MAT_GRASS, 0x5b7544);
+    k.FloorFinish(-145, -145, -46, 145, -.14f, MAT_GRASS, 0x5b7544);
+    k.FloorFinish(42, -145, 145, 145, -.14f, MAT_GRASS, 0x5b7544);
+    k.FloorFinish(-46, -145, 42, -52, -.14f, MAT_GRASS, 0x5b7544);
+    k.FloorFinish(-46, 52, 42, 145, -.14f, MAT_GRASS, 0x5b7544);
     k.FloorFinish(-57, -85, -47, 85, -.12f, MAT_TILE, 0x9c998a);
     k.FloorFinish(43, -85, 53, 85, -.12f, MAT_TILE, 0x9c998a);
     // Abgesetzte Stadthäuser mit Lücken und zurückhaltender Silhouette.
@@ -295,17 +334,46 @@ class Zwinger {
       k.Style(MAT_LEAVES, i % 2 ? 0x536d35 : 0x668144);
       k.ob.Ellipsoid({x, 4.3f, z}, {2.2f, 2.5f, 2.0f}, 12, 8);
     }
+    // A broken skyline behind the pavilions, with a distant lantern dome and tree canopies.
+    for (int side : {-1,1}) {
+      for (int i=0; i<7; ++i) {
+        float x=-57.f+i*17, z=side*(81.f+5*(i%3)), h=5.2f+1.55f*((i+2)%4);
+        k.Style(MAT_PLASTER, i%2 ? 0xb29a82 : 0xc9b388);
+        k.Visual({x-5.4f,0,z-3},{x+5.4f,h,z+3});
+        k.Style(MAT_METAL,i%3 ? 0x536364 : 0x845946);
+        k.ob.Push(Translation({x,h,z})*Scaling({6.1f,1,3.7f})*RotationY(PI*.25f));
+        k.ob.Frustum({},1.42f,1.01f,1.35f,4); k.ob.Frustum({0,1.35f,0},1.01f,.48f,1.7f,4); k.ob.Pop();
+        for (int window=-2; window<=2; ++window) {
+          float xx=x+window*1.9f, zz=z-side*3.08f;
+          k.Style(MAT_GLASS,0x566667);
+          for(float y=1.15f;y<h-1.7f;y+=2.25f)
+            k.Visual({xx-.38f,y,zz-.025f},{xx+.38f,y+1.28f,zz+.025f});
+        }
+      }
+      for (int i=0; i<13; ++i) {
+        float x=-57.f+i*9, z=side*(63.f+(i%4)*2.5f), h=3.4f+.45f*(i%3);
+        k.Style(MAT_WOOD,0x6b5948); k.ob.Cylinder({x,-.14f,z},.24f,h,8);
+        for (int j=0; j<3; ++j) {
+          k.Style(MAT_LEAVES,(i+j)%2 ? 0x526a44 : 0x627b49);
+          k.ob.Ellipsoid({x+1.2f*(j-1),h+.8f+(j%2),z+.8f*cosf(i+j)},
+                         {2.4f,2.1f+.35f*(i%2),2.35f},12,8);
+        }
+      }
+    }
+    Stone(0xb8a385); k.ob.Frustum({-37,0,-89},3.5f,3.2f,12.7f,12);
+    Dome({-37,12.7f,-89},3.9f,3.9f,5.4f);
+    Stone(LIGHT); k.ob.Frustum({-37,17.8f,-89},.8f,.7f,1.65f,8);
+    Dome({-37,19.45f,-89},1.05f,1.05f,1.5f);
   }
  public:
   explicit Zwinger(World& world) : w(world), k(world) {}
   void Build() {
-    w.env.sunDir = Normalize(Vec3(-.5f, .75f, .3f)); w.env.sunColor = {3.1f, 2.7f, 2.15f};
+    w.env.sunDir = Normalize(Vec3(-.72f, .64f, .42f)); w.env.sunColor = {2.70f, 2.29f, 1.78f};
     w.env.clouds = .25f; w.env.fogDensity = .0018f; w.env.indoorAmbient = {.40f, .37f, .32f};
     w.env.exposure = .78f;
-    k.Clip({-46, -2, -52}, {42, 0, 52}, COL_SOLID);
-    k.FloorFinish(-46, -52, 42, 52, 0, MAT_TILE, 0xb8ae95);
+    BuildZwingerCourts(k);
     Arcades(); CrownGate(); SemperGallery(); NymphBath();
-    for (float x : {-11.0f, 11.0f}) for (float z : {-10.0f, 10.0f}) Fountain(x, z);
+    Fountain(-11, -10);
     Furnish(); Boundary();
     k.Zone({-46, -1, -52}, {42, 20, 52}, 1, "Dresdner Zwinger");
     k.Zone({-24, 0, -22}, {26.5f, 12, 22}, 1, "Zwingerhof", 1);
@@ -317,9 +385,14 @@ class Zwinger {
     k.Zone({-4, 0, 35}, {4, 4, 43}, .5f, "Glockenspielpavillon", 2);
     for (float x : {-4.5f, -1.5f, 1.5f, 4.5f}) for (float z : {45.0f, 46.5f, 48.0f, 49.5f})
       w.hunterSpawns.push_back({{x, 0, z}, 0});
-    for (float x : {-1.5f, 1.5f}) for (float z : {-18.0f, -13.0f, -8.0f, -3.0f, 3.0f, 8.0f, 13.0f, 18.0f})
-      w.propSpawns.push_back({{x, 0, z}, PI});
-    w.cameraPath = {{16, 13, 28}, {-10, 4, -8}, {4, 2.1f, 1}, {-28, 7, 0},
+    // Each team member starts within a few steps of a group of disguises.
+    for (Vec3 start : {Vec3(-16,0,-17), Vec3(-3.8f,0,-15), Vec3(-18,0,-7), Vec3(-3.8f,0,-6),
+                       Vec3(5,0,-11), Vec3(17.7f,0,-10), Vec3(7,0,-3.5f), Vec3(15,0,-3),
+                       Vec3(-17,0,10), Vec3(-5,0,10), Vec3(-12,0,18), Vec3(-17,0,16),
+                       Vec3(5,0,7), Vec3(17,0,10), Vec3(11,0,17), Vec3(6,0,16)})
+      w.propSpawns.push_back({start, YawFromDir(Vec3(start.x < 0 ? -11.f : 11.f, 0, start.z < 0 ? -10.f : 10.f) - start)});
+    w.cameraPath = {{22, 13, 29}, {-5, 2, -5}, {-2, 2.0f, -2}, {11, 2, -11},
+                    {2.5f, -2.7f, 8.5f}, {-4.7f, -3.1f, 0}, {-3, 1.7f, 15}, {-13, 1.5f, 8},
                     {7, 2.1f, 23}, {0, 5, 39}, {7, 2.1f, -24}, {0, 5, -39},
                     {30, 3, -29}, {27, 2.2f, -42}, {-26.8f, 2, 23}, {-29.3f, .8f, 19.2f},
                     {-28, 6.1f, -12}, {-6, 2, 10}, {22, 2.4f, -5}, {29, 4.5f, 0}};

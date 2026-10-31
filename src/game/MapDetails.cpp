@@ -245,14 +245,19 @@ void Zwinger(MapKit& k) {
   for (float side : {-1.0f, 1.0f}) {
     k.Stairs({16.6f, 0, side * 25.8f}, 0, 3.0f, 4.3f / 22, 22, .30f, 0);
   }
-  for (float x : {-11.0f, 11.0f}) for (float z : {-10.0f, 10.0f}) {
-    Planter(k, {x, 0, z - 5.5f}, 6, 0x995d82);
-    Planter(k, {x, 0, z + 5.5f}, 6, 0xe1c181);
-    k.Prop("parkbank", {x, 0, z < 0 ? -21.5f : 21.5f}, z < 0 ? 0 : PI);
-  }
+  Planter(k, {-11, 0, -15.5f}, 6, 0x995d82);
+  Planter(k, {-11, 0, -4.5f}, 6, 0xe1c181);
+  for (float side : {-1.0f, 1.0f})
+    k.Prop("parkbank", {-11 * side, 0, side * 21.5f}, side < 0 ? 0 : PI);
   k.Style(MAT_MARBLE, 0x82735c); k.ob.Ring({0, .032f, 0}, 2.3f, 2.6f, 64, true);
   k.Style(MAT_SANDSTONE, 0xd0bb92); k.ob.Ring({0, .034f, 0}, .01f, 2.29f, 64, true);
-  Board(k, {6, 0, 26}, "ZWINGER / RUNDGANG", "KRONENTOR  <   >  NYMPHENBAD", 0xdfc89a);
+  for (int i=0;i<8;++i) {
+    float len=i%2 ? 1.42f : 2.12f;
+    k.ob.Push(RotationY(i*PI/4));
+    k.Style(MAT_MARBLE,0x62716c); k.ob.Tri({0,.045f,len},{0,.045f,.15f},{-.25f,.045f,.63f});
+    k.Style(MAT_SANDSTONE,0xa78659); k.ob.Tri({0,.046f,len},{.25f,.046f,.63f},{0,.046f,.15f});
+    k.ob.Pop();
+  }
   // Kleine, gerahmte Gemäldeszenen in der Galerie, komplett aus eigener Geometrie.
   for (float z : {-15.0f, -7.0f, 7.0f, 15.0f}) {
     k.Style(MAT_GOLD, 0x947138); k.Visual({32.85f, 1.6f, z - 1.05f}, {32.98f, 3.5f, z + 1.05f});

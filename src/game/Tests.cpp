@@ -598,9 +598,24 @@ static void ZwingerTests(const World& w, const NavGrid& nav, int& fails) {
   bool free = w.hunterSpawns.size() >= 16 && w.propSpawns.size() >= 16;
   for (const auto* starts : {&w.hunterSpawns, &w.propSpawns}) for (const auto& spawn : *starts) {
     s = MoveState(); s.pos = spawn.pos + Vec3(0, .05f, 0);
-    free &= !BoxBlocked(env, PlayerBox(s, -1)) && nav.Nearest(spawn.pos, .8f) >= 0;
+    s.colYaw = WrapAngle(spawn.yaw + PI);
+    int node = nav.Nearest(spawn.pos,.8f);
+    bool clear = !BoxBlocked(env,PlayerBox(s,-1)) && node >= 0 && nav.Component(node)==nav.MainComponent();
+    if (starts == &w.propSpawns) clear &= !BoxBlocked(env,PlayerBox(s,props::Find("karton")));
+    if (!clear) LOG("  Startplatz blockiert: %.2f %.2f %.2f",spawn.pos.x,spawn.pos.y,spawn.pos.z);
+    free &= clear;
   }
   Check(free, "Zwinger: 32 freie, über Wege erreichbare Startplätze", fails);
+  Check(!w.LineOfSight({-14,1.6f,3},{-14,1.6f,7}) &&
+        !w.LineOfSight({8.3f,2.1f,-14},{8.3f,2.1f,-11}) &&
+        !w.LineOfSight({-4.7f,-2.9f,-1.5f},{-4.7f,-2.9f,1.5f}),
+        "Zwinger: Hecke, Bühnenvorhang und Depotregal unterbrechen die Sicht bei der Jagd", fails);
+  for (int side : {-1,1}) {
+    Vec3 start(side*8.f,.035f,side*31.6f);
+    WalkTest(w,start,side>0 ? 0.f : PI,3.8f,s,props::Find("zwinger_kanne"));
+    Check(fabsf(s.pos.y+4.4f)<.15f && fabsf(s.pos.z)<19,
+          "Zwinger: eine Porzellankanne gelangt von der Hoftreppe unter das Pflaster",fails);
+  }
   int themes = 0, heavy = 0;
   for (const auto& p : w.props) { const auto& d = props::Get(p.type); themes += d.id.rfind("zwinger_", 0) == 0; heavy += d.ramDamage > 0; }
   Check(themes >= 50 && heavy >= 20, "Zwinger: thematische Tarnungen und schwere Formen ausreichend verteilt", fails);
@@ -815,7 +830,7 @@ int RunTests(int matchRounds) {
       Check(BotRouteTest::Drop(bots,w,{27,4.3f,25.2f},{19,0,20}),"Zwinger: Sucher folgt vom Terrassenrand in den Hof",fails);
       for (Vec3 goal : {Vec3(-28, 4.3f, 10), Vec3(-12, 4.3f, -37), Vec3(12, 4.3f, -37),
                         Vec3(27, 4.3f, -25.2f), Vec3(12, 4.3f, 37), Vec3(27, 4.3f, 25.2f),
-                        Vec3(11, 0, 11), Vec3(-11, 0, -11), Vec3(11, 0, -11), Vec3(-11, 0, 11),
+                        Vec3(11, 0, 12.5f), Vec3(-11, 0, -11), Vec3(11,.72f,-10), Vec3(-11, 0, 10),
                         Vec3(27, 0, -37), Vec3(-40, 0, 0), Vec3(0, 0, -47),
                         Vec3(29.3f,3.8f,0),Vec3(-16,0,45),Vec3(16,0,47)})
         Check(BotRouteTest::Walk(bots, w, {0, 0, 0}, goal),
@@ -823,6 +838,26 @@ int RunTests(int matchRounds) {
       Check(BotRouteTest::Walk(bots, w, {27, 4.3f, -25.2f}, {0, 0, 0}), "Sucher verlässt die Nordostterrasse wieder", fails);
       Check(BotRouteTest::Walk(bots, w, {27, 4.3f, 25.2f}, {0, 0, 0}), "Sucher verlässt die Südostterrasse wieder", fails);
       Check(BotRouteTest::Walk(bots,w,{29.3f,3.8f,0},{0,0,0}),"Sucher verlässt die obere Sammlung",fails);
+      for (int side : {-1,1}) {
+        Vec3 top(side*8.f,0,side*32.f), foot(side*8.f,-4.4f,side*17.f);
+        Check(BotRouteTest::Walk(bots,w,top,foot) && BotRouteTest::Walk(bots,w,foot,top),
+              "Sucher läuft die Depottreppe in beide Richtungen",fails);
+      }
+      Check(BotRouteTest::Walk(bots,w,{-8,-4.4f,-17},{8,-4.4f,17}),
+            "Sucher durchquert das möblierte Depot zwischen den Ausgängen",fails);
+      for (auto crossing : {std::pair<Vec3,Vec3>{{21.4f,0,-28.0f},{26.4f,0,-32.2f}},
+                            {{-18.9f,0,-30.4f},{-22.9f,0,-35.5f}},
+                            {{18.9f,0,30.4f},{22.9f,0,35.5f}},
+                            {{-18.9f,0,30.4f},{-22.9f,0,35.5f}}}) {
+        std::vector<Vec3> path;
+        bool direct=bots.Nav().FindPath(crossing.first,crossing.second,path) && PathLength(path)<9;
+        Check(direct && BotRouteTest::Walk(bots,w,crossing.first,crossing.second) &&
+              BotRouteTest::Walk(bots,w,crossing.second,crossing.first),
+              "Sucher nimmt den direkten Durchgang durch die Bogengalerie in beide Richtungen",fails);
+      }
+      Check(BotRouteTest::Walk(bots,w,{17.8f,0,-12},{11,.72f,-13.85f}) &&
+            BotRouteTest::Walk(bots,w,{11,.72f,-13.85f},{11,0,-5}),
+            "Sucher erreicht die Hinterbühne und verlässt sie zur Hofmitte",fails);
     }
     if (w.id == "paketzentrum") {
       Check(BotRouteTest::Drop(bots,w,{22,4.5f,25},{20,0,35}),"KEK: Sucher springt von der Dachterrasse in den Betriebshof",fails);

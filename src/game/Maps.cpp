@@ -20,8 +20,8 @@ const std::vector<MapInfo>& AllMaps() {
        "Leitstelle und drei begehbaren Lkw-Wechselbrücken. Pausendeck und Dachterrasse verbindet eine Hofbrücke; dazu Expresshalle, Containerhof und Paketstation.",
        BuildPaketzentrum},
       {"zwinger", "Dresdner Zwinger",
-       "Barocker Innenhof mit vier Brunnen, Blumengärten, goldenem Kronentor und Bogengalerien mit vier Terrassenaufgängen. "
-       "Zweistöckige Sammlung, Orangerie-Café und Restaurierungshof ergänzen Porzellan, Orangenkübel und Nymphenbad.",
+       "Zwischen Hofbühne, Rosenboskett, Sternengarten und Brunnen kannst du mitten in der Jagd die Tarnung wechseln. "
+       "Zwei Treppen führen durchs Porzellandepot unter dem Hof. Über den Arkaden läuft die Jagd auf den Terrassen weiter.",
        BuildZwinger},
   };
   return maps;
