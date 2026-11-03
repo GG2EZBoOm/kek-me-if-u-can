@@ -40,3 +40,4 @@ static bool LoadSoundResource(int id, RecordedSoundBank& out) {
 
 bool LoadRecordedSounds(RecordedSoundBank& out) { return LoadSoundResource(301,out); }
 bool LoadComedySounds(RecordedSoundBank& out) { return LoadSoundResource(302,out); }
+bool LoadDutySpeech(RecordedSoundBank& out) { return LoadSoundResource(303,out); }

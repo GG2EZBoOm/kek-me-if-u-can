@@ -2,3 +2,4 @@
 301 RCDATA "audio/game-sfx.bank"
 // CC0 performances and instruments, kept separate from the licensed weapon bank.
 302 RCDATA "audio/comedy-sfx.bank"
+303 RCDATA "audio/duty-voice.bank"

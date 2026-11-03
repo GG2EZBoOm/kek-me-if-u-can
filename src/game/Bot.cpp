@@ -175,6 +175,26 @@ void BotManager::ThinkProp(Sim& sim, int id, Brain& b, UserCmd& cmd) {
     }
   };
   if (damaged && b.state != 6 && sim.phase == Phase::Hunting) startFlee();
+  if (sim.mode==MODE_DUTY && sim.duty && !b.triedDuty && b.state==0 && sim.modeTimer==0) {
+    b.triedDuty=true;
+    bool volunteer=true;
+    for (int j=0;j<id;++j) {
+      const Player& other=sim.players[j];
+      if (other.active && other.alive && other.bot && other.team==TEAM_PROPS) volunteer=false;
+    }
+    if (volunteer) {
+      int best=-1;
+      float dist=1e9f;
+      for (int i=0;i<(int)w.props.size();++i) {
+        const WorldProp& prop=w.props[i];
+        float d=Distance(prop.pos,p.ms.pos);
+        if (prop.type==sim.dutyType && d<dist) { best=i; dist=d; }
+      }
+      if (best>=0 && SetGoal(p,b,w.props[best].pos)) {
+        b.disguiseTarget=best; b.state=1; b.stateTimer=0;
+      }
+    }
+  }
   if (sim.phase == Phase::Hunting && sim.mode == MODE_HOT && b.state != 6) startFlee();
   if (sim.phase == Phase::Hunting && sim.mode == MODE_ROULETTE && b.state < 3) { b.state = 3; b.stateTimer = 0; }
   if (sim.phase == Phase::Hunting && sim.mode == MODE_CLONES) {
@@ -245,10 +265,19 @@ void BotManager::ThinkProp(Sim& sim, int id, Brain& b, UserCmd& cmd) {
       if (b.stateTimer > 0.3f) press(BTN_USE);
       if (p.propType == wp.type) {
         b.state = 3;
+        if (sim.mode==MODE_DUTY && sim.duty && !sim.modeTimer && p.propType==sim.dutyType &&
+            SetGoal(p,b,sim.duty->spot)) b.state=7;
         b.stateTimer = 0;
       } else if (b.stateTimer > 2.5f) {
         b.state = 0;
       }
+      break;
+    }
+    case 7: { // Optional shift: follow the normal path, stay on station, then find cover.
+      if (sim.modeTimer>0 || b.stateTimer>35 || !b.hasGoal) { b.state=3; b.stateTimer=0; break; }
+      if (fabsf(p.ms.pos.y-sim.duty->spot.y)<.24f && DistanceXZ(p.ms.pos,sim.duty->spot)<sim.duty->radius*.82f) break;
+      Vec3 dir=FollowPath(p,b);
+      Steer(p,b,dir,true,cmd,false);
       break;
     }
     case 3: {  // Versteck neben gleichartigem Objekt wählen
@@ -573,7 +602,7 @@ void BotManager::OnEvents(const Sim& sim, const std::vector<GameEvent>& evs) {
         ((e.type == EV_DISGUISE && sim.mode == MODE_ROULETTE) || e.type == EV_CLONE_SWAP)) {
       brains_[e.a].state = 3; brains_[e.a].stateTimer = 0; brains_[e.a].path.clear();
     }
-    if (e.type == EV_TAUNT || e.type == EV_PING) {
+    if (e.type == EV_TAUNT || e.type == EV_PING || e.type==EV_DUTY) {
       sounds_.push_back({e.pos, time_});
       for (int j = 0; j < MAX_PLAYERS; j++) {
         const Player& q = sim.players[j];

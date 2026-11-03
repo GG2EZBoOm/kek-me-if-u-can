@@ -17,6 +17,9 @@ int FindDisguiseTarget(const World& w, const MoveState& ms, int propType, Vec3* 
 
 void Sim::Init(World* w, const MatchSettings& s) {
   world = w;
+  duty = MapDuty(w->id);
+  dutyType = duty ? props::Find(duty->form) : -1;
+  replay.Reset();
   settings = s;
   settings.mode = ClampI(settings.mode, 0, MODE_COUNT - 1);
   mode = MODE_CLASSIC;
@@ -60,6 +63,7 @@ int Sim::AddPlayer(const std::string& name, bool bot) {
 
 void Sim::RemovePlayer(int id) {
   if (id < 0 || id >= MAX_PLAYERS || !players[id].active) return;
+  replay.ForgetRecent(); // A reused player slot must not join two people's recordings.
   Emit(EV_LEAVE).a = (u8)id;
   players[id] = Player();
   for (auto& d : decoys)
@@ -179,6 +183,7 @@ void Sim::SpawnPlayer(int id, Team team, int spawnIndex) {
 }
 
 void Sim::StartRound() {
+  replay.Reset();
   std::vector<int> ids;
   for (int i = 0; i < MAX_PLAYERS; i++)
     if (players[i].active) ids.push_back(i);
@@ -192,7 +197,8 @@ void Sim::StartRound() {
   GameMode previousMode = mode;
   mode = (GameMode)ClampI(settings.mode, 0, MODE_COUNT - 1);
   if (mode == MODE_SHUFFLE) {
-    do { mode = (GameMode)rng_.Int(MODE_ROULETTE, MODE_MOON); } while (mode == previousMode);
+    const GameMode pool[]={MODE_ROULETTE,MODE_CLONES,MODE_HOT,MODE_MOON,MODE_DUTY};
+    do { mode=pool[rng_.Int(0,COUNTOF(pool)-1)]; } while (mode==previousMode);
   }
   modeTimer = mode == MODE_ROULETTE ? ROULETTE_INTERVAL : 0;
   int hunters = std::max(1, (n * 2 + 2) / 5);
@@ -359,6 +365,7 @@ void Sim::Tick() {
   }
   UpdateGrenades();
   UpdateMode();
+  if (phase == Phase::Hunting) replay.Record(*this);
   CheckRoundEnd();
 }
 

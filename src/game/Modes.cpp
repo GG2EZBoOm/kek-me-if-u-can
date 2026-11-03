@@ -69,6 +69,7 @@ void Sim::SwapClone(int id) {
 
 void Sim::UpdateMode() {
   if (phase != Phase::Hunting) return;
+  if (mode == MODE_DUTY) { UpdateDuty(); return; }
   if (mode == MODE_ROULETTE) {
     float before = modeTimer;
     modeTimer -= TICK_DT;

@@ -106,6 +106,19 @@ class ParcelCenter {
 
   void Sorting() {
     Conveyor(-6); Conveyor(6);
+    // Accessible dispatch belt after the protected sorting machine, with a low side stair.
+    k.Style(MAT_METAL,STEEL); k.Solid({5,0,7},{7,.75f,11.9f});
+    k.FloorFinish(5.05f,7,6.95f,11.9f,.762f,MAT_LEATHER,0x363638);
+    AnimatedPart rollers; rollers.slideDir={0,0,1}; rollers.slideLen=.58f; rollers.speed=.85f;
+    MeshBuilder marks(&rollers.mesh); marks.Mat(MAT_METAL); marks.ColorHex(0x88857a);
+    for (int i=0;i<8;++i) marks.Box({5.08f,.772f,7.1f+i*.58f},{6.92f,.78f,7.14f+i*.58f},FACE_PY);
+    w.anims.push_back(std::move(rollers));
+    k.Style(MAT_METAL,YELLOW);
+    k.Stairs({8.6f,0,9.5f},1,2,.1875f,4,.4f,0);
+    for (float x : {5.f,6.85f}) k.Solid({x,0,11.9f},{x+.15f,.86f,12.85f});
+    k.Style(MAT_METAL,STEEL); k.Solid({5.2f,0,12.85f},{6.8f,.24f,13.65f});
+    for (float x : {5.17f,6.83f}) k.Solid({x-.04f,.75f,6.91f},{x+.04f,2.14f,6.99f});
+    k.ParcelSign("AUSLAUF B",{6,1.95f,7.055f},0,.06f);
     k.Style(MAT_PLASTIC, YELLOW);
     for (float x : {-10.0f, 10.0f}) k.FloorFinish(x, -20, x + .1f, 12, .015f, MAT_PLASTIC, YELLOW);
     k.FloorFinish(-24, 10.9f, 24, 11.0f, .015f, MAT_PLASTIC, YELLOW);

@@ -37,7 +37,7 @@ static GameEvent ReadEvent(Reader& r) {
   return e;
 }
 
-static void WritePlayer(Writer& w, const Player& p, int i, bool full) {
+static void WritePlayer(Writer& w, const Player& p, int i, bool full,GameMode mode) {
   w.U8((u8)i);
   u8 flags = (p.alive ? 1 : 0) | (p.bot ? 2 : 0) | (p.ms.onGround ? 4 : 0) | (p.ms.crouching ? 8 : 0) | (p.ms.rotLock ? 16 : 0);
   w.U8(flags);
@@ -73,7 +73,7 @@ static void WritePlayer(Writer& w, const Player& p, int i, bool full) {
   w.U8(Q8(p.disguiseTimer, 20));
   w.U8(Q8(p.hurtTimer, 50));
   w.U8(p.decoys);
-  w.U8(Q8(p.modeMeter, 10));
+  w.U8(Q8(mode==MODE_DUTY && !full ? 0.f : p.modeMeter, 10));
   w.I16((i16)p.score);
   w.U8((u8)std::min(p.kills, 255));
   w.U8((u8)std::min(p.deaths, 255));
@@ -142,6 +142,41 @@ static MoveState MoveFromClient(const ClientPlayer& p) {
   m.rotLock = p.rotLock;
   m.lastButtons = p.lastButtons;
   return m;
+}
+
+static void WriteReplay(Writer& w,const ReplayView& clip) {
+  w.U8((u8)clip.hunter); w.U8((u8)clip.prop);
+  w.U16((u16)lroundf(clip.distance*100)); w.U16((u16)lroundf(clip.elapsed*1000));
+  u16 mask=0;
+  for (int i=0;i<MAX_PLAYERS;++i) if (clip.scene.actors[i].team!=TEAM_SPECTATOR) mask|=(u16)(1<<i);
+  w.U16(mask);
+  for (int i=0;i<MAX_PLAYERS;++i) if (mask&(1<<i)) {
+    const ReplayActor& p=clip.scene.actors[i];
+    w.I16((i16)p.type); w.Pos16(p.pos); w.Angle(p.yaw); w.Angle(p.pitch); w.Angle(p.colYaw);
+    w.U8(p.weapon|(p.crouch?128:0));
+  }
+  w.U8((u8)clip.scene.decoys.size());
+  for (const ReplayProp& p : clip.scene.decoys) { w.I16((i16)p.type); w.Pos16(p.pos); w.Angle(p.yaw); }
+}
+
+static bool ReadReplay(Reader& r,ReplayView& clip) {
+  clip.hunter=r.U8(); clip.prop=r.U8(); clip.distance=r.U16()*.01f; clip.elapsed=r.U16()*.001f;
+  if (clip.hunter>=MAX_PLAYERS || clip.prop>=MAX_PLAYERS || clip.hunter==clip.prop) return false;
+  u16 mask=r.U16();
+  for (int i=0;i<MAX_PLAYERS;++i) if (mask&(1<<i)) {
+    ReplayActor& p=clip.scene.actors[i];
+    p.type=r.I16(); if (p.type < -1 || p.type>=props::Count()) return false;
+    p.team=p.type<0 ? TEAM_HUNTERS : TEAM_PROPS;
+    p.pos=r.Pos16(); p.yaw=r.Angle(); p.pitch=r.Angle(); p.colYaw=r.Angle();
+    u8 flags=r.U8(); p.crouch=(flags&128)!=0; p.weapon=flags&127;
+    if (p.weapon>=WPN_COUNT) return false;
+  }
+  int count=r.U8(); if (count>MAX_DECOYS) return false;
+  for (int i=0;i<count;++i) {
+    int type=r.I16(); if (type<0 || type>=props::Count()) return false;
+    clip.scene.decoys.push_back({r.Pos16(),r.Angle(),type});
+  }
+  return r.Ok() && clip.scene.actors[clip.hunter].team==TEAM_HUNTERS && clip.scene.actors[clip.prop].team==TEAM_PROPS;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -343,16 +378,18 @@ void NetServer::SendSnapshot(Sim& sim, Client& c, double now) {
   w.U8((u8)sim.winner);
   w.U8((u8)sim.settings.mapIndex);
   bool names = (c.snapshots % 15) == 0;
-  w.U8((sim.settings.infection ? 1 : 0) | (names ? 2 : 0));
+  ReplayView clip = sim.phase==Phase::RoundEnd ? sim.replay.At(8.f-sim.phaseTimer) : ReplayView{};
+  w.U8((sim.settings.infection ? 1 : 0) | (names ? 2 : 0) | (clip.hunter>=0 ? 4 : 0));
   w.U8(sim.mode);
   w.U8((u8)sim.settings.mode);
   w.F32(sim.modeTimer);
+  if (clip.hunter>=0) WriteReplay(w,clip);
   u16 mask = 0;
   for (int i = 0; i < MAX_PLAYERS; i++)
     if (sim.players[i].active) mask |= (u16)(1 << i);
   w.U16(mask);
   for (int i = 0; i < MAX_PLAYERS; i++)
-    if (sim.players[i].active) WritePlayer(w, sim.players[i], i, i == c.slot);
+    if (sim.players[i].active) WritePlayer(w, sim.players[i], i, i == c.slot,sim.mode);
   int nd = 0;
   for (const Decoy& d : sim.decoys) if (d.active) nd++;
   w.U8((u8)nd);
@@ -556,9 +593,10 @@ void NetClient::HandlePacket(const u8* data, int size) {
       st.mapIndex = r.U8();
       u8 flags = r.U8();
       st.infection = flags & 1;
-      st.mode = (GameMode)ClampI(r.U8(), 0, MODE_MOON);
+      st.mode = (GameMode)ClampI(r.U8(), 0, MODE_COUNT-1);
       st.nextMode = ClampI(r.U8(), 0, MODE_COUNT - 1);
       st.modeTimer = r.F32();
+      if ((flags&4) && (st.phase!=Phase::RoundEnd || !ReadReplay(r,st.replay))) return;
       u16 mask = r.U16();
       for (int i = 0; i < MAX_PLAYERS; i++) {
         if (!(mask & (1 << i))) continue;
@@ -721,6 +759,12 @@ void NetClient::BuildView(float alpha) {
   float t = b->tick > a->tick ? (float)((renderTick_ - a->tick) / (double)(b->tick - a->tick)) : 1.0f;
   t = Saturate(t);
   view_ = latest.st;
+  if (view_.replay.hunter>=0 && a->st.replay.hunter==view_.replay.hunter &&
+      b->st.replay.hunter==view_.replay.hunter && a->st.round==latest.st.round) {
+    for (int i=0;i<MAX_PLAYERS;++i)
+      view_.replay.scene.actors[i]=BlendReplayActor(a->st.replay.scene.actors[i],b->st.replay.scene.actors[i],t);
+    view_.replay.elapsed=Lerp(a->st.replay.elapsed,b->st.replay.elapsed,t);
+  }
   for (int i = 0; i < MAX_PLAYERS; i++) {
     if (i == slot_) continue;
     const ClientPlayer& pa = a->st.players[i];

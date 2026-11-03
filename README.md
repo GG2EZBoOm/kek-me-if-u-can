@@ -81,7 +81,7 @@ Das Pausendeck hat eine integrierte Beschriftung, Fensterrahmen, Kaffeeküche un
 die KEK-Wegweiser verwenden gelbe Tafeln mit roter Schrift. Die Darstellung aus 1.0.9 bleibt erhalten.
 Neue Treppen und Rundwege werden mit realer Bot-Bewegung auf Hin- und Rückwegen geprüft.
 
-Alle Teilnehmer benötigen **Version 1.0.12 / Protokoll 11**, damit der Zwinger und die beiden neuen Tarnungen bei allen übereinstimmen.
+Alle Teilnehmer benötigen **Version 1.0.13 / Protokoll 12**, damit Aufträge und Rundenwiederholungen bei allen übereinstimmen.
 Ältere Versionen können dieser Lobby nicht beitreten.
 
 ## Selbst bauen
@@ -150,8 +150,8 @@ Vertikalgriff auf; unter den kurzen Schrotlauf passt keine 8er-Magazinverlänger
 
 Der Gastgeber prüft alle Teile. **Bis zum Ende der Versteckphase** werden Umbauten übernommen;
 während der Jagd gilt eine Änderung **ab der nächsten Runde**. Auch bei einem späten Beitritt während der Jagd
-wird der gespeicherte Build erst zur nächsten Runde angelegt. Alle Teilnehmer benötigen **Netzwerkprotokoll 11**
-(Version 1.0.12). Andere Spieler sehen dieselben montierten Bauteile.
+wird der gespeicherte Build erst zur nächsten Runde angelegt. Alle Teilnehmer benötigen **Netzwerkprotokoll 12**
+(Version 1.0.13). Andere Spieler sehen dieselben montierten Bauteile.
 
 Die Handhabung nutzt zeitabhängigen Anschlag, serverseitigen Rückstoß, Sprint-Erholung und getrennte Bewegungen
 für Hände, Magazin, Verschluss und Pumpgriff. Die Schrotflinte lädt **Patronen einzeln**; mit Feuer lässt sich
@@ -180,7 +180,14 @@ Alle Modi funktionieren mit Bots und Freunden auf allen fünf Karten. Infektion 
 | **Klon-Alarm** | Q stellt bis zu drei eigene Klone auf. G tauscht dich mit dem nächsten eigenen Klon innerhalb von 20 m, mit zehn Sekunden Abklingzeit. Klone imitieren Taunts und Sonarantworten, verschwinden nach 45 Jagdsekunden; alle zwölf Sekunden kommt eine Ladung zurück. |
 | **Hummeln im Hintern** | Wer als Prop sieben Sekunden am selben Platz bleibt, hupt und verrät seine Position. Ein Meter Ortswechsel setzt den Alarm zurück. |
 | **Mondschicht** | 40 Prozent Schwerkraft für beide Teams und Granaten: hohe Sprünge und lange Flugbahnen. |
-| **Wundertüte** | Jede Runde einer der vier Spezialmodi, ohne direkte Wiederholung. |
+| **Dienst nach Vorschrift** | Freiwilliger Teamauftrag. Während der Jagd die richtige Tarnung drei Sekunden am Ziel halten. Einmal pro Runde sinkt die Restzeit um zehn Sekunden. Die Sucher hören den Hinweis aus dem Kartenbereich. |
+| **Wundertüte** | Jede Runde einer der fünf Spezialmodi, ohne direkte Wiederholung. |
+
+Im Zwinger spielst du als **Violoncello** beim Hofkonzert. Im Bundestag bittest du als **Tischmikrofon** am Rednerpult um das Wort. Im Paketzentrum startet ein **KEK-Päckchen** am begehbaren Auslauf von Band B eine Zustellung. Auf dem Oktoberfest sucht die Blaskapelle eine **Tuba**, in der Nudelfabrik fehlt ein **Nudelkarton** im Versandlager.
+
+Am Rundenende können alle sechs Sekunden aus der Sicht eines Suchers noch einmal sehen. Das Spiel wählt den knappsten aufgezeichneten Vorbeigang mit freier Sicht aus, bei dem der Sucher nicht geschossen hat und beide überlebt haben. Es zeigt den Abstand zwischen den Figuren und die übersehene Tarnung. Ohne passenden Moment erscheint direkt die Ergebnistafel. Die Wiederholung funktioniert in allen Modi.
+
+[Hofkonzert im Spiel](docs/screenshots/v1.0.13-concert.jpg) · [Wiederholung aus Sicht des Suchers](docs/screenshots/v1.0.13-replay.jpg)
 
 **Klassisch** bleibt ebenfalls wählbar. Für Mehrspieler müssen alle dieselbe aktuelle Version verwenden;
 das Netzwerkprotokoll wurde für die neuen Regeln erweitert.

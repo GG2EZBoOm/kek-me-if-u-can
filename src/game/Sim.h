@@ -4,6 +4,8 @@
 #include "game/Movement.h"
 #include "game/World.h"
 #include "game/Weapons.h"
+#include "game/Duty.h"
+#include "game/RoundReplay.h"
 
 struct Player {
   bool active = false;
@@ -76,6 +78,9 @@ class Sim {
   u32 tick = 0;
   GameMode mode = MODE_CLASSIC;
   float modeTimer = 0;
+  const Duty* duty = nullptr;
+  int dutyType = -1;
+  RoundReplay replay;
   Player players[MAX_PLAYERS];
   Decoy decoys[MAX_DECOYS];
   Grenade grenades[MAX_GRENADES];
@@ -114,6 +119,7 @@ class Sim {
   void DoTaunt(int id, int which);
   void PlaceDecoy(int id);
   void UpdateMode();
+  void UpdateDuty();
   void RandomDisguise(int id);
   void SwapClone(int id);
   void SetDisguise(int id, int type, const MoveState& state);

@@ -857,6 +857,11 @@ void GameView::Render(Renderer& r, const ClientState& s, int localId, const Worl
   fr.FromMatrix(cam_.viewProj);
   float pulse = 0.35f + 0.25f * sinf(time * 6.0f);
   wr_.Submit(r, w, fr, cam_.pos, highlight_, pulse);
+  if (s.mode==MODE_DUTY && s.modeTimer>0 && w.id=="paketzentrum") {
+    const float t=Saturate(s.modeTimer/1.6f);
+    PropInstance box; box.pos={6,.76f-.52f*Saturate((t-.70f)/.30f),10.8f+2.3f*t};
+    box.sky=w.SkyAt(box.pos); r.Prop(props::Find("paket_s"),box);
+  }
 
   for (int i = 0; i < MAX_PLAYERS; i++) {
     const ClientPlayer& p = s.players[i];
@@ -927,6 +932,27 @@ void GameView::Render(Renderer& r, const ClientState& s, int localId, const Worl
     if (me->alive && me->team == TEAM_HUNTERS && s.phase == Phase::Hiding) fx.blackout = 0.985f;
   }
   r.Render(fx);
+}
+
+void GameView::RenderReplay(Renderer& r,const World& w,const ReplayView& clip,float fov,int width,int height) {
+  const ReplayActor& hunter=clip.scene.actors[clip.hunter];
+  Camera camera;
+  camera.pos=hunter.pos+Vec3(0,hunter.crouch ? 1.f : 1.62f,0);
+  camera.yaw=hunter.yaw; camera.pitch=hunter.pitch; camera.fovDeg=fov;
+  r.Begin(camera,w.env,width,height,clip.elapsed);
+  cam_=r.Cam(); Frustum fr; fr.FromMatrix(cam_.viewProj);
+  wr_.Submit(r,w,fr,camera.pos);
+  auto drawProp=[&](int type,Vec3 pos,float yaw) {
+    PropInstance inst; inst.pos=pos; inst.yaw=yaw; inst.sky=w.SkyAt(pos+Vec3(0,.3f,0)); r.Prop(type,inst);
+  };
+  for (int i=0;i<MAX_PLAYERS;++i) {
+    const ReplayActor& actor=clip.scene.actors[i];
+    if (actor.team==TEAM_PROPS) drawProp(actor.type,actor.pos,actor.colYaw);
+    if (actor.team==TEAM_HUNTERS && i!=clip.hunter)
+      DrawHunterPreview(r,actor.pos,actor.yaw,actor.pitch,0,0,actor.crouch,actor.weapon,w.SkyAt(actor.pos+Vec3(0,1,0)));
+  }
+  for (const ReplayProp& prop : clip.scene.decoys) drawProp(prop.type,prop.pos,prop.yaw);
+  r.SetLights(w.lights); ScreenFX fx; r.Render(fx);
 }
 
 void GameView::RenderFlyby(Renderer& r, const World& w, float time, int width, int height) {

@@ -24,6 +24,7 @@ class GameView {
               int height, ScreenFX& fx);
   // Menü-Hintergrund: Kamerafahrt
   void RenderFlyby(Renderer& r, const World& w, float time, int width, int height);
+  void RenderReplay(Renderer& r,const World& w,const ReplayView& clip,float fov,int width,int height);
   void RenderWorkbench(Renderer& r, int weapon, u16 build, float angle, float elevation, int selectedSlot,
                        float time, int width, int height);
 

@@ -16,6 +16,7 @@ void FillClientState(const Sim& sim, ClientState& out, float alpha) {
   out.mode = sim.mode;
   out.nextMode = sim.settings.mode;
   out.modeTimer = sim.modeTimer;
+  out.replay = sim.phase==Phase::RoundEnd ? sim.replay.At(8.f-sim.phaseTimer) : ReplayView{};
   for (int i = 0; i < MAX_PLAYERS; i++) {
     const Player& p = sim.players[i];
     ClientPlayer& c = out.players[i];

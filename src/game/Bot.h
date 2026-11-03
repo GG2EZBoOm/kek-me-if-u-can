@@ -40,6 +40,7 @@ class BotManager {
     // Prop
     int state = 0;
     int disguiseTarget = -1;
+    bool triedDuty = false;
     Vec3 hideSpot;
     float hideYaw = 0;
     float stateTimer = 0;

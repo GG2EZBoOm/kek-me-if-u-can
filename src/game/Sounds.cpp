@@ -979,6 +979,30 @@ static std::vector<Buf> MakeBaseSounds() {
   s[SND_AMB_OUTDOOR] = Ambience(true);
   s[SND_AMB_INDOOR] = Ambience(false);
   s[SND_MUSIC_MENU] = MenuMusic();
+  s[SND_DUTY_STRINGS]=Melody({{50,.32f},{57,.30f},{62,.70f},{60,.32f},{57,.7f}},
+      [](float f,float len) {
+        Buf note=Make(len);
+        for(size_t i=0;i<note.size();++i) {
+          float t=T(i), phase=f*t+.027f*sinf(TAU*5*t);
+          float bow=std::min(1.f,t*16)*std::min(1.f,(len-t)*9);
+          note[i]=bow*(SinC(phase)+.42f*SinC(phase*2)+.23f*SinC(phase*3)+.09f*SinC(phase*5))*.49f;
+        }
+        return note;
+      },.025f);
+  s[SND_DUTY_BRASS]=Brass(1.55f,{NoteHz(48),NoteHz(55),NoteHz(60)},.22f,.54f);
+  Buf dispatch=Make(1.75f);
+  for(int i=0;i<8;++i) Mix(dispatch,WoodenTap(175+i*12),.06f+i*.085f,.50f);
+  Mix(dispatch,Thump(.22f,110,62,18),.82f,.7f);
+  Mix(dispatch,Beep(670,.12f,.45f),1.05f); Mix(dispatch,Beep(860,.20f,.45f),1.22f);
+  s[SND_DUTY_DISPATCH]=std::move(dispatch);
+  RecordedSoundBank voice;
+  s[SND_DUTY_SPEECH]=Bell(.6f,850,7,.45f);
+  if (LoadDutySpeech(voice) && voice.count("word")) {
+    Buf announcement=Make(.48f+T(voice.at("word").size()));
+    Mix(announcement,s[SND_DUTY_SPEECH],0,.5f);
+    Mix(announcement,voice.at("word"),.45f);
+    s[SND_DUTY_SPEECH]=std::move(announcement);
+  }
   for (int k = 0; k < NUM_TAUNTS; k++) {
     g_rng = Rng(202410u + k * 397u);
     s[SND_TAUNT_FIRST + k] = kTauntMakers[k]();
@@ -1107,6 +1131,9 @@ int RunSoundTests(const std::string& previewDir) {
   check(audio::TestTransientStart(), "Kurze Klanganfänge bleiben bis zum ersten Mixer-Update erhalten");
   RecordedSoundBank recordings;
   check(LoadRecordedSounds(recordings) && recordings.size() == 24, "Alle 24 eingebetteten Aufnahmen lesbar");
+  RecordedSoundBank speech;
+  check(LoadDutySpeech(speech) && speech.count("word") && speech.at("word").size()>2*SR,
+        "Deutsche Mikrofon-Durchsage im Spielpaket enthalten");
   RecordedSoundBank comedy;
   check(LoadComedySounds(comedy) && comedy.size()==26 && ComedyBankComplete(comedy),
         "Alle 26 CC0-Comedy- und Instrumentenaufnahmen eingebettet und vollständig");

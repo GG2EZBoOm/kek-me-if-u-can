@@ -1,6 +1,7 @@
 #pragma once
 // Was ein Client vom Spiel sieht (aus der Simulation oder aus Netzwerk-Snapshots).
 #include "game/GameTypes.h"
+#include "game/RoundReplay.h"
 
 struct ClientPlayer {
   bool active = false;
@@ -54,6 +55,7 @@ struct ClientState {
   GameMode mode = MODE_CLASSIC;
   int nextMode = MODE_CLASSIC;
   float modeTimer = 0;
+  ReplayView replay;
   ClientPlayer players[MAX_PLAYERS];
   ClientDecoy decoys[MAX_DECOYS];
   ClientGrenade grenades[MAX_GRENADES];

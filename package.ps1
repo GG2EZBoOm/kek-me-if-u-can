@@ -49,6 +49,9 @@ R entsperrt die Drehung; Fahrzeuge beschleunigen und drehen traeger.
 Schwere Props koennen Sucher rammen (Umschalt + 1,5 m Anlauf) oder
 aus ausreichender Hoehe erschlagen. Nach einem Treffer: 2 s Pause.
 Spezialmodi: Prop-Roulette, Klon-Alarm, Hummeln im Hintern, Mondschicht.
+Dienst nach Vorschrift: 3 Sekunden als passende Tarnung am Ziel bleiben.
+Einmal pro Runde entfallen 10 Sekunden Jagdzeit; Sucher hoeren den Auftrag.
+Nach einem knappen Vorbeigang sehen alle 6 Sekunden aus Suchersicht.
 Wundertuete waehlt pro Runde einen anderen Spezialmodus.
 Der Gastgeber waehlt vor dem Start oder per Esc fuer die naechste Runde.
 

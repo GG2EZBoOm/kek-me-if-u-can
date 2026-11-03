@@ -648,6 +648,85 @@ static void PaketzentrumTests(const World& w, const NavGrid& nav, int& fails) {
                    {{0, 0, 8}, {34, 1.2f, -5.5f}, "Halle -> Lkw-Laderaum"}}, fails);
 }
 
+static void DutyTests(World& w,BotManager& bots,int& fails) {
+  MatchSettings ms; ms.mode=MODE_DUTY;
+  Sim sim; sim.Init(&w,ms);
+  if (!Check(sim.duty && sim.dutyType>=0,"Karte hat einen Auftrag mit gültiger Tarnung",fails)) return;
+  bool copyable=false;
+  for (const WorldProp& wp : w.props) copyable |= wp.type==sim.dutyType && props::Get(wp.type).disguisable;
+  const Vec3 target=sim.duty->spot;
+  MoveState pose; pose.pos=target+Vec3(0,.025f,0);
+  MoveEnv env; env.world=&w;
+  Check(copyable && !BoxBlocked(env,PlayerBox(pose,sim.dutyType)) &&
+        BotRouteTest::Walk(bots,w,w.propSpawns.front().pos,target),
+        "Auftragsform kopierbar, Ziel frei und mit echter Bewegung erreichbar",fails);
+  sim.AddPlayer("Sucher",false); sim.AddPlayer("Prop",false);
+  sim.phaseTimer=0; sim.Tick();
+  Player& p=sim.players[sim.players[0].team==TEAM_PROPS ? 0 : 1];
+  p.ms=pose; p.ms.onGround=true;
+  p.propType=sim.dutyType;
+  for (int i=0;i<185;++i) sim.Tick();
+  bool hideIgnored=sim.modeTimer==0 && p.modeMeter==0;
+  sim.phase=Phase::Hunting; sim.phaseTimer=45; p.propType=props::Find("karton");
+  for(int i=0;i<185;++i) sim.Tick();
+  bool wrongIgnored=sim.modeTimer==0 && p.modeMeter==0;
+  p.propType=sim.dutyType;
+  for(int i=0;i<120;++i) sim.Tick();
+  p.ms.pos.y+=1.5f; sim.Tick();
+  Check(hideIgnored && wrongIgnored && p.modeMeter==0 && sim.modeTimer==0,
+        "Nur ununterbrochene Arbeit auf der richtigen Etage während der Jagd zählt",fails);
+  p.ms=pose; p.ms.onGround=true; float before=sim.phaseTimer;
+  for(int i=0;i<240;++i) sim.Tick();
+  int cues=0;
+  for (const auto& e : sim.events) if(e.type==EV_DUTY && Distance(e.pos,sim.duty->speaker)<.001f) ++cues;
+  Check(cues==1 && fabsf(before-sim.phaseTimer-4-DUTY_BONUS)<.01f,
+        "Genau ein öffentlicher Hinweis und zehn Sekunden Teamprämie",fails);
+  sim.modeTimer=0; p.modeMeter=DUTY_HOLD-TICK_DT; sim.phaseTimer=5; sim.Tick();
+  Check(sim.phase==Phase::RoundEnd && sim.winner==TEAM_PROPS,"Erfolgreicher Auftrag kann die Runde entscheiden",fails);
+  if (w.id=="zwinger") {
+    Sim solo; solo.Init(&w,ms); solo.AddPlayer("Sucher",false); solo.AddPlayer("Cellist",true);
+    solo.phaseTimer=0; solo.Tick();
+    solo.players[1].ms.pos={11,.74f,-7.9f}; solo.players[1].autoTaunt=1000;
+    solo.players[0].ms.pos={0,.05f,46};
+    solo.phase=Phase::Hunting; solo.phaseTimer=90;
+    bool earned=false;
+    for (int i=0;i<35*TICK_RATE && !earned;++i) {
+      bots.Think(solo); solo.Tick(); bots.OnEvents(solo,solo.events);
+      for (auto& e : solo.events) earned |= e.type==EV_DUTY;
+      solo.events.clear();
+    }
+    Check(earned && solo.players[1].propType==solo.dutyType,
+          "Prop-Bot kopiert ein echtes Violoncello und spielt das Hofkonzert",fails);
+    bots.Init(w);
+  }
+}
+
+static void ReplayTests(int& fails) {
+  World w; w.AddCollider(OBox({0,-1,0},{32,1,32}),COL_SOLID,MAT_CONCRETE); w.Finalize();
+  Sim sim; MatchSettings ms; sim.Init(&w,ms);
+  sim.AddPlayer("Sucher",false); sim.AddPlayer("Prop",false);
+  auto run=[&]() {
+    sim.replay.Reset(); sim.phase=Phase::Hunting; sim.phaseTimer=8.4f;
+    Player& hunter=sim.players[0]; hunter.team=TEAM_HUNTERS; hunter.alive=true; hunter.propType=-1;
+    hunter.ms={}; hunter.ms.pos={1.3f,.01f,17}; hunter.ms.onGround=true;
+    Player& prop=sim.players[1]; prop.team=TEAM_PROPS; prop.alive=true; prop.propType=props::Find("karton");
+    prop.ms={}; prop.ms.pos={0,.01f,0}; prop.ms.onGround=true;
+    sim.events.clear();
+    for(int i=0;i<530 && sim.phase==Phase::Hunting;++i) {
+      UserCmd cmd; cmd.buttons=BTN_FORWARD; sim.QueueCmd(0,cmd); sim.Tick();
+    }
+  };
+  run();
+  ClientState state; FillClientState(sim,state,1);
+  auto mid=sim.replay.At(3), end=sim.replay.At(5.9f);
+  Check(sim.phase==Phase::RoundEnd && state.replay.hunter==0 && mid.prop==1 && mid.distance>0 && mid.distance<1 &&
+        Distance(mid.scene.actors[0].pos,end.scene.actors[0].pos)>8 && sim.replay.At(6).hunter<0,
+        "Sechs Sekunden echter Sucherweg mit gemessenem Abstand; anschließend Ergebnisanzeige",fails);
+  w.AddCollider(OBox({.66f,1.5f,0},{.08f,1.5f,30}),COL_SOLID,MAT_BRICK); w.Finalize();
+  run(); FillClientState(sim,state,1);
+  Check(state.replay.hunter==-1,"Wand zwischen Sucher und Prop: kein erfundener Vorbeigang",fails);
+}
+
 static void BotMatch(World& w, BotManager& bots, int rounds, int& fails, GameMode mode = MODE_CLASSIC) {
   Sim sim;
   MatchSettings ms;
@@ -803,6 +882,7 @@ int RunTests(int matchRounds) {
   fails += RunSoundTests();
   NavigationRegressionTests(fails);
   props::BuildCatalog();
+  ReplayTests(fails);
   extern int RunModeTests();
   fails += RunModeTests();
   extern int RunImpactTests();
@@ -821,6 +901,7 @@ int RunTests(int matchRounds) {
     CheckZones(w, bots.Nav(), fails);
     CheckZFighting(w, fails);
     CheckFoliage(w, bots.Nav(), fails);
+    DutyTests(w,bots,fails);
     if (w.id == "bundestag") BundestagTests(w, bots.Nav(), fails);
     if (w.id == "oktoberfest") OktoberfestTests(w, bots.Nav(), fails);
     if (w.id == "nudelfabrik") NudelfabrikTests(w, bots.Nav(), fails);
@@ -1126,6 +1207,41 @@ int RunNetTest() {
         gunCmd.buttons=0; for(int i=0;i<140;i++) pump();
         Check(guest.State().players[remote].ammo[WPN_PISTOL]==20 && guest.State().players[remote].reloadTimer==0,
               "Pistolen-Nachladen füllt auch über UDP exakt das gewählte Magazin",fails);
+        guest.makeCmd=[](){ return UserCmd{}; };
+        impact.phase=Phase::Hunting; impact.phaseTimer=80; impact.mode=MODE_DUTY; impact.modeTimer=0;
+        Player& seeker=impact.players[0]; seeker.team=TEAM_HUNTERS; seeker.propType=-1;
+        seeker.ms={}; seeker.ms.pos={0,.02f,0}; seeker.alive=true;
+        Player& musician=impact.players[remote]; musician.team=TEAM_PROPS; musician.propType=impact.dutyType;
+        musician.ms={}; musician.ms.pos=impact.duty->spot+Vec3(0,.02f,0); musician.ms.onGround=true;
+        musician.alive=true; musician.modeMeter=0; musician.pending.clear(); musician.autoTaunt=1000;
+        int cues=0; bool progressed=false;
+        for(int i=0;i<260;++i) {
+          pump();
+          progressed |= guest.State().players[remote].modeMeter>1 && guest.State().modeTimer==0;
+          std::vector<GameEvent> messages; guest.TakeEvents(messages);
+          for(const auto& e : messages) if(e.type==EV_DUTY && Distance(e.pos,impact.duty->speaker)<.03f) ++cues;
+        }
+        Check(progressed && cues==1 && guest.State().mode==MODE_DUTY && guest.State().modeTimer>0 &&
+              fabsf(guest.State().phaseTimer-(70-260*TICK_DT))<.2f,
+              "Gast erfüllt Hofkonzert: Fortschritt, ein Bühnenhinweis und zehn Sekunden Zeitgewinn",fails);
+        impact.replay.Reset(); impact.phaseTimer=8.6f;
+        seeker.ms={}; seeker.ms.pos={1.30f,.02f,17}; musician.ms={}; musician.ms.pos={0,.02f,0};
+        bool leaked=false,played=false,aligned=true;
+        for(int i=0;i<920;++i) {
+          if(impact.phase==Phase::Hunting) {
+            UserCmd walk; walk.buttons=BTN_FORWARD; impact.QueueCmd(0,walk);
+          }
+          pump();
+          const ClientState& guestState=guest.State();
+          if (guestState.replay.hunter<0) continue;
+          leaked |= guestState.phase!=Phase::RoundEnd;
+          const ReplayView& clip=guestState.replay;
+          ReplayView expected=impact.replay.At(clip.elapsed);
+          played |= clip.elapsed>2 && clip.elapsed<5 && clip.hunter==0 && clip.prop==remote;
+          aligned &= expected.hunter==0 && Distance(clip.scene.actors[0].pos,expected.scene.actors[0].pos)<.16f;
+        }
+        Check(!leaked && played && aligned && guest.State().replay.hunter<0 && guest.State().phase==Phase::RoundEnd,
+              "Gast sieht denselben Vorbeigang erst nach Rundenende und danach die Ergebnistafel",fails);
       }
       server.Stop(impact);
     }

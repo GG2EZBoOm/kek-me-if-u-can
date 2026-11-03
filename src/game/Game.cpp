@@ -402,6 +402,7 @@ UserCmd Game::MakeCmd() {
   if (!InGameInput()) return c;
   const ClientState& st = session_->State();
   int me = session_->LocalId();
+  if (st.replay.hunter>=0) return c;
   Team team = me >= 0 ? st.players[me].team : TEAM_SPECTATOR;
   auto tap = [](int vk) { bool t = plat::ConsumeKeyTap(vk); return t || plat::KeyDown(vk); };
   if (plat::KeyDown('W')) c.buttons |= BTN_FORWARD;
@@ -436,7 +437,7 @@ void Game::UpdateView(float dt) {
   const ClientState& st = session_->State();
   int me = session_->LocalId();
   const ClientPlayer* lp = me >= 0 ? &st.players[me] : nullptr;
-  bool look = InGameInput() && !tauntMenu_;
+  bool look = InGameInput() && !tauntMenu_ && st.replay.hunter<0;
   plat::SetMouseCaptured(look);
   if (look) {
     Vec2 md = plat::MouseDelta();
@@ -634,6 +635,13 @@ void Game::HandleEvent(const GameEvent& e) {
     case EV_TAUNT:
       audio::Play(Snd(SND_TAUNT_FIRST + ClampI(e.b, 0, NUM_TAUNTS - 1), e.c), P3(e.pos, 1.0f, 4.0f, 75.0f));
       break;
+    case EV_DUTY:
+      if (const Duty* duty=MapDuty(session_->GetWorld().id)) {
+        audio::Play(Snd(duty->sound),P3(e.pos,.95f,7,85));
+        Center("Dienst erledigt!",kGold,3.5f);
+        centerSub_=duty->announcement;
+      }
+      break;
     case EV_DISGUISE:
       audio::Play(Snd(SND_DISGUISE), P3(e.pos, 0.6f, 2.0f, 22.0f));
       if (e.a == me) {
@@ -784,7 +792,7 @@ void Game::UpdateAudio(float dt) {
   audio::SetVoiceVolume(ambOut_, ambOutVol_);
   audio::SetVoiceVolume(ambIn_, ambInVol_);
   audio::SetVoiceVolume(music_, musicVol_);
-  if (inGame) {
+  if (inGame && session_->State().replay.hunter<0) {
     const ClientState& st = session_->State();
     int me = session_->LocalId();
     for (int i = 0; i < MAX_PLAYERS; i++) {
@@ -882,6 +890,7 @@ void Game::Frame(float dt) {
     ScreenFX fx;
     double r0 = plat::Time();
     if(workbenchOpen_) view_.RenderWorkbench(r_,benchWeapon_,cfg_.builds[benchWeapon_],benchAngle_,benchElevation_,benchSlot_,(float)time_,W,H);
+    else if(st.replay.hunter>=0) view_.RenderReplay(r_,session_->GetWorld(),st.replay,cfg_.fov,W,H);
     else view_.Render(r_, st, me, session_->GetWorld(), vi, (float)time_, W, H, fx);
     frameMs_ = Lerp(frameMs_, (float)(plat::Time() - r0) * 1000.0f, 0.1f);
   } else {
@@ -2113,6 +2122,31 @@ void Game::DrawHUD() {
   float W = (float)ui_.W(), H = (float)ui_.H();
   const ClientPlayer* lp = me >= 0 ? &st.players[me] : nullptr;
   bool hiddenHunter = lp && lp->alive && lp->team == TEAM_HUNTERS && st.phase == Phase::Hiding;
+  if (st.replay.hunter>=0 && !chatOpen_ && !help_) {
+    const ReplayView& clip=st.replay;
+    const ReplayActor& target=clip.scene.actors[clip.prop];
+    ui_.Rect_({0,H-ui_.S(110),W,ui_.S(110)},Color(9,14,22,225));
+    ui_.Label(ui_.S(32),H-ui_.S(96),"Rundenwiederholung · Suchersicht",kGold);
+    ui_.Text(FONT_MEDIUM,ui_.S(32),H-ui_.S(65),StrFormat("Knappster Vorbeigang: %d cm",(int)lroundf(clip.distance*100)),kWhite);
+    ui_.Text(FONT_SMALL,ui_.S(32),H-ui_.S(32),st.winner==TEAM_PROPS ? "Die Props gewinnen" : "Die Sucher gewinnen",TeamColor(st.winner));
+    ui_.Rect_({0,H-ui_.S(4),W*Saturate(clip.elapsed/REPLAY_SECONDS),ui_.S(4)},kGold);
+    if (clip.elapsed>=2.f) {
+      Vec2 screen;
+      Vec3 point=target.pos+Vec3(0,props::Get(target.type).bmax.y+.20f,0);
+      std::string label=props::Get(target.type).name;
+      if (view_.Project(point,(int)W,(int)H,screen) && screen.x>ui_.S(100) && screen.x<W-ui_.S(100) &&
+          screen.y>ui_.S(30) && screen.y<H-ui_.S(128))
+        ui_.TextShadow(FONT_NORMAL,screen.x,screen.y,label,kProp,ALIGN_CENTER);
+      else {
+        Vec3 delta=target.pos-view_.Cam().pos;
+        label+=(Dot(delta,view_.Cam().Forward())<0) ? " · hinter dem Sucher" :
+               (Dot(delta,view_.Cam().Right())>0 ? " · rechts" : " · links");
+        ui_.TextShadow(FONT_NORMAL,W-ui_.S(32),H-ui_.S(59),label,kProp,ALIGN_RIGHT);
+      }
+    }
+    if (plat::KeyDown(VK_TAB)) DrawScoreboard(1);
+    return;
+  }
   if (st.phase == Phase::Hiding) hideTotal_ = std::max(hideTotal_, st.phaseTimer);
   else hideTotal_ = 0;
 
@@ -2238,6 +2272,15 @@ void Game::DrawHUD() {
       if (mode == MODE_CLONES) hint = prop ? StrFormat("Q: Klon · G: Tausch%s · Nachschub %.0f s", lp->abilityTimer > 0 ? " lädt" : " bereit", lp->decoys < 3 ? ceilf(CLONE_RECHARGE - lp->modeMeter) : 0) : "Klone antworten ebenfalls auf Sonar und Taunts.";
       if (mode == MODE_HOT) hint = prop ? StrFormat("Bewege dich 1 m! Alarm in %.1f s", std::max(0.0f, HOT_LIMIT - lp->modeMeter)) : "Wer stillsteht, hupt und verrät seinen Standort.";
       if (mode == MODE_MOON) hint = "40 % Schwerkraft · auch für deine Granaten";
+      if (mode == MODE_DUTY) {
+        const Duty* job=MapDuty(w.id);
+        if (st.modeTimer>0) hint="Teamauftrag erledigt · 10 s abgezogen.";
+        else if (prop && job) {
+          hint=job->instruction;
+          if (lp->modeMeter>0) hint+=StrFormat(" Noch %.1f s.",std::max(0.f,DUTY_HOLD-lp->modeMeter));
+          else hint+=StrFormat(" 3 s halten · %.0f m",Distance(lp->pos,job->spot));
+        } else hint="Achte auf Geräusche aus der Umgebung.";
+      }
     }
     float y = p.y + ui_.S(64);
     for (const auto& line : ui_.Wrap(FONT_SMALL, hint, p.w - ui_.S(32))) {
@@ -2663,6 +2706,24 @@ void Game::Autopilot() {
   Shot("discord_request");
   joinRequests_.clear();
   hosting_ = false;
+  // Exercise the same local session, HUD and recorded round-end playback used by players.
+  cfg_.match.mapIndex=FindMap("zwinger"); cfg_.match.mode=MODE_DUTY; cfg_.match.bots=1;
+  StartLocal(false); fastForward(2.5f);
+  Sim& shift=static_cast<LocalSession*>(session_.get())->GetSim();
+  Player& cello=shift.players[0]; Player& hunter=shift.players[1];
+  cello.team=TEAM_PROPS; cello.propType=shift.dutyType; cello.alive=true; cello.ms={};
+  cello.ms.pos=shift.duty->spot+Vec3(0,.02f,0); cello.ms.onGround=true;
+  hunter.team=TEAM_HUNTERS; hunter.propType=-1; hunter.bot=false; hunter.alive=true;
+  hunter.ms={}; hunter.ms.pos={0,.05f,30};
+  shift.phase=Phase::Hunting; shift.phaseTimer=80;
+  yaw_=PI*.84f; lastTeam_=TEAM_PROPS; lastAlive_=true; centerTime_=0;
+  fastForward(1.45f); frames(2); Shot("duty_cello");
+  fastForward(1.4f); frames(20); Shot("duty_concert");
+  shift.replay.Reset(); shift.phaseTimer=8.5f;
+  hunter.ms.pos={3.15f,.02f,17}; cello.ms.pos={4.5f,.02f,0};
+  session_->makeCmd=[&shift](){ UserCmd walk; walk.buttons=BTN_FORWARD; shift.QueueCmd(1,walk); return UserCmd{}; };
+  fastForward(10.7f); frames(3); Shot("duty_replay");
+  session_->makeCmd=[this](){ return MakeCmd(); };
 }
 
 }  // namespace

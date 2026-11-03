@@ -120,7 +120,7 @@ int RunModeTests() {
   for (int i = 0; i < 20; i++) {
     GameMode previous = sim.mode;
     sim.phase = Phase::RoundEnd; sim.phaseTimer = 0; sim.Tick();
-    shuffled &= sim.mode >= MODE_ROULETTE && sim.mode <= MODE_MOON && sim.mode != previous;
+    shuffled &= sim.mode >= MODE_ROULETTE && sim.mode < MODE_COUNT && sim.mode != MODE_SHUFFLE && sim.mode != previous;
   }
   check(shuffled, "Wundertüte spielt alle Runden ohne direkte Moduswiederholung");
   GameMode current = sim.mode; sim.settings.mode = MODE_CLASSIC; sim.Tick();

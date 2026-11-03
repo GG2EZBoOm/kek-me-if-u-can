@@ -10,9 +10,9 @@ constexpr int MAX_DECOYS = 48;  // auch bei voller Lobby drei Klone je Prop
 constexpr int MAX_GRENADES = 8;
 constexpr int NAME_LEN = 24;
 constexpr u16 GAME_PORT = 27015;
-constexpr u32 PROTOCOL_VERSION = 11;
+constexpr u32 PROTOCOL_VERSION = 12;
 
-enum GameMode : u8 { MODE_CLASSIC, MODE_ROULETTE, MODE_CLONES, MODE_HOT, MODE_MOON, MODE_SHUFFLE, MODE_COUNT };
+enum GameMode : u8 { MODE_CLASSIC, MODE_ROULETTE, MODE_CLONES, MODE_HOT, MODE_MOON, MODE_SHUFFLE, MODE_DUTY, MODE_COUNT };
 constexpr float ROULETTE_INTERVAL = 25, CLONE_RECHARGE = 12, HOT_LIMIT = 7;
 struct ModeInfo { const char* name; const char* tagline; const char* rules; u32 color; };
 inline const ModeInfo& GetMode(int mode) {
@@ -22,7 +22,8 @@ inline const ModeInfo& GetMode(int mode) {
     {"Klon-Alarm", "Der da war's! Oder doch der andere?", "Q: bis zu 3 Klone. G: mit dem nächsten eigenen Klon tauschen (20 m). Klone täuschen Sonar und Taunts; Nachschub alle 12 s.", 0x5ce6ca},
     {"Hummeln im Hintern", "Diese Topfpflanze hat einen Termin.", "Props müssen ihren Platz spätestens nach 7 s um einen Meter verlassen. Wer bleibt, hupt und blinkt für die Sucher.", 0xff9256},
     {"Mondschicht", "Houston, der Karton hebt ab.", "Für beide Teams gilt 40 % Schwerkraft. Höhere Sprünge, lange Flugbahnen und schwebende Granaten.", 0x8cc8ff},
-    {"Wundertüte", "Neue Runde. Neuer Unsinn.", "Jede Runde ein anderer der vier Spezialmodi. Die Regeln werden vor der Jagd eingeblendet; keine direkte Wiederholung.", 0xffd34e},
+    {"Wundertüte", "Neue Runde. Neuer Unsinn.", "Jede Runde ein anderer der fünf Spezialmodi. Die Regeln werden vor der Jagd eingeblendet; keine direkte Wiederholung.", 0xffd34e},
+    {"Dienst nach Vorschrift", "Heute hat die Tarnung einen Job.", "Freiwilliger Teamauftrag: In der richtigen Form 3 Sekunden am Ziel bleiben. Einmal pro Runde entfallen 10 Sekunden Jagdzeit. Die Sucher hören, wo der Auftrag erledigt wurde.", 0x74dcc2},
   };
   return modes[ClampI(mode, 0, MODE_COUNT - 1)];
 }
@@ -107,6 +108,7 @@ enum EventType : u8 {
   EV_MODE_PULSE,    // b=Modus, periodischer Regelwechsel
   EV_CLONE_SWAP,    // a=Spieler
   EV_SHELL,        // a=Spieler, einzelne Schrotpatrone eingesetzt
+  EV_DUTY,         // pos=öffentliche Schallquelle, kein Spielerbezug
 };
 
 enum KillCause : u8 { KILL_SMG = 0, KILL_SHOTGUN, KILL_GRENADE, KILL_PENALTY, KILL_FALL, KILL_INFECT, KILL_RAM, KILL_CRUSH, KILL_PISTOL };
